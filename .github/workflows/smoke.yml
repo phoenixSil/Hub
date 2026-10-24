@@ -1,0 +1,78 @@
+name: Test de fumée
+
+# Démarre le site avec une vraie base SQL Server, parcourt les pages, envoie un devis,
+# se connecte au back-office et publie des captures d'écran sur la branche « apercus ».
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Hub_Smoke_2026!"
+        ports:
+          - 1433:1433
+    env:
+      ConnectionStrings__Hub: "Server=localhost,1433;Database=HubSmoke;User Id=sa;Password=Hub_Smoke_2026!;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      Hub__AdminEmail: "admin@smoke.test"
+      Hub__AdminPassword: "SmokeTest-Password-2026"
+      ASPNETCORE_URLS: "http://localhost:5080"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publier
+        run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release -o publish
+
+      - name: Démarrer le site
+        run: |
+          nohup dotnet publish/Hub.Web.dll > app.log 2>&1 &
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5080/ || true)
+            if [ "$code" = "200" ]; then echo "Site prêt après $i essais"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::Le site n'a pas démarré"
+          grep -E "fail|crit|Exception|error" app.log | head -30 | while read -r line; do echo "::error::$line"; done
+          exit 1
+
+      - name: Parcourir les pages et envoyer un devis
+        run: python3 .github/smoke/smoke.py http://localhost:5080
+
+      - name: Captures d'écran
+        if: always()
+        run: |
+          pip install --quiet playwright==1.49.1
+          python3 -m playwright install --with-deps chromium > /dev/null
+          python3 .github/smoke/screens.py http://localhost:5080 apercus
+
+      - name: Erreurs du journal
+        if: always()
+        run: |
+          grep -E "^(fail|crit)|Unhandled|Exception:" app.log | sort -u | head -40 | while read -r line; do echo "::warning::$line"; done || true
+
+      - name: Publier les captures
+        if: always()
+        run: |
+          [ -d apercus ] || exit 0
+          cp app.log apercus/app.log || true
+          cd apercus
+          git init -q -b apercus
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Captures du test de fumée ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" apercus
