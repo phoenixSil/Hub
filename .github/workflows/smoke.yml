@@ -39,7 +39,7 @@ jobs:
 
       - name: Démarrer le site
         run: |
-          nohup dotnet publish/Hub.Web.dll > app.log 2>&1 &
+          (cd publish && nohup dotnet Hub.Web.dll > ../app.log 2>&1 &)
           for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5080/ || true)
             if [ "$code" = "200" ]; then echo "Site prêt après $i essais"; exit 0; fi

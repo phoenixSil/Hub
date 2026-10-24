@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
+using Microsoft.Extensions.WebEncoders;
 using Hub.Modules.Analytics;
 using Hub.Modules.Catalog;
 using Hub.Modules.Channels;
@@ -25,6 +28,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("La chaîne de connexion « ConnectionStrings:Hub » est absente.");
 
 // Socle
+// Accents écrits tels quels dans le HTML (« é » plutôt que « &#xE9; ») : pages plus légères et lisibles.
+builder.Services.Configure<WebEncoderOptions>(o => o.TextEncoderSettings = new TextEncoderSettings(UnicodeRanges.All));
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ContentCache>();
 builder.Services.AddSingleton(TimeProvider.System);
