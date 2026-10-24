@@ -1,18 +1,20 @@
-name: Générer une migration EF Core
+name: Générer les migrations EF Core
 
-# Lancement manuel : crée une migration pour chaque module dont le modèle a changé
-# et la dépose comme artefact (à valider puis à commiter).
+# Pousser sur la branche « migrations » (ou lancer à la main) : une migration est
+# générée pour chaque module, puis commitée sur cette même branche, prête à fusionner.
+# Le nom vient du fichier .github/next-migration (sinon un horodatage).
 on:
+  push:
+    branches: [migrations]
   workflow_dispatch:
-    inputs:
-      name:
-        description: 'Nom de la migration (ex. Initial, AjoutAvis)'
-        required: true
-        default: 'Initial'
+
+permissions:
+  contents: write
 
 jobs:
   migrations:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[migrations générées]')"
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +23,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Installer dotnet-ef
-        run: dotnet tool install --global dotnet-ef --version 10.*
+        run: dotnet tool install --global dotnet-ef --version "10.*"
 
       - name: Compiler
         run: dotnet build Hub.slnx -c Debug
@@ -29,26 +31,22 @@ jobs:
       - name: Générer les migrations
         run: |
           set -e
-          add() {
-            project=$1; context=$2
-            dotnet ef migrations add "${{ github.event.inputs.name }}" \
-              --project "$project" --startup-project src/Hub.Web \
-              --context "$context" --output-dir Infrastructure/Migrations --no-build || \
-            dotnet ef migrations add "${{ github.event.inputs.name }}" \
-              --project "$project" --startup-project src/Hub.Web \
-              --context "$context" --output-dir Infrastructure/Migrations
-          }
-          add src/Modules/Platform PlatformDbContext
-          add src/Modules/Catalog CatalogDbContext
-          add src/Modules/Content ContentDbContext
-          add src/Modules/Leads LeadsDbContext
-          add src/Modules/Analytics AnalyticsDbContext
-          add src/Modules/Channels ChannelsDbContext
+          NAME=$(cat .github/next-migration 2>/dev/null || echo "Migration$(date -u +%Y%m%d%H%M)")
+          echo "Nom : $NAME"
+          for pair in Platform:PlatformDbContext Catalog:CatalogDbContext Content:ContentDbContext Leads:LeadsDbContext Analytics:AnalyticsDbContext Channels:ChannelsDbContext; do
+            module=${pair%%:*}; context=${pair##*:}
+            dotnet ef migrations add "$NAME" \
+              --project "src/Modules/$module" --startup-project src/Hub.Web \
+              --context "$context" --output-dir Infrastructure/Migrations --no-build
+          done
 
       - name: Vérifier que tout compile avec les migrations
         run: dotnet build Hub.slnx -c Debug
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: migrations
-          path: src/Modules/*/Infrastructure/Migrations/
+      - name: Commiter
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Modules/*/Infrastructure/Migrations
+          git commit -m "Migrations EF Core [migrations générées]" || echo "Rien à commiter"
+          git push

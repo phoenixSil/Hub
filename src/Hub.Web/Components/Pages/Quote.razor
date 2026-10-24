@@ -57,13 +57,13 @@
                             <option value="">Choisir…</option>
                             @foreach (var t in PropertyTypes)
                             {
-                                <option value="@t" selected="@(Model.PropertyType == t)">@t</option>
+                                <option value="@t" selected="@(Model!.PropertyType == t)">@t</option>
                             }
                         </select>
                     </div>
                     <div class="field">
                         <label for="propertySize">Superficie approximative</label>
-                        <input id="propertySize" name="Model.PropertySize" value="@Model.PropertySize" placeholder="ex. 1 200 pi² ou 5 ½" maxlength="80" />
+                        <input id="propertySize" name="Model.PropertySize" value="@Model!.PropertySize" placeholder="ex. 1 200 pi² ou 5 ½" maxlength="80" />
                     </div>
                 </div>
                 <div class="field">
