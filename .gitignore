@@ -10,3 +10,4 @@ TestResults/
 appsettings.*.local.json
 src/Hub.Web/wwwroot/uploads/
 *.db
+src/Hub.Web/App_Data/

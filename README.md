@@ -26,20 +26,30 @@ tests/
 
 Chaque module a son schéma SQL (`platform`, `catalog`, `content`, `leads`, `analytics`, `channels`) et son propre historique de migrations.
 
-## Démarrer en local
+## Démarrer en local (Windows)
 
-Prérequis : SDK .NET 10, SQL Server LocalDB (installé avec Visual Studio).
+Une seule commande, depuis le dossier du dépôt cloné :
 
-```bash
-cd src/Hub.Web
-dotnet user-secrets set "Hub:AdminEmail" "vous@exemple.com"
-dotnet user-secrets set "Hub:AdminPassword" "UnMotDePasseDe12+Caracteres"
-dotnet run
+```powershell
+git clone https://github.com/phoenixSil/Hub.git
+cd Hub
+powershell -ExecutionPolicy Bypass -File .\scripts\installer-local.ps1
 ```
 
-Au démarrage, l'application applique les migrations, crée l'entreprise ScintiNet, le premier administrateur et les données de départ (services, secteurs, FAQ…). Site : https://localhost:7180 — back-office : https://localhost:7180/admin.
+Le script vérifie ou installe le SDK .NET 10, démarre SQL Server LocalDB, approuve le certificat HTTPS de développement,
+demande le courriel et le mot de passe du premier administrateur (stockés dans les secrets utilisateur, jamais dans Git),
+compile, lance les tests puis démarre le site.
 
-Sans clé Resend, les courriels sont écrits dans la console au lieu d'être envoyés.
+| | |
+| --- | --- |
+| Site public | https://localhost:7180 |
+| Back-office | https://localhost:7180/admin |
+| Courriels | `src/Hub.Web/App_Data/courriels/*.html` : chaque courriel est un fichier à ouvrir dans le navigateur, rien n'est envoyé |
+| Base | `(localdb)\MSSQLLocalDB`, base `Hub` (créée et remplie au premier démarrage) |
+
+Options : `-Reinitialiser` (repartir d'une base vide), `-SansTests`, `-SansLancer`.
+
+Dans Visual Studio : ouvrir `Hub.slnx`, choisir le profil **https** de `Hub.Web` et lancer (F5). Il faut avoir exécuté le script une fois pour l'administrateur et le certificat.
 
 ## Configuration (variables d'environnement sur Azure)
 

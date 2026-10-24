@@ -45,10 +45,15 @@ builder.Services
     .AddAnalyticsModule(connectionString)
     .AddChannelsModule(connectionString);
 
-// Courriels : Resend si une clé est fournie, sinon journal.
+// Courriels : Resend si une clé est fournie ; sinon, en local, fichiers .html dans un dossier ; sinon journal.
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection(ResendOptions.Section));
+var devEmailFolder = builder.Configuration["DevEmail:Folder"];
 if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{ResendOptions.Section}:ApiKey"]))
     builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
+else if (!string.IsNullOrWhiteSpace(devEmailFolder))
+    builder.Services.AddSingleton<IEmailSender>(sp => new FileEmailSender(
+        Path.Combine(builder.Environment.ContentRootPath, devEmailFolder),
+        sp.GetRequiredService<ILogger<FileEmailSender>>()));
 else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 
