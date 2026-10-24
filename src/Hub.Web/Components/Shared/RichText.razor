@@ -1,5 +1,6 @@
-@* Affiche un texte simple saisi dans le back-office :
-   ligne vide = nouveau paragraphe, « ## » = intertitre, « - » = élément de liste.
+@* Affiche un texte simple saisi dans le back-office, ligne par ligne :
+   « ## » = intertitre, « ### » = sous-titre, « - » = élément de liste,
+   ligne vide = nouveau paragraphe, **gras**.
    Tout le texte est encodé : aucun HTML saisi n'est interprété. *@
 <div class="rich @Class">@((MarkupString)Render(Text))</div>
 
@@ -10,37 +11,57 @@
     public static string Render(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+
         var sb = new System.Text.StringBuilder();
-        var blocks = text.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+        var paragraph = new List<string>();
+        var inList = false;
 
-        foreach (var raw in blocks)
+        void FlushParagraph()
         {
-            var lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.TrimEnd()).ToArray();
-            if (lines.Length == 0) continue;
+            if (paragraph.Count == 0) return;
+            sb.Append("<p>").Append(string.Join("<br>", paragraph.Select(Inline))).Append("</p>");
+            paragraph.Clear();
+        }
 
-            if (lines.All(l => l.TrimStart().StartsWith("- ")))
+        void CloseList()
+        {
+            if (!inList) return;
+            sb.Append("</ul>");
+            inList = false;
+        }
+
+        foreach (var rawLine in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0)
             {
-                sb.Append("<ul>");
-                foreach (var l in lines) sb.Append("<li>").Append(Inline(l.TrimStart()[2..])).Append("</li>");
-                sb.Append("</ul>");
+                FlushParagraph();
+                CloseList();
             }
-            else if (lines[0].StartsWith("## "))
+            else if (line.StartsWith("### "))
             {
-                sb.Append("<h2>").Append(Inline(lines[0][3..])).Append("</h2>");
-                if (lines.Length > 1)
-                    sb.Append("<p>").Append(string.Join("<br>", lines.Skip(1).Select(Inline))).Append("</p>");
+                FlushParagraph(); CloseList();
+                sb.Append("<h3>").Append(Inline(line[4..])).Append("</h3>");
             }
-            else if (lines[0].StartsWith("### "))
+            else if (line.StartsWith("## "))
             {
-                sb.Append("<h3>").Append(Inline(lines[0][4..])).Append("</h3>");
-                if (lines.Length > 1)
-                    sb.Append("<p>").Append(string.Join("<br>", lines.Skip(1).Select(Inline))).Append("</p>");
+                FlushParagraph(); CloseList();
+                sb.Append("<h2>").Append(Inline(line[3..])).Append("</h2>");
+            }
+            else if (line.StartsWith("- "))
+            {
+                FlushParagraph();
+                if (!inList) { sb.Append("<ul>"); inList = true; }
+                sb.Append("<li>").Append(Inline(line[2..])).Append("</li>");
             }
             else
             {
-                sb.Append("<p>").Append(string.Join("<br>", lines.Select(Inline))).Append("</p>");
+                CloseList();
+                paragraph.Add(line);
             }
         }
+        FlushParagraph();
+        CloseList();
         return sb.ToString();
     }
 

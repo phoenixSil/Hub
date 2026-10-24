@@ -62,6 +62,7 @@ def post_form(path, form_name, fields, expect_redirect):
 # Pages publiques
 get("/", contains="ScintiNet")
 get("/services/nettoyage-residentiel", contains="Nettoyage résidentiel")
+get("/services/nettoyage-residentiel", contains="<li>Dépoussiérage")
 get("/services/entretien-immeubles", contains="immeubles")
 get("/aines/aide-a-domicile", contains="Aide à domicile")
 get("/aines/perte-d-autonomie")

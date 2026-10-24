@@ -40,6 +40,7 @@ p { margin: 0 0 1em; }
 .skip-link { position: absolute; left: -999px; top: 8px; background: var(--ink); color: #fff; padding: 8px 12px; border-radius: 6px; z-index: 100; }
 .skip-link:focus { left: 8px; }
 :focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+h1:focus, h1:focus-visible { outline: none; }
 
 /* Boutons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5em; padding: .75em 1.35em; border-radius: 999px; border: 2px solid transparent;
@@ -70,7 +71,7 @@ p { margin: 0 0 1em; }
 .brand img { height: 46px; width: auto; }
 .main-nav { margin-left: auto; }
 .main-nav > ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.main-nav a { display: inline-flex; align-items: center; gap: 4px; padding: 8px 12px; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 500; font-size: .95rem; }
+.main-nav a { display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; white-space: nowrap; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 500; font-size: .92rem; }
 .main-nav a:hover { background: var(--tint); color: var(--blue-dark); }
 .has-menu { position: relative; }
 .submenu { position: absolute; top: 100%; left: 0; min-width: 280px; list-style: none; margin: 0; padding: 8px; background: #fff; border: 1px solid var(--line);
@@ -122,7 +123,7 @@ p { margin: 0 0 1em; }
 .section-tint { background: var(--tint); }
 .section-head { max-width: 720px; margin: 0 auto 48px; text-align: center; }
 .section-head p { color: var(--muted); font-size: 1.05rem; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 24px; }
 
 .service-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; transition: box-shadow .2s, transform .2s; }
 .service-card:hover { box-shadow: var(--shadow); transform: translateY(-3px); }
@@ -264,7 +265,7 @@ p { margin: 0 0 1em; }
 .consent-inner p { margin-bottom: .6em; }
 .consent-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-@media (max-width: 1080px) {
+@media (max-width: 1240px) {
     .main-nav { display: none; }
     .mobile-nav { display: block; }
     .header-inner { position: relative; }
