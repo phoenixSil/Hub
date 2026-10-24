@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+publish/
+TestResults/
+appsettings.*.local.json
+src/Hub.Web/wwwroot/uploads/
+*.db

@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Hub.SharedKernel/Hub.SharedKernel.csproj" />
+    <Project Path="src/Hub.Web/Hub.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/Platform/Hub.Modules.Platform.csproj" />
+    <Project Path="src/Modules/Catalog/Hub.Modules.Catalog.csproj" />
+    <Project Path="src/Modules/Content/Hub.Modules.Content.csproj" />
+    <Project Path="src/Modules/Leads/Hub.Modules.Leads.csproj" />
+    <Project Path="src/Modules/Leads.Contracts/Hub.Modules.Leads.Contracts.csproj" />
+    <Project Path="src/Modules/Analytics/Hub.Modules.Analytics.csproj" />
+    <Project Path="src/Modules/Channels/Hub.Modules.Channels.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hub.ArchitectureTests/Hub.ArchitectureTests.csproj" />
+    <Project Path="tests/Hub.UnitTests/Hub.UnitTests.csproj" />
+  </Folder>
+</Solution>
