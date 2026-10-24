@@ -65,10 +65,13 @@
         return sb.ToString();
     }
 
-    /// <summary>Encode le texte et rend **gras** en &lt;strong&gt;.</summary>
+    private static readonly System.Text.Encodings.Web.HtmlEncoder Encoder =
+        System.Text.Encodings.Web.HtmlEncoder.Create(System.Text.Unicode.UnicodeRanges.All);
+
+    /// <summary>Encode le texte (accents conservés) et rend **gras** en &lt;strong&gt;.</summary>
     private static string Inline(string s)
     {
-        var encoded = System.Net.WebUtility.HtmlEncode(s.Trim());
+        var encoded = Encoder.Encode(s.Trim());
         var parts = encoded.Split("**");
         if (parts.Length < 3) return encoded;
         var sb = new System.Text.StringBuilder();
