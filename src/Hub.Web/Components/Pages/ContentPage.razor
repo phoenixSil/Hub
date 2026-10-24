@@ -4,40 +4,40 @@
 @inject IContentQueries ContentQueries
 @inject NavigationManager Navigation
 
-@if (tenant is null || page is null)
+@if (tenant is null || current is null)
 {
     return;
 }
 
-<Seo Title="@(page.SeoTitle ?? page.Title)" Description="@(page.SeoDescription ?? page.Lead ?? tenant.Tagline)" SiteName="@tenant.Name" />
+<Seo Title="@(current.SeoTitle ?? current.Title)" Description="@(current.SeoDescription ?? current.Lead ?? tenant.Tagline)" SiteName="@tenant.Name" />
 
 <section class="page-hero page-hero-plain">
     <div class="container narrow">
-        <h1>@page.Title</h1>
-        @if (!string.IsNullOrWhiteSpace(page.Lead))
+        <h1>@current.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(current.Lead))
         {
-            <p class="hero-lead">@page.Lead</p>
+            <p class="hero-lead">@current.Lead</p>
         }
     </div>
 </section>
 
 <section class="section">
     <div class="container narrow">
-        <RichText Text="@Fill(page.Body)" Class="prose" />
-        <p class="muted small">Dernière mise à jour : @page.UpdatedAt.ToString("d MMMM yyyy", CultureInfo.GetCultureInfo("fr-CA"))</p>
+        <RichText Text="@Fill(current.Body)" Class="prose" />
+        <p class="muted small">Dernière mise à jour : @current.UpdatedAt.ToString("d MMMM yyyy", CultureInfo.GetCultureInfo("fr-CA"))</p>
     </div>
 </section>
 
 @code {
     private Tenant? tenant;
-    private Page? page;
+    private Page? current;
 
     protected override async Task OnInitializedAsync()
     {
         tenant = await CurrentTenant.GetAsync();
         var slug = new Uri(Navigation.Uri).AbsolutePath.Trim('/');
-        page = (await ContentQueries.GetAsync()).FindPage(slug);
-        if (page is null) Navigation.NotFound();
+        current = (await ContentQueries.GetAsync()).FindPage(slug);
+        if (current is null) Navigation.NotFound();
     }
 
     /// <summary>Remplace les champs {{Nom}}, {{Courriel}}, etc. par les coordonnées de l'entreprise.</summary>

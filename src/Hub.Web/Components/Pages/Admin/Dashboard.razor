@@ -1,6 +1,6 @@
 @page "/admin"
 @rendermode InteractiveServer
-@inject IDashboardQueries Dashboard
+@inject IDashboardQueries DashboardData
 @inject ILeadService Leads
 
 <PageTitle>Tableau de bord</PageTitle>
@@ -118,7 +118,7 @@ else
 
     private async Task LoadAsync()
     {
-        stats = await Dashboard.GetAsync(days);
+        stats = await DashboardData.GetAsync(days);
         var counts = await Leads.CountByStatusAsync();
         newLeads = counts.GetValueOrDefault(LeadStatus.New);
         recent = await Leads.ListAsync(new LeadListFilter(Take: 8));
