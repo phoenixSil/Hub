@@ -1,0 +1,13 @@
+<div class="faq">
+    @foreach (var item in Items)
+    {
+        <details class="faq-item">
+            <summary>@item.Question <Icon Name="chevron-down" Size="18" Class="faq-chevron" /></summary>
+            <RichText Text="@item.Answer" />
+        </details>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<FaqItem> Items { get; set; } = [];
+}

@@ -1,0 +1,111 @@
+@page "/admin/services"
+@rendermode InteractiveServer
+@inject IRepository<ServiceCategory> Categories
+@inject IRepository<Service> ServicesRepo
+
+<PageTitle>Services</PageTitle>
+
+<CrudEditor T="Service" Title="Services" Context="s"
+            Help="Chaque service a sa page publique. L'adresse (slug) est créée à partir du titre si vous la laissez vide."
+            Query="@(q => q.OrderBy(x => x.CategoryId).ThenBy(x => x.SortOrder))"
+            NewItem="@(() => new Service { CategoryId = categories.FirstOrDefault()?.Id ?? Guid.Empty, SortOrder = 100 })"
+            Validate="ValidateService" BeforeSave="PrepareService">
+    <Header><th>Titre</th><th>Catégorie</th><th>Ordre</th><th>Visible</th></Header>
+    <Row>
+        <td><a href="@($"/{CategoryOf(s.CategoryId)?.RouteSegment}/{s.Slug}")" target="_blank">@s.Title</a></td>
+        <td>@(CategoryOf(s.CategoryId)?.Name)</td>
+        <td>@s.SortOrder</td>
+        <td>@(s.IsActive ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Titre</label><InputText @bind-Value="s.Title" /></div>
+            <div class="field">
+                <label>Catégorie</label>
+                <InputSelect @bind-Value="s.CategoryId">
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Adresse de la page (slug)</label><InputText @bind-Value="s.Slug" placeholder="ex. nettoyage-residentiel" /></div>
+            <div class="field">
+                <label>Icône</label>
+                <InputSelect @bind-Value="s.Icon">
+                    @foreach (var name in Icon.Names)
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="s.SortOrder" /></div>
+        </div>
+        <div class="field"><label>Résumé (cartes et haut de page, 1 ou 2 phrases)</label><InputTextArea rows="2" @bind-Value="s.Summary" /></div>
+        <div class="field">
+            <label>Contenu de la page</label>
+            <InputTextArea rows="12" @bind-Value="s.Body" />
+            <span class="hint">Ligne vide = nouveau paragraphe · « ## Titre » = intertitre · « - » en début de ligne = liste · **gras**</span>
+        </div>
+        <div class="field"><label>Image</label><ImagePicker @bind-Value="s.ImageUrl" /></div>
+        <div class="field-row">
+            <div class="field"><label>Titre pour Google (60 caractères max.)</label><InputText @bind-Value="s.SeoTitle" maxlength="70" /></div>
+            <div class="field"><label>Description pour Google (155 caractères max.)</label><InputText @bind-Value="s.SeoDescription" maxlength="170" /></div>
+        </div>
+        <div class="field-row">
+            <label class="check"><InputCheckbox @bind-Value="s.IsActive" /> Visible sur le site</label>
+            <label class="check"><InputCheckbox @bind-Value="s.ShowInQuoteForm" /> Proposé dans le formulaire de devis</label>
+        </div>
+    </Form>
+</CrudEditor>
+
+<CrudEditor T="ServiceCategory" Title="Catégories" Context="c"
+            Help="« Segment d'adresse » : services → /services/…, aines → /aines/…"
+            Query="@(q => q.OrderBy(x => x.SortOrder))" BeforeSave="PrepareCategory">
+    <Header><th>Nom</th><th>Segment</th><th>Ordre</th></Header>
+    <Row><td>@c.Name</td><td>/@c.RouteSegment</td><td>@c.SortOrder</td></Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Nom</label><InputText @bind-Value="c.Name" /></div>
+            <div class="field"><label>Ancre sur l'accueil (slug)</label><InputText @bind-Value="c.Slug" /></div>
+            <div class="field"><label>Segment d'adresse</label><InputText @bind-Value="c.RouteSegment" /></div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="c.SortOrder" /></div>
+        </div>
+        <div class="field"><label>Introduction</label><InputTextArea rows="2" @bind-Value="c.Intro" /></div>
+    </Form>
+</CrudEditor>
+
+<PricingAdmin Services="services" />
+
+@code {
+    private List<ServiceCategory> categories = [];
+    private List<Service> services = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await Categories.ListAsync(q => q.OrderBy(x => x.SortOrder));
+        services = await ServicesRepo.ListAsync(q => q.OrderBy(x => x.Title));
+    }
+
+    private ServiceCategory? CategoryOf(Guid id) => categories.FirstOrDefault(c => c.Id == id);
+
+    private string? ValidateService(Service s) =>
+        string.IsNullOrWhiteSpace(s.Title) ? "Le titre est obligatoire."
+        : s.CategoryId == Guid.Empty ? "Choisissez une catégorie."
+        : null;
+
+    private Task PrepareService(Service s)
+    {
+        s.Slug = Hub.SharedKernel.Text.Slug.From(string.IsNullOrWhiteSpace(s.Slug) ? s.Title : s.Slug);
+        return Task.CompletedTask;
+    }
+
+    private Task PrepareCategory(ServiceCategory c)
+    {
+        c.Slug = Hub.SharedKernel.Text.Slug.From(string.IsNullOrWhiteSpace(c.Slug) ? c.Name : c.Slug);
+        c.RouteSegment = Hub.SharedKernel.Text.Slug.From(c.RouteSegment);
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>hub-web-7f3c2a91</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hub.SharedKernel\Hub.SharedKernel.csproj" />
+    <ProjectReference Include="..\Modules\Platform\Hub.Modules.Platform.csproj" />
+    <ProjectReference Include="..\Modules\Catalog\Hub.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\Modules\Content\Hub.Modules.Content.csproj" />
+    <ProjectReference Include="..\Modules\Leads\Hub.Modules.Leads.csproj" />
+    <ProjectReference Include="..\Modules\Analytics\Hub.Modules.Analytics.csproj" />
+    <ProjectReference Include="..\Modules\Channels\Hub.Modules.Channels.csproj" />
+  </ItemGroup>
+</Project>

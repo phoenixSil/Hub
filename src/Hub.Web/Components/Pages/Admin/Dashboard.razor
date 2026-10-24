@@ -1,0 +1,126 @@
+@page "/admin"
+@rendermode InteractiveServer
+@inject IDashboardQueries Dashboard
+@inject ILeadService Leads
+
+<PageTitle>Tableau de bord</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Tableau de bord</h1>
+        <p class="muted">Les @days derniers jours. Les visites sont enregistrées par lots, toutes les 2 minutes.</p>
+    </div>
+    <div class="segmented">
+        @foreach (var d in new[] { 7, 30, 90 })
+        {
+            <button class="@(days == d ? "active" : null)" @onclick="() => ChangeAsync(d)">@d jours</button>
+        }
+    </div>
+</div>
+
+@if (stats is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    <div class="kpi-grid">
+        <div class="kpi kpi-accent"><span>Nouvelles demandes à traiter</span><strong>@newLeads</strong><a href="/admin/demandes?statut=New">Voir</a></div>
+        <div class="kpi"><span>Demandes reçues</span><strong>@stats.Leads</strong></div>
+        <div class="kpi"><span>Pages vues</span><strong>@stats.PageViews.ToString("N0", Fr)</strong></div>
+        <div class="kpi"><span>Demandes pour 100 pages vues</span><strong>@stats.ConversionRate.ToString("0.0", Fr)</strong></div>
+        <div class="kpi"><span>Clics sur le téléphone</span><strong>@stats.PhoneClicks</strong></div>
+        <div class="kpi"><span>Clics courriel et WhatsApp</span><strong>@(stats.EmailClicks + stats.WhatsAppClicks)</strong></div>
+    </div>
+
+    <div class="admin-card">
+        <h2>Pages vues et demandes par jour</h2>
+        @{
+            var maxViews = Math.Max(1, stats.Daily.Max(p => p.PageViews));
+        }
+        <div class="bar-chart" role="img" aria-label="Pages vues par jour">
+            @foreach (var p in stats.Daily)
+            {
+                <div class="bar-col" title="@p.Day.ToString("d MMM", Fr) : @p.PageViews pages vues, @p.Leads demandes">
+                    <div class="bar" style="height:@((100.0 * p.PageViews / maxViews).ToString("0.#", CultureInfo.InvariantCulture))%"></div>
+                    @if (p.Leads > 0)
+                    {
+                        <span class="bar-lead">@p.Leads</span>
+                    }
+                </div>
+            }
+        </div>
+        <div class="bar-axis"><span>@stats.From.ToString("d MMM", Fr)</span><span>@stats.To.ToString("d MMM", Fr)</span></div>
+        <p class="muted small">Barre : pages vues. Pastille verte : demandes reçues ce jour-là.</p>
+    </div>
+
+    <div class="admin-columns">
+        <div class="admin-card">
+            <h2>Provenance des visiteurs</h2>
+            @if (stats.Sources.Count == 0)
+            {
+                <p class="muted">Pas encore de données.</p>
+            }
+            else
+            {
+                <table class="admin-table">
+                    <thead><tr><th>Source</th><th class="num">Pages vues</th><th class="num">Demandes</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in stats.Sources)
+                        {
+                            <tr><td>@s.Source</td><td class="num">@s.PageViews</td><td class="num">@s.Leads</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <div class="admin-card">
+            <h2>Pages les plus vues</h2>
+            @if (stats.TopPages.Count == 0)
+            {
+                <p class="muted">Pas encore de données.</p>
+            }
+            else
+            {
+                <table class="admin-table">
+                    <thead><tr><th>Page</th><th class="num">Vues</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in stats.TopPages)
+                        {
+                            <tr><td><a href="@p.Path" target="_blank">@p.Path</a></td><td class="num">@p.PageViews</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <div class="admin-card">
+        <div class="card-head"><h2>Dernières demandes</h2><a href="/admin/demandes">Toutes les demandes</a></div>
+        <LeadTable Items="recent" />
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
+    private int days = 30;
+    private DashboardStats? stats;
+    private int newLeads;
+    private List<Lead> recent = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ChangeAsync(int d)
+    {
+        days = d;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        stats = await Dashboard.GetAsync(days);
+        var counts = await Leads.CountByStatusAsync();
+        newLeads = counts.GetValueOrDefault(LeadStatus.New);
+        recent = await Leads.ListAsync(new LeadListFilter(Take: 8));
+    }
+}

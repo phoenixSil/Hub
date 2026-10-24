@@ -1,0 +1,131 @@
+@page "/contact"
+@inject ICurrentTenant CurrentTenant
+@inject ILeadService Leads
+@inject TurnstileVerifier Turnstile
+@inject NavigationManager Navigation
+
+@if (tenant is null)
+{
+    return;
+}
+
+<Seo Title="Nous joindre" Description="@($"Écrivez ou téléphonez à {tenant.Name} : {tenant.Phone}, {tenant.PublicEmail}.")" SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <h1>Nous joindre</h1>
+        <p class="hero-lead">Une question, un besoin particulier ? Écrivez-nous, nous répondons dans un délai d'un jour ouvrable.</p>
+    </div>
+</section>
+
+<section class="section section-form">
+    <div class="container form-layout">
+        <form method="post" @formname="contact" @onsubmit="SubmitAsync" class="lead-form" data-track-form="contact" novalidate>
+            <AntiforgeryToken />
+            @if (error is not null)
+            {
+                <div class="alert alert-error" role="alert">@error</div>
+            }
+            <div class="field-row">
+                <div class="field">
+                    <label for="name">Nom complet <span class="req">*</span></label>
+                    <input id="name" name="Model.FullName" value="@Model!.FullName" autocomplete="name" required maxlength="160" />
+                    <FieldError For="FullName" Errors="errors" />
+                </div>
+                <div class="field">
+                    <label for="phone">Téléphone</label>
+                    <input id="phone" name="Model.Phone" value="@Model.Phone" type="tel" autocomplete="tel" maxlength="40" />
+                    <FieldError For="Phone" Errors="errors" />
+                </div>
+            </div>
+            <div class="field">
+                <label for="email">Courriel <span class="req">*</span></label>
+                <input id="email" name="Model.Email" value="@Model.Email" type="email" autocomplete="email" required maxlength="256" />
+                <FieldError For="Email" Errors="errors" />
+            </div>
+            <div class="field">
+                <label for="subject">Sujet</label>
+                <input id="subject" name="Model.Subject" value="@Model.Subject" maxlength="200" />
+            </div>
+            <div class="field">
+                <label for="message">Message <span class="req">*</span></label>
+                <textarea id="message" name="Model.Message" rows="6" required maxlength="4000">@Model.Message</textarea>
+                <FieldError For="Message" Errors="errors" />
+            </div>
+            <FormExtras ModelName="Model" Consent="Model.ConsentGiven" TenantName="@tenant.Name" Errors="errors" />
+            <button type="submit" class="btn btn-primary btn-lg">Envoyer le message</button>
+        </form>
+
+        <aside class="aside-card contact-card">
+            <h2>Coordonnées</h2>
+            <ul class="contact-list">
+                <li><Icon Name="phone" Size="18" /> <a href="@SiteFormat.PhoneHref(tenant.Phone)">@tenant.Phone</a></li>
+                <li><Icon Name="mail" Size="18" /> <a href="mailto:@tenant.PublicEmail">@tenant.PublicEmail</a></li>
+                @if (SiteFormat.WhatsAppHref(tenant.WhatsAppNumber) is { } wa)
+                {
+                    <li><Icon Name="whatsapp" Size="18" /> <a href="@wa" target="_blank" rel="noopener">WhatsApp</a></li>
+                }
+                <li>
+                    <Icon Name="map-pin" Size="18" />
+                    <span>@(tenant.ShowStreetAddress && !string.IsNullOrWhiteSpace(tenant.StreetAddress) ? $"{tenant.StreetAddress}, " : "")@SiteFormat.LocalityLine(tenant)</span>
+                </li>
+                @if (!string.IsNullOrWhiteSpace(tenant.BusinessHours))
+                {
+                    <li><Icon Name="clock" Size="18" /> <span>@tenant.BusinessHours</span></li>
+                }
+            </ul>
+            @if (!string.IsNullOrWhiteSpace(tenant.BusinessNumber))
+            {
+                <p class="muted small">NEQ : @tenant.BusinessNumber</p>
+            }
+        </aside>
+    </div>
+</section>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "contact")] private ContactForm? Model { get; set; }
+
+    private Tenant? tenant;
+    private IReadOnlyDictionary<string, string>? errors;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        Model ??= new ContactForm();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (LeadRequest.IsSpam(Model!.Website))
+        {
+            Navigation.NavigateTo("/merci?demande=contact");
+            return;
+        }
+        if (!await Turnstile.VerifyAsync(HttpContext))
+        {
+            error = "La vérification anti-robot a échoué. Réessayez ou appelez-nous.";
+            return;
+        }
+
+        var result = await Leads.SubmitAsync(new LeadSubmission
+        {
+            Kind = LeadKind.Contact,
+            FullName = Model.FullName,
+            Email = Model.Email,
+            Phone = Model.Phone,
+            Subject = Model.Subject,
+            Message = Model.Message,
+            ConsentGiven = Model.ConsentGiven,
+        }.WithVisit(HttpContext));
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/merci?demande=contact");
+            return;
+        }
+        errors = result.FieldErrors;
+        error = result.FieldErrors.Count > 0 ? "Vérifiez les champs indiqués ci-dessous." : result.Error;
+    }
+}

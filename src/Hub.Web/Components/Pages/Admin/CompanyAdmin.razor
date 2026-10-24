@@ -1,0 +1,119 @@
+@page "/admin/entreprise"
+@rendermode InteractiveServer
+@inject ICurrentTenant CurrentTenant
+@inject ITenantStore Store
+@inject Hub.SharedKernel.Caching.ContentCache Cache
+
+<PageTitle>Entreprise</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Entreprise</h1>
+        <p class="muted">Coordonnées, identité et réglages affichés partout sur le site et dans les courriels.</p>
+    </div>
+</div>
+
+@if (message is not null)
+{
+    <div class="alert @(messageIsError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (tenant is not null)
+{
+    <EditForm Model="tenant" OnValidSubmit="SaveAsync" class="admin-form">
+        <div class="admin-card">
+            <h2>Identité</h2>
+            <div class="field-row">
+                <div class="field"><label>Nom</label><InputText @bind-Value="tenant.Name" /></div>
+                <div class="field"><label>Slogan</label><InputText @bind-Value="tenant.Tagline" /></div>
+            </div>
+            <div class="field"><label>Phrase de présentation (pied de page)</label><InputTextArea rows="2" @bind-Value="tenant.ServiceAreaSummary" /></div>
+            <div class="field"><label>Logo</label><ImagePicker @bind-Value="tenant.LogoUrl" /></div>
+            <div class="field-row">
+                <div class="field"><label>Couleur principale</label><InputText type="color" @bind-Value="tenant.PrimaryColor" /></div>
+                <div class="field"><label>Couleur secondaire</label><InputText type="color" @bind-Value="tenant.SecondaryColor" /></div>
+                <div class="field"><label>Couleur d'accent</label><InputText type="color" @bind-Value="tenant.AccentColor" /></div>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <h2>Coordonnées</h2>
+            <div class="field-row">
+                <div class="field"><label>Téléphone</label><InputText @bind-Value="tenant.Phone" /></div>
+                <div class="field"><label>Courriel public</label><InputText @bind-Value="tenant.PublicEmail" /></div>
+                <div class="field"><label>WhatsApp (numéro)</label><InputText @bind-Value="tenant.WhatsAppNumber" /></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Adresse</label><InputText @bind-Value="tenant.StreetAddress" /></div>
+                <div class="field"><label>Ville</label><InputText @bind-Value="tenant.City" /></div>
+                <div class="field"><label>Province</label><InputText @bind-Value="tenant.Region" /></div>
+                <div class="field"><label>Code postal</label><InputText @bind-Value="tenant.PostalCode" /></div>
+            </div>
+            <label class="check"><InputCheckbox @bind-Value="tenant.ShowStreetAddress" /> Afficher l'adresse complète sur le site (sinon seulement la ville)</label>
+            <div class="field-row">
+                <div class="field"><label>NEQ</label><InputText @bind-Value="tenant.BusinessNumber" /></div>
+                <div class="field"><label>Heures d'ouverture</label><InputText @bind-Value="tenant.BusinessHours" placeholder="Lun. au ven. 8 h – 18 h · sam. 9 h – 16 h" /></div>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <h2>Réseaux sociaux et Google</h2>
+            <div class="field-row">
+                <div class="field"><label>Facebook</label><InputText @bind-Value="tenant.FacebookUrl" /></div>
+                <div class="field"><label>Instagram</label><InputText @bind-Value="tenant.InstagramUrl" /></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>YouTube</label><InputText @bind-Value="tenant.YouTubeUrl" /></div>
+                <div class="field"><label>TikTok</label><InputText @bind-Value="tenant.TikTokUrl" /></div>
+            </div>
+            <div class="field"><label>Fiche Google (lien vers les avis)</label><InputText @bind-Value="tenant.GoogleBusinessUrl" /></div>
+            <p class="hint">Un réseau sans adresse n'est pas affiché : fini les icônes qui ne mènent nulle part.</p>
+        </div>
+
+        <div class="admin-card">
+            <h2>Courriels et conformité</h2>
+            <div class="field-row">
+                <div class="field"><label>Courriel qui reçoit les demandes</label><InputText @bind-Value="tenant.AdminNotificationEmail" /></div>
+                <div class="field"><label>Adresse du site (pour les liens dans les courriels)</label><InputText @bind-Value="tenant.SiteUrl" placeholder="https://www.scintinet.com" /></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Responsable de la protection des renseignements personnels</label><InputText @bind-Value="tenant.PrivacyOfficerName" /></div>
+                <div class="field"><label>Son courriel</label><InputText @bind-Value="tenant.PrivacyOfficerEmail" /></div>
+            </div>
+            <div class="field"><label>Domaines servis (séparés par des virgules)</label><InputText @bind-Value="tenant.Domains" /></div>
+        </div>
+
+        <div class="admin-actions sticky-actions">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private Tenant? tenant;
+    private string? message;
+    private bool messageIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var current = await CurrentTenant.GetAsync();
+        // Copie de travail : l'objet en cache n'est modifié qu'à l'enregistrement.
+        tenant = System.Text.Json.JsonSerializer.Deserialize<Tenant>(System.Text.Json.JsonSerializer.Serialize(current));
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await Store.SaveAsync(tenant!);
+            Cache.Invalidate();
+            message = "Enregistré. Le site est à jour.";
+            messageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            message = "Enregistrement impossible : " + ex.Message;
+            messageIsError = true;
+        }
+    }
+}

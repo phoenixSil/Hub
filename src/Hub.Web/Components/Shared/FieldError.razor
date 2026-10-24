@@ -1,0 +1,9 @@
+@if (Errors is not null && Errors.TryGetValue(For, out var message))
+{
+    <span class="field-error" id="err-@For" role="alert">@message</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string For { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyDictionary<string, string>? Errors { get; set; }
+}

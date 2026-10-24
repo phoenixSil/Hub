@@ -1,0 +1,24 @@
+@page "/admin/images"
+@rendermode InteractiveServer
+
+<PageTitle>Images</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Images</h1>
+        <p class="muted">Téléversez une photo : elle est convertie en WebP et redimensionnée (1 600 px de large au plus). Copiez ensuite son adresse là où vous en avez besoin.</p>
+    </div>
+</div>
+
+<div class="admin-card">
+    <ImagePicker @bind-Value="url" />
+    @if (!string.IsNullOrWhiteSpace(url))
+    {
+        <p>Adresse de l'image : <code>@url</code></p>
+    }
+    <p class="hint">Conseil : de vraies photos de vos interventions (avec l'accord des clients) inspirent bien plus confiance que des images génériques.</p>
+</div>
+
+@code {
+    private string? url;
+}

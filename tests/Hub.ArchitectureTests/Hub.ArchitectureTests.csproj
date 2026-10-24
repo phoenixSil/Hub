@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Platform\Hub.Modules.Platform.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Hub.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Content\Hub.Modules.Content.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Leads\Hub.Modules.Leads.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Analytics\Hub.Modules.Analytics.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Channels\Hub.Modules.Channels.csproj" />
+  </ItemGroup>
+</Project>

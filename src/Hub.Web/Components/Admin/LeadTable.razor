@@ -1,0 +1,30 @@
+@if (!Items.Any())
+{
+    <p class="muted">Aucune demande.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr><th>Reçue</th><th>Type</th><th>Nom</th><th>Services / sujet</th><th>Statut</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Items)
+                {
+                    <tr class="@(l.Status == LeadStatus.New ? "row-new" : null)">
+                        <td class="nowrap">@AdminFormat.Local(l.CreatedAt)</td>
+                        <td><span class="tag tag-@l.Kind.ToString().ToLowerInvariant()">@LeadLabels.Of(l.Kind)</span></td>
+                        <td><a href="/admin/demandes/@l.Id">@l.FullName</a></td>
+                        <td class="truncate">@(l.Services ?? l.Subject ?? l.Message)</td>
+                        <td><span class="status status-@l.Status.ToString().ToLowerInvariant()">@LeadLabels.Of(l.Status)</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<Lead> Items { get; set; } = [];
+}

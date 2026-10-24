@@ -1,0 +1,44 @@
+@page "/admin/faq"
+@rendermode InteractiveServer
+@inject IRepository<Service> ServicesRepo
+
+<PageTitle>FAQ</PageTitle>
+
+<CrudEditor T="FaqItem" Title="Questions fréquentes" Context="f"
+            Help="Une question liée à un service s'affiche sur la page de ce service ; les autres vont sur la page FAQ et l'accueil."
+            Query="@(q => q.OrderBy(x => x.SortOrder))"
+            NewItem="@(() => new FaqItem { SortOrder = 100 })"
+            Validate="@(f => string.IsNullOrWhiteSpace(f.Question) || string.IsNullOrWhiteSpace(f.Answer) ? "La question et la réponse sont obligatoires." : null)">
+    <Header><th>Question</th><th>Service</th><th>Ordre</th><th>Visible</th></Header>
+    <Row>
+        <td>@f.Question</td>
+        <td>@(services.FirstOrDefault(s => s.Slug == f.ServiceSlug)?.Title ?? "Générale")</td>
+        <td>@f.SortOrder</td>
+        <td>@(f.IsActive ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field"><label>Question</label><InputText @bind-Value="f.Question" /></div>
+        <div class="field"><label>Réponse</label><InputTextArea rows="5" @bind-Value="f.Answer" /></div>
+        <div class="field-row">
+            <div class="field">
+                <label>Service lié</label>
+                <InputSelect @bind-Value="f.ServiceSlug">
+                    <option value="">Question générale</option>
+                    @foreach (var s in services)
+                    {
+                        <option value="@s.Slug">@s.Title</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="f.SortOrder" /></div>
+        </div>
+        <label class="check"><InputCheckbox @bind-Value="f.IsActive" /> Visible sur le site</label>
+    </Form>
+</CrudEditor>
+
+@code {
+    private List<Service> services = [];
+
+    protected override async Task OnInitializedAsync() =>
+        services = await ServicesRepo.ListAsync(q => q.OrderBy(x => x.Title));
+}

@@ -1,0 +1,22 @@
+@page "/erreur"
+@using System.Diagnostics
+
+<PageTitle>Erreur</PageTitle>
+<HeadContent><meta name="robots" content="noindex" /></HeadContent>
+
+<section class="section">
+    <div class="container narrow center">
+        <h1>Oups, un problème est survenu</h1>
+        <p class="lead-text">Réessayez dans un instant. Si le problème persiste, appelez-nous : votre demande compte pour nous.</p>
+        @if (RequestId is not null)
+        {
+            <p class="muted small">Référence : <code>@RequestId</code></p>
+        }
+        <a class="btn btn-primary" href="/">Retour à l'accueil</a>
+    </div>
+</section>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    private string? RequestId => Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

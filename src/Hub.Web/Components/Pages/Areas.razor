@@ -1,0 +1,44 @@
+@page "/secteurs"
+@inject ICurrentTenant CurrentTenant
+@inject IContentQueries ContentQueries
+
+@if (tenant is null || site is null)
+{
+    return;
+}
+
+<Seo Title="@($"Secteurs desservis à {tenant.City}")"
+     Description="@($"{tenant.Name} se déplace dans {site.Areas.Count} secteurs de {tenant.City} : entretien ménager, nettoyage et aide à domicile pour les aînés.")"
+     SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <h1>Secteurs desservis</h1>
+        <p class="hero-lead">Nous nous déplaçons chez vous partout dans @tenant.City. Choisissez votre quartier.</p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <ul class="area-grid">
+            @foreach (var a in site.Areas)
+            {
+                <li><a href="/secteurs/@a.Slug"><Icon Name="map-pin" Size="18" /> <span>@a.Name</span></a></li>
+            }
+        </ul>
+        <p class="center muted">Votre secteur n'est pas dans la liste ? <a href="/contact">Écrivez-nous</a> : nous évaluerons la possibilité de nous déplacer.</p>
+    </div>
+</section>
+
+<CtaBand Phone="@tenant.Phone" />
+
+@code {
+    private Tenant? tenant;
+    private SiteContent? site;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        site = await ContentQueries.GetAsync();
+    }
+}

@@ -1,0 +1,53 @@
+@page "/admin/offres"
+@rendermode InteractiveServer
+
+<PageTitle>Offres du carrousel</PageTitle>
+
+<CrudEditor T="Promotion" Title="Offres du carrousel"  Context="p"
+            Help="Diapositives qui suivent la bannière d'accueil. Avec des dates, l'offre apparaît et disparaît toute seule (ex. grand ménage du printemps)."
+            Query="@(q => q.OrderBy(x => x.SortOrder))"
+            NewItem="@(() => new Promotion { SortOrder = 100 })"
+            Validate="@(p => string.IsNullOrWhiteSpace(p.Title) ? "Le titre est obligatoire." : null)">
+    <Header><th>Offre</th><th>Période</th><th>Ordre</th><th>Active</th></Header>
+    <Row>
+        <td>@p.Title @p.Highlight</td>
+        <td>@Period(p)</td>
+        <td>@p.SortOrder</td>
+        <td>@(p.IsActive ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Étiquette</label><InputText @bind-Value="p.Badge" placeholder="ex. Offre de printemps" /></div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="p.SortOrder" /></div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Titre</label><InputText @bind-Value="p.Title" /></div>
+            <div class="field"><label>Fin du titre en couleur</label><InputText @bind-Value="p.Highlight" /></div>
+        </div>
+        <div class="field"><label>Texte</label><InputTextArea rows="3" @bind-Value="p.Text" /></div>
+        <div class="field"><label>Image de fond</label><ImagePicker @bind-Value="p.ImageUrl" /></div>
+        <div class="field-row">
+            <div class="field"><label>Bouton principal</label><InputText @bind-Value="p.PrimaryLabel" /></div>
+            <div class="field"><label>Lien</label><InputText @bind-Value="p.PrimaryUrl" /></div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Bouton secondaire (facultatif)</label><InputText @bind-Value="p.SecondaryLabel" /></div>
+            <div class="field"><label>Lien</label><InputText @bind-Value="p.SecondaryUrl" /></div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Début (facultatif)</label><InputDate @bind-Value="p.StartsOn" /></div>
+            <div class="field"><label>Fin (facultatif)</label><InputDate @bind-Value="p.EndsOn" /></div>
+        </div>
+        <label class="check"><InputCheckbox @bind-Value="p.IsActive" /> Active</label>
+    </Form>
+</CrudEditor>
+
+@code {
+    private static string Period(Promotion p) => (p.StartsOn, p.EndsOn) switch
+    {
+        (null, null) => "Toujours",
+        ({ } s, null) => $"Dès le {s.ToString("d MMM yyyy", AdminFormat.Fr)}",
+        (null, { } e) => $"Jusqu'au {e.ToString("d MMM yyyy", AdminFormat.Fr)}",
+        ({ } s, { } e) => $"{s.ToString("d MMM", AdminFormat.Fr)} au {e.ToString("d MMM yyyy", AdminFormat.Fr)}",
+    };
+}

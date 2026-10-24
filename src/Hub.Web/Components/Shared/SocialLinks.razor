@@ -1,0 +1,21 @@
+@if (!string.IsNullOrWhiteSpace(Tenant.FacebookUrl))
+{
+    <a href="@Tenant.FacebookUrl" target="_blank" rel="noopener" aria-label="Facebook"><Icon Name="facebook" Size="Size" /></a>
+}
+@if (!string.IsNullOrWhiteSpace(Tenant.InstagramUrl))
+{
+    <a href="@Tenant.InstagramUrl" target="_blank" rel="noopener" aria-label="Instagram"><Icon Name="instagram" Size="Size" /></a>
+}
+@if (!string.IsNullOrWhiteSpace(Tenant.YouTubeUrl))
+{
+    <a href="@Tenant.YouTubeUrl" target="_blank" rel="noopener" aria-label="YouTube"><Icon Name="youtube" Size="Size" /></a>
+}
+@if (SiteFormat.WhatsAppHref(Tenant.WhatsAppNumber) is { } wa)
+{
+    <a href="@wa" target="_blank" rel="noopener" aria-label="WhatsApp"><Icon Name="whatsapp" Size="Size" /></a>
+}
+
+@code {
+    [Parameter, EditorRequired] public Tenant Tenant { get; set; } = default!;
+    [Parameter] public int Size { get; set; } = 16;
+}

@@ -1,0 +1,44 @@
+@inherits LayoutComponentBase
+
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <a href="/admin" class="admin-brand">
+            <img src="/images/site/logo.png" alt="" width="132" height="42" />
+            <span>Back-office</span>
+        </a>
+        <nav aria-label="Back-office">
+            <p class="admin-nav-group">Suivi</p>
+            <NavLink href="/admin" Match="NavLinkMatch.All">Tableau de bord</NavLink>
+            <NavLink href="/admin/demandes">Demandes</NavLink>
+            <NavLink href="/admin/horaires">Disponibilités</NavLink>
+
+            <p class="admin-nav-group">Site</p>
+            <NavLink href="/admin/services">Services</NavLink>
+            <NavLink href="/admin/secteurs">Secteurs</NavLink>
+            <NavLink href="/admin/offres">Offres du carrousel</NavLink>
+            <NavLink href="/admin/faq">FAQ</NavLink>
+            <NavLink href="/admin/avis">Avis clients</NavLink>
+            <NavLink href="/admin/textes">Textes de l'accueil</NavLink>
+            <NavLink href="/admin/pages">Pages</NavLink>
+            <NavLink href="/admin/images">Images</NavLink>
+
+            <p class="admin-nav-group">Réglages</p>
+            <NavLink href="/admin/entreprise">Entreprise</NavLink>
+            <NavLink href="/admin/canaux">Canaux</NavLink>
+        </nav>
+        <div class="admin-sidebar-foot">
+            <a href="/" target="_blank">Voir le site ↗</a>
+            <form method="post" action="/compte/deconnexion">
+                <AntiforgeryToken />
+                <button type="submit" class="link-button">Se déconnecter</button>
+            </form>
+        </div>
+    </aside>
+    <main class="admin-main">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" class="admin-error" hidden>
+    Une erreur est survenue. <a href="" class="reload">Recharger la page</a>
+</div>

@@ -1,0 +1,174 @@
+@page "/admin/demandes/{Id:guid}"
+@rendermode InteractiveServer
+@inject ILeadService Leads
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Demande</PageTitle>
+
+@if (detail is null)
+{
+    <p class="muted">@(notFound ? "Demande introuvable." : "Chargement…")</p>
+    return;
+}
+
+@{ var l = detail.Lead; }
+
+<div class="admin-head">
+    <div>
+        <p class="muted small"><a href="/admin/demandes">← Demandes</a></p>
+        <h1>@l.FullName</h1>
+        <p class="muted">
+            <span class="tag tag-@l.Kind.ToString().ToLowerInvariant()">@LeadLabels.Of(l.Kind)</span>
+            reçue le @AdminFormat.Local(l.CreatedAt, "dddd d MMMM yyyy 'à' HH:mm")
+        </p>
+    </div>
+    <div class="status-picker">
+        <label for="status">Statut</label>
+        <select id="status" value="@l.Status" @onchange="ChangeStatusAsync">
+            @foreach (var s in Enum.GetValues<LeadStatus>())
+            {
+                <option value="@s">@LeadLabels.Of(s)</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (message is not null)
+{
+    <div class="alert @(messageIsError ? "alert-error" : "alert-success")">@message</div>
+}
+
+<div class="admin-columns">
+    <div class="admin-card">
+        <h2>Coordonnées</h2>
+        <dl class="details">
+            <dt>Courriel</dt><dd><a href="mailto:@l.Email">@l.Email</a></dd>
+            @if (l.Phone is not null) { <dt>Téléphone</dt><dd><a href="tel:@l.Phone">@l.Phone</a></dd> }
+            @if (l.Address is not null) { <dt>Adresse</dt><dd>@l.Address</dd> }
+            @if (l.AreaSlug is not null) { <dt>Secteur</dt><dd>@l.AreaSlug</dd> }
+        </dl>
+
+        <h2>Demande</h2>
+        <dl class="details">
+            @if (l.Services is not null) { <dt>Services</dt><dd>@l.Services</dd> }
+            @if (l.PropertyType is not null) { <dt>Propriété</dt><dd>@l.PropertyType</dd> }
+            @if (l.PropertySize is not null) { <dt>Superficie</dt><dd>@l.PropertySize</dd> }
+            @if (l.Frequency is not null) { <dt>Fréquence</dt><dd>@l.Frequency</dd> }
+            @if (l.Subject is not null) { <dt>Sujet</dt><dd>@l.Subject</dd> }
+            @if (l.PreferredDate is { } d)
+            {
+                <dt>Date souhaitée</dt>
+                <dd>@d.ToString("dddd d MMMM yyyy", AdminFormat.Fr)@(l.PreferredSlot is { } s ? ", " + LeadLabels.Of(s) : "")</dd>
+            }
+            @if (l.ConfirmedFor is { } c) { <dt>Rendez-vous confirmé</dt><dd><strong>@AdminFormat.Local(c, "dddd d MMMM yyyy 'à' HH:mm")</strong></dd> }
+        </dl>
+        @if (l.Message is not null)
+        {
+            <div class="message-box">@l.Message</div>
+        }
+
+        <h2>Provenance</h2>
+        <dl class="details">
+            <dt>Source</dt><dd>@(l.Source ?? "Directe ou inconnue") @(l.Medium is null ? "" : $"({l.Medium})")</dd>
+            @if (l.Campaign is not null) { <dt>Campagne</dt><dd>@l.Campaign</dd> }
+            @if (l.LandingPage is not null) { <dt>Page d'arrivée</dt><dd>@l.LandingPage</dd> }
+        </dl>
+    </div>
+
+    <div>
+        @if (l.Kind == LeadKind.Appointment || l.PreferredDate is not null)
+        {
+            <div class="admin-card">
+                <h2>Confirmer le rendez-vous</h2>
+                <p class="muted small">Le client reçoit un courriel de confirmation et la demande passe à « Planifiée ».</p>
+                <div class="field">
+                    <label>Date et heure</label>
+                    <input type="datetime-local" @bind="confirmAt" />
+                </div>
+                <div class="field">
+                    <label>Message au client (facultatif)</label>
+                    <textarea rows="2" @bind="confirmNote" placeholder="ex. Notre préposée Marie se présentera à 9 h."></textarea>
+                </div>
+                <button class="btn btn-primary btn-sm" @onclick="ConfirmAsync" disabled="@(confirmAt is null || busy)">Confirmer et envoyer</button>
+            </div>
+        }
+
+        <div class="admin-card">
+            <h2>Suivi</h2>
+            <div class="field">
+                <textarea rows="3" @bind="note" placeholder="Ajouter une note (appel, devis envoyé, prix proposé…)"></textarea>
+            </div>
+            <button class="btn btn-outline btn-sm" @onclick="AddNoteAsync" disabled="@string.IsNullOrWhiteSpace(note)">Ajouter la note</button>
+
+            <ol class="timeline">
+                @foreach (var a in detail.Activities)
+                {
+                    <li>
+                        <span class="muted small">@AdminFormat.Local(a.CreatedAt) · @a.Author</span>
+                        <strong>@a.Action</strong>
+                        @if (a.Note is not null) { <p>@a.Note</p> }
+                    </li>
+                }
+            </ol>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private LeadDetail? detail;
+    private bool notFound;
+    private string? note;
+    private DateTime? confirmAt;
+    private string? confirmNote;
+    private bool busy;
+    private string? message;
+    private bool messageIsError;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        detail = await Leads.GetAsync(Id);
+        notFound = detail is null;
+        if (detail?.Lead.PreferredDate is { } d && confirmAt is null)
+        {
+            var hour = detail.Lead.PreferredSlot switch { TimeSlot.Afternoon => 13, TimeSlot.LateDay => 16, _ => 9 };
+            confirmAt = d.ToDateTime(new TimeOnly(hour, 0));
+        }
+    }
+
+    private async Task<string> AuthorAsync()
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+        return user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur";
+    }
+
+    private async Task ChangeStatusAsync(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<LeadStatus>(e.Value?.ToString(), out var s))
+        {
+            await Leads.ChangeStatusAsync(Id, s, await AuthorAsync());
+            await LoadAsync();
+        }
+    }
+
+    private async Task AddNoteAsync()
+    {
+        await Leads.AddNoteAsync(Id, note!, await AuthorAsync());
+        note = null;
+        await LoadAsync();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (confirmAt is null) return;
+        busy = true;
+        var result = await Leads.ConfirmAppointmentAsync(Id, Hub.SharedKernel.Time.BusinessTime.FromLocal(confirmAt.Value), confirmNote, await AuthorAsync());
+        busy = false;
+        message = result.IsSuccess ? "Rendez-vous confirmé : le client a reçu un courriel." : result.Error;
+        messageIsError = result.IsFailure;
+        await LoadAsync();
+    }
+}

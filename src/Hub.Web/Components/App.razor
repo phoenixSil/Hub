@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="@Assets["css/site.css"]" />
+    @if (IsAdmin || IsAccount)
+    {
+        <link rel="stylesheet" href="@Assets["css/admin.css"]" />
+    }
+    <link rel="icon" type="image/png" href="images/site/favicon.png" />
+    <ImportMap />
+    <HeadOutlet @rendermode="HeadRenderMode" />
+</head>
+<body class="@(IsAdmin || IsAccount ? "admin-body" : "site-body")">
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+    @if (!IsAdmin && !IsAccount)
+    {
+        <script src="@Assets["js/site.js"]" defer></script>
+    }
+</body>
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    private bool IsAdmin => HttpContext.Request.Path.StartsWithSegments("/admin");
+    private bool IsAccount => HttpContext.Request.Path.StartsWithSegments("/compte");
+
+    private IComponentRenderMode? HeadRenderMode => IsAdmin ? InteractiveServer : null;
+}

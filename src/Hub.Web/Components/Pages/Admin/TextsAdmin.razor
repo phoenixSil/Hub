@@ -1,0 +1,63 @@
+@page "/admin/textes"
+@rendermode InteractiveServer
+
+<PageTitle>Textes de l'accueil</PageTitle>
+
+<CrudEditor T="ContentBlock" Title="Blocs de texte" Context="b" AllowDelete="false"
+            Help="« home.hero » = grande bannière d'accueil · « home.about » = section À propos · « home.advantages » et « home.steps » = titres des sections."
+            Query="@(q => q.OrderBy(x => x.Key))"
+            Validate="@(b => string.IsNullOrWhiteSpace(b.Key) || string.IsNullOrWhiteSpace(b.Title) ? "La clé et le titre sont obligatoires." : null)">
+    <Header><th>Clé</th><th>Titre</th></Header>
+    <Row><td><code>@b.Key</code></td><td>@b.Title</td></Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Clé</label><InputText @bind-Value="b.Key" /></div>
+            <div class="field"><label>Surtitre</label><InputText @bind-Value="b.Eyebrow" /></div>
+        </div>
+        <div class="field"><label>Titre</label><InputText @bind-Value="b.Title" /></div>
+        <div class="field"><label>Texte</label><InputTextArea rows="5" @bind-Value="b.Body" /></div>
+    </Form>
+</CrudEditor>
+
+<CrudEditor T="HighlightItem" Title="Listes mises en avant" Context="h"
+            Help="Groupe « values » = nos valeurs (bandeau sous la bannière et À propos) · « advantages » = pourquoi nous choisir · « steps » = comment ça marche."
+            Query="@(q => q.OrderBy(x => x.Group).ThenBy(x => x.SortOrder))"
+            NewItem="@(() => new HighlightItem { Group = HighlightGroups.Advantages, Icon = "check", SortOrder = 100 })"
+            Validate="@(h => string.IsNullOrWhiteSpace(h.Title) ? "Le titre est obligatoire." : null)">
+    <Header><th>Groupe</th><th>Titre</th><th>Ordre</th></Header>
+    <Row><td>@GroupLabel(h.Group)</td><td>@h.Title</td><td>@h.SortOrder</td></Row>
+    <Form>
+        <div class="field-row">
+            <div class="field">
+                <label>Groupe</label>
+                <InputSelect @bind-Value="h.Group">
+                    <option value="@HighlightGroups.Values">Nos valeurs</option>
+                    <option value="@HighlightGroups.Advantages">Pourquoi nous choisir</option>
+                    <option value="@HighlightGroups.Steps">Comment ça marche</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>Icône</label>
+                <InputSelect @bind-Value="h.Icon">
+                    @foreach (var name in Icon.Names)
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="h.SortOrder" /></div>
+        </div>
+        <div class="field"><label>Titre</label><InputText @bind-Value="h.Title" /></div>
+        <div class="field"><label>Texte</label><InputTextArea rows="3" @bind-Value="h.Text" /></div>
+    </Form>
+</CrudEditor>
+
+@code {
+    private static string GroupLabel(string group) => group switch
+    {
+        HighlightGroups.Values => "Nos valeurs",
+        HighlightGroups.Advantages => "Pourquoi nous choisir",
+        HighlightGroups.Steps => "Comment ça marche",
+        _ => group,
+    };
+}

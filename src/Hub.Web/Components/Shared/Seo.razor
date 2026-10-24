@@ -1,0 +1,54 @@
+@inject NavigationManager Navigation
+
+<PageTitle>@FullTitle</PageTitle>
+<HeadContent>
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@Canonical" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="fr_CA" />
+    <meta property="og:site_name" content="@SiteName" />
+    <meta property="og:title" content="@FullTitle" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@Canonical" />
+    @if (!string.IsNullOrWhiteSpace(Image))
+    {
+        <meta property="og:image" content="@AbsoluteImage" />
+    }
+    @if (NoIndex)
+    {
+        <meta name="robots" content="noindex, nofollow" />
+    }
+    @foreach (var json in JsonLd)
+    {
+        @((MarkupString)$"<script type=\"application/ld+json\">{json}</script>")
+    }
+</HeadContent>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? SiteName { get; set; }
+    [Parameter] public string? Image { get; set; }
+    [Parameter] public bool NoIndex { get; set; }
+
+    /// <summary>Le titre est déjà complet (page d'accueil).</summary>
+    [Parameter] public bool ExactTitle { get; set; }
+
+    /// <summary>Blocs JSON-LD déjà sérialisés (System.Text.Json échappe « &lt; »).</summary>
+    [Parameter] public IEnumerable<string> JsonLd { get; set; } = [];
+
+    private string FullTitle => ExactTitle || string.IsNullOrWhiteSpace(SiteName) ? Title : $"{Title} | {SiteName}";
+
+    private string Canonical
+    {
+        get
+        {
+            var uri = new Uri(Navigation.Uri);
+            var path = uri.AbsolutePath == "/" ? "/" : uri.AbsolutePath.TrimEnd('/');
+            return uri.GetLeftPart(UriPartial.Authority) + path;
+        }
+    }
+
+    private string? AbsoluteImage =>
+        Image is null ? null : Image.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? Image : Navigation.BaseUri.TrimEnd('/') + "/" + Image.TrimStart('/');
+}

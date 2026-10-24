@@ -1,0 +1,18 @@
+<article class="service-card">
+    <a href="@Service.Url" class="service-card-media" tabindex="-1" aria-hidden="true">
+        @if (!string.IsNullOrWhiteSpace(Service.ImageUrl))
+        {
+            <img src="@Service.ImageUrl" alt="" loading="lazy" width="600" height="400" />
+        }
+        <span class="service-card-icon"><Icon Name="@(Service.Icon ?? "sparkles")" Size="20" /></span>
+    </a>
+    <div class="service-card-body">
+        <h3><a href="@Service.Url">@Service.Title</a></h3>
+        <p>@Service.Summary</p>
+        <a class="more" href="@Service.Url">En savoir plus <Icon Name="arrow-right" Size="16" /></a>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public ServiceSummary Service { get; set; } = default!;
+}

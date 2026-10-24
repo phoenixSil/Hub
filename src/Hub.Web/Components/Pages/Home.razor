@@ -1,0 +1,248 @@
+@page "/"
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+@inject IContentQueries ContentQueries
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+@if (tenant is null || site is null)
+{
+    return;
+}
+
+<Seo Title="@(hero?.Title is { } t ? $"{tenant.Name} — {t}" : tenant.Name)" ExactTitle="true"
+     Description="@(hero?.Body ?? tenant.Tagline)" SiteName="@tenant.Name" Image="/images/site/hero.webp"
+     JsonLd="@([SiteFormat.LocalBusinessJsonLd(tenant, SiteFormat.BaseUrl(Navigation), site.Areas, site.AverageRating, site.Reviews.Count)])" />
+
+<section class="hero" data-carousel aria-roledescription="carrousel" aria-label="Nos offres">
+    <div class="hero-track">
+        <div class="hero-slide" style="--hero-image:url('/images/site/hero.webp')">
+            <div class="container hero-content">
+                @if (!string.IsNullOrWhiteSpace(hero?.Eyebrow))
+                {
+                    <span class="eyebrow eyebrow-light">@hero!.Eyebrow</span>
+                }
+                <h1>@(hero?.Title ?? tenant.Name)</h1>
+                <p class="hero-lead">@(hero?.Body ?? tenant.Tagline)</p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary btn-lg" href="/devis">Demander un devis gratuit <Icon Name="arrow-right" Size="18" /></a>
+                    <a class="btn btn-ghost-light btn-lg" href="/rendez-vous"><Icon Name="calendar" Size="18" /> Demander un rendez-vous</a>
+                </div>
+            </div>
+        </div>
+        @foreach (var promo in promotions)
+        {
+            <div class="hero-slide" style="--hero-image:url('@(promo.ImageUrl ?? "/images/site/hero.webp")')">
+                <div class="container hero-content">
+                    <span class="eyebrow eyebrow-light">@promo.Badge</span>
+                    <p class="hero-title">@promo.Title @if (!string.IsNullOrWhiteSpace(promo.Highlight)) {<span class="hl"> @promo.Highlight</span>}</p>
+                    <p class="hero-lead">@promo.Text</p>
+                    <div class="hero-actions">
+                        <a class="btn btn-primary btn-lg" href="@promo.PrimaryUrl">@promo.PrimaryLabel</a>
+                        @if (!string.IsNullOrWhiteSpace(promo.SecondaryLabel) && !string.IsNullOrWhiteSpace(promo.SecondaryUrl))
+                        {
+                            <a class="btn btn-ghost-light btn-lg" href="@promo.SecondaryUrl">@promo.SecondaryLabel</a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    @if (promotions.Count > 0)
+    {
+        <div class="hero-dots" role="tablist">
+            @for (var i = 0; i <= promotions.Count; i++)
+            {
+                <button type="button" class="hero-dot" data-slide="@i" aria-label="Diapositive @(i + 1)"></button>
+            }
+        </div>
+    }
+</section>
+
+<div class="trust-strip">
+    <div class="container trust-inner">
+        @foreach (var item in site.Group(HighlightGroups.Values).Take(4))
+        {
+            <div class="trust-item"><Icon Name="@(item.Icon ?? "check")" Size="20" /> <span>@item.Title</span></div>
+        }
+    </div>
+</div>
+
+@foreach (var category in catalog)
+{
+    <section class="section @(category.RouteSegment == "aines" ? "section-tint" : null)" id="@category.Slug">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">@category.Name</span>
+                <h2>@(category.RouteSegment == "aines" ? "Aînés et soutien à domicile" : "Des services adaptés à vos besoins")</h2>
+                @if (!string.IsNullOrWhiteSpace(category.Intro))
+                {
+                    <p>@category.Intro</p>
+                }
+            </header>
+            <div class="card-grid">
+                @foreach (var s in category.Services)
+                {
+                    <ServiceCard Service="s" />
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@if (site.Block("home.about") is { } about)
+{
+    <section class="section" id="apropos">
+        <div class="container split">
+            <div>
+                <span class="eyebrow">@about.Eyebrow</span>
+                <h2>@about.Title</h2>
+                <RichText Text="@about.Body" Class="lead-text" />
+                <a class="btn btn-outline" href="/a-propos">Notre histoire <Icon Name="arrow-right" Size="16" /></a>
+            </div>
+            <ul class="value-list">
+                @foreach (var v in site.Group(HighlightGroups.Values))
+                {
+                    <li>
+                        <span class="value-icon"><Icon Name="@(v.Icon ?? "check")" Size="20" /></span>
+                        <div><strong>@v.Title</strong><p>@v.Text</p></div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </section>
+}
+
+@if (site.Group(HighlightGroups.Advantages).Any())
+{
+    <section class="section section-tint" id="pourquoi">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">@(site.Block("home.advantages")?.Eyebrow ?? "Nos engagements")</span>
+                <h2>@(site.Block("home.advantages")?.Title ?? $"Pourquoi choisir {tenant.Name} ?")</h2>
+                @if (site.Block("home.advantages")?.Body is { } body)
+                {
+                    <p>@body</p>
+                }
+            </header>
+            <div class="feature-grid">
+                @foreach (var a in site.Group(HighlightGroups.Advantages))
+                {
+                    <div class="feature">
+                        <span class="feature-icon"><Icon Name="@(a.Icon ?? "check")" Size="22" /></span>
+                        <h3>@a.Title</h3>
+                        <p>@a.Text</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@if (site.Group(HighlightGroups.Steps).Any())
+{
+    <section class="section" id="comment">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">@(site.Block("home.steps")?.Eyebrow ?? "Comment ça marche")</span>
+                <h2>@(site.Block("home.steps")?.Title ?? "Un processus simple, du premier appel au travail terminé")</h2>
+            </header>
+            <ol class="steps">
+                @foreach (var s in site.Group(HighlightGroups.Steps))
+                {
+                    <li class="step">
+                        <span class="step-icon"><Icon Name="@(s.Icon ?? "check")" Size="22" /></span>
+                        <h3>@s.Title</h3>
+                        <p>@s.Text</p>
+                    </li>
+                }
+            </ol>
+        </div>
+    </section>
+}
+
+@if (site.Reviews.Count > 0)
+{
+    <section class="section section-tint" id="avis">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">Avis clients</span>
+                <h2>Ce que disent nos clients</h2>
+                @if (site.AverageRating is { } avg)
+                {
+                    <p>Note moyenne : <strong>@avg.ToString("0.0", CultureInfo.GetCultureInfo("fr-CA")) / 5</strong> sur @site.Reviews.Count avis</p>
+                }
+            </header>
+            <div class="review-grid">
+                @foreach (var r in site.Reviews.Take(6))
+                {
+                    <figure class="review">
+                        <div class="stars" aria-label="@r.Rating sur 5">@for (var i = 0; i < r.Rating; i++) {<Icon Name="star" Size="16" />}</div>
+                        <blockquote>@r.Text</blockquote>
+                        <figcaption>
+                            <strong>@r.AuthorName</strong>
+                            @if (!string.IsNullOrWhiteSpace(r.AuthorContext)) {<span> · @r.AuthorContext</span>}
+                            @if (r.Source != ReviewSource.Direct) {<span class="review-source"> · Avis @r.Source</span>}
+                        </figcaption>
+                    </figure>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(tenant.GoogleBusinessUrl))
+            {
+                <p class="center"><a class="btn btn-outline" href="@tenant.GoogleBusinessUrl" target="_blank" rel="noopener">Voir tous nos avis Google <Icon Name="external" Size="16" /></a></p>
+            }
+        </div>
+    </section>
+}
+
+@if (site.Faq.Count > 0)
+{
+    <section class="section" id="faq">
+        <div class="container narrow">
+            <header class="section-head">
+                <span class="eyebrow">FAQ</span>
+                <h2>Questions fréquentes</h2>
+            </header>
+            <FaqList Items="@site.Faq.Where(f => f.ServiceSlug is null).Take(6)" />
+            <p class="center"><a class="btn btn-outline" href="/faq">Toutes les questions <Icon Name="arrow-right" Size="16" /></a></p>
+        </div>
+    </section>
+}
+
+@if (site.Areas.Count > 0)
+{
+    <section class="section section-tint" id="secteurs">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">Zone de service</span>
+                <h2>Secteurs desservis</h2>
+                <p>Nous nous déplaçons dans tous ces quartiers de @tenant.City. Votre secteur n'y est pas ? <a href="/contact">Écrivez-nous</a>, nous verrons ensemble.</p>
+            </header>
+            <ul class="chips">
+                @foreach (var a in site.Areas)
+                {
+                    <li><a href="/secteurs/@a.Slug"><Icon Name="map-pin" Size="14" /> @a.Name</a></li>
+                }
+            </ul>
+        </div>
+    </section>
+}
+
+<CtaBand Phone="@tenant.Phone" />
+
+@code {
+    private Tenant? tenant;
+    private SiteContent? site;
+    private ContentBlock? hero;
+    private IReadOnlyList<CategoryWithServices> catalog = [];
+    private List<Promotion> promotions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        site = await ContentQueries.GetAsync();
+        catalog = await Catalog.GetCatalogAsync();
+        hero = site.Block("home.hero");
+        promotions = site.LivePromotions(Hub.SharedKernel.Time.BusinessTime.Today(Clock)).ToList();
+    }
+}

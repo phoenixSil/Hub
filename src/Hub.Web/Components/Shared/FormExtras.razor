@@ -1,0 +1,32 @@
+@inject TurnstileVerifier Turnstile
+
+@* Piège à robots (invisible), consentement Loi 25 et anti-pourriel Turnstile s'il est configuré. *@
+<div class="hp" aria-hidden="true">
+    <label>Ne pas remplir <input type="text" name="@HoneypotName" tabindex="-1" autocomplete="off" /></label>
+</div>
+
+<div class="field consent-field">
+    <label class="check">
+        <input type="checkbox" name="@ConsentName" value="true" checked="@Consent" />
+        <span>
+            J'accepte que @TenantName utilise ces renseignements pour répondre à ma demande, comme décrit dans la
+            <a href="/confidentialite" target="_blank">politique de confidentialité</a>.
+        </span>
+    </label>
+    <FieldError For="ConsentGiven" Errors="Errors" />
+</div>
+
+@if (Turnstile.Enabled)
+{
+    <div class="cf-turnstile" data-sitekey="@Turnstile.SiteKey" data-language="fr"></div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string ModelName { get; set; } = "Model";
+    [Parameter] public bool Consent { get; set; }
+    [Parameter] public string TenantName { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyDictionary<string, string>? Errors { get; set; }
+
+    private string HoneypotName => $"{ModelName}.Website";
+    private string ConsentName => $"{ModelName}.ConsentGiven";
+}

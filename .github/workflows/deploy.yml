@@ -1,0 +1,31 @@
+name: Déployer sur Azure
+
+# Lancement manuel tant que la bascule depuis OVH n'est pas faite.
+# Secrets requis : AZURE_WEBAPP_NAME, AZURE_WEBAPP_PUBLISH_PROFILE.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Tester
+        run: dotnet test Hub.slnx -c Release
+
+      - name: Publier
+        run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release -o publish
+
+      - name: Déployer
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish

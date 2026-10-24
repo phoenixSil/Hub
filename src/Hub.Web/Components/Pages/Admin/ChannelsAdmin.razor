@@ -1,0 +1,51 @@
+@page "/admin/canaux"
+@rendermode InteractiveServer
+@using Hub.Modules.Channels
+
+<PageTitle>Canaux</PageTitle>
+
+<CrudEditor T="Channel" Title="Canaux de présence en ligne" Context="c" AllowDelete="false"
+            Help="Phase 1 : seul le site est piloté. Les réseaux sociaux seront branchés ici un par un (Facebook en premier, en phase 3)."
+            Query="@(q => q.OrderBy(x => x.Phase).ThenBy(x => x.Type))">
+    <Header><th>Canal</th><th>État</th><th>Phase</th><th>Adresse</th></Header>
+    <Row>
+        <td>@c.Type</td>
+        <td><span class="status status-@c.Status.ToString().ToLowerInvariant()">@StatusLabel(c.Status)</span></td>
+        <td>@c.Phase</td>
+        <td>@if (!string.IsNullOrWhiteSpace(c.Url)) {<a href="@c.Url" target="_blank">@c.Url</a>}</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field">
+                <label>Canal</label>
+                <InputSelect @bind-Value="c.Type">
+                    @foreach (var t in Enum.GetValues<ChannelType>())
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>État</label>
+                <InputSelect @bind-Value="c.Status">
+                    @foreach (var s in Enum.GetValues<ChannelStatus>())
+                    {
+                        <option value="@s">@StatusLabel(s)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field"><label>Phase</label><InputNumber @bind-Value="c.Phase" /></div>
+        </div>
+        <div class="field"><label>Adresse</label><InputText @bind-Value="c.Url" /></div>
+        <div class="field"><label>Notes</label><InputTextArea rows="3" @bind-Value="c.Notes" /></div>
+    </Form>
+</CrudEditor>
+
+@code {
+    private static string StatusLabel(ChannelStatus s) => s switch
+    {
+        ChannelStatus.Active => "Actif",
+        ChannelStatus.Paused => "En pause",
+        _ => "Prévu",
+    };
+}

@@ -1,0 +1,54 @@
+<CrudEditor T="PricingModel" Title="Modèles de prix" Context="p"
+            Help="Préparé pour l'analyse des prix et le futur agent IA. Un prix n'apparaît sur le site que si « Afficher » est coché."
+            NewItem="@(() => new PricingModel { ServiceId = Services.FirstOrDefault()?.Id ?? Guid.Empty })">
+    <Header><th>Service</th><th>Type</th><th>Montant</th><th>Affiché</th></Header>
+    <Row>
+        <td>@Services.FirstOrDefault(s => s.Id == p.ServiceId)?.Title</td>
+        <td>@KindLabel(p.Kind)</td>
+        <td>@(p.MinAmount?.ToString("0.##") ?? "—") @(p.MaxAmount is null ? "" : $"à {p.MaxAmount:0.##}") $</td>
+        <td>@(p.IsPublic ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field">
+                <label>Service</label>
+                <InputSelect @bind-Value="p.ServiceId">
+                    @foreach (var s in Services)
+                    {
+                        <option value="@s.Id">@s.Title</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>Type de prix</label>
+                <InputSelect @bind-Value="p.Kind">
+                    @foreach (var k in Enum.GetValues<PricingKind>())
+                    {
+                        <option value="@k">@KindLabel(k)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Montant minimum ($)</label><InputNumber @bind-Value="p.MinAmount" /></div>
+            <div class="field"><label>Montant maximum ($)</label><InputNumber @bind-Value="p.MaxAmount" /></div>
+            <div class="field"><label>Heures minimum</label><InputNumber @bind-Value="p.MinimumHours" /></div>
+            <div class="field"><label>Durée d'un quart (h)</label><InputNumber @bind-Value="p.ShiftHours" /></div>
+        </div>
+        <div class="field"><label>Notes</label><InputTextArea rows="2" @bind-Value="p.Notes" /></div>
+        <label class="check"><InputCheckbox @bind-Value="p.IsPublic" /> Afficher ce prix sur la page du service</label>
+    </Form>
+</CrudEditor>
+
+@code {
+    [Parameter] public List<Service> Services { get; set; } = [];
+
+    public static string KindLabel(PricingKind k) => k switch
+    {
+        PricingKind.Hourly => "À l'heure",
+        PricingKind.PerShift => "Par quart",
+        PricingKind.Flat => "Forfait",
+        PricingKind.Monthly => "Par mois",
+        _ => "Sur évaluation",
+    };
+}

@@ -1,0 +1,37 @@
+@page "/faq"
+@inject ICurrentTenant CurrentTenant
+@inject IContentQueries ContentQueries
+
+@if (tenant is null || site is null)
+{
+    return;
+}
+
+<Seo Title="Questions fréquentes" Description="@($"Horaires, matériel, assurance, annulation, facturation : les réponses aux questions fréquentes sur les services de {tenant.Name}.")"
+     SiteName="@tenant.Name" JsonLd="@([SiteFormat.FaqJsonLd(site.Faq)])" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <h1>Questions fréquentes</h1>
+        <p class="hero-lead">Vous ne trouvez pas votre réponse ? <a href="/contact">Posez-nous votre question</a>.</p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container narrow">
+        <FaqList Items="site.Faq" />
+    </div>
+</section>
+
+<CtaBand Phone="@tenant.Phone" />
+
+@code {
+    private Tenant? tenant;
+    private SiteContent? site;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        site = await ContentQueries.GetAsync();
+    }
+}

@@ -1,0 +1,34 @@
+@page "/merci"
+@inject ICurrentTenant CurrentTenant
+
+@if (tenant is null)
+{
+    return;
+}
+
+<Seo Title="Demande bien reçue" SiteName="@tenant.Name" NoIndex="true" />
+
+<section class="section">
+    <div class="container narrow center thanks">
+        <span class="thanks-icon"><Icon Name="check" Size="36" /></span>
+        <h1>Merci, c'est bien reçu !</h1>
+        <p class="lead-text">
+            @(Kind switch
+            {
+                "rendez-vous" => "Votre demande de rendez-vous est enregistrée. Elle n'est pas encore confirmée : nous vous écrivons dans un délai d'un jour ouvrable pour la confirmer ou proposer une autre plage.",
+                "contact" => "Votre message est enregistré. Nous vous répondons dans un délai d'un jour ouvrable.",
+                _ => "Votre demande de devis est enregistrée. Nous vous appelons dans un délai d'un jour ouvrable pour préciser votre besoin.",
+            })
+        </p>
+        <p>Un accusé de réception vient de partir vers votre boîte courriel (pensez à vérifier les indésirables).</p>
+        <p>Une urgence ? <a href="@SiteFormat.PhoneHref(tenant.Phone)">@tenant.Phone</a></p>
+        <a class="btn btn-primary" href="/">Retour à l'accueil</a>
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "demande")] private string? Kind { get; set; }
+    private Tenant? tenant;
+
+    protected override async Task OnInitializedAsync() => tenant = await CurrentTenant.GetAsync();
+}

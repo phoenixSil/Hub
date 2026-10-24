@@ -1,0 +1,39 @@
+@page "/admin/secteurs"
+@rendermode InteractiveServer
+
+<PageTitle>Secteurs</PageTitle>
+
+<CrudEditor T="ServiceArea" Title="Secteurs desservis" Context="a"
+            Help="Chaque secteur a sa page (/secteurs/…). Un texte propre à chaque quartier aide beaucoup Google à la distinguer des autres."
+            Query="@(q => q.OrderBy(x => x.SortOrder).ThenBy(x => x.Name))"
+            Validate="@(a => string.IsNullOrWhiteSpace(a.Name) ? "Le nom est obligatoire." : null)"
+            BeforeSave="Prepare">
+    <Header><th>Secteur</th><th>Texte propre</th><th>Ordre</th><th>Visible</th></Header>
+    <Row>
+        <td><a href="/secteurs/@a.Slug" target="_blank">@a.Name</a></td>
+        <td>@(string.IsNullOrWhiteSpace(a.Intro) ? "À écrire" : "Oui")</td>
+        <td>@a.SortOrder</td>
+        <td>@(a.IsActive ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Nom</label><InputText @bind-Value="a.Name" /></div>
+            <div class="field"><label>Adresse (slug)</label><InputText @bind-Value="a.Slug" /></div>
+            <div class="field"><label>Ordre</label><InputNumber @bind-Value="a.SortOrder" /></div>
+        </div>
+        <div class="field">
+            <label>Texte de la page</label>
+            <InputTextArea rows="8" @bind-Value="a.Intro" />
+            <span class="hint">Parlez du quartier : types de logements, distances, clients déjà servis, particularités.</span>
+        </div>
+        <label class="check"><InputCheckbox @bind-Value="a.IsActive" /> Visible sur le site</label>
+    </Form>
+</CrudEditor>
+
+@code {
+    private Task Prepare(ServiceArea a)
+    {
+        a.Slug = Hub.SharedKernel.Text.Slug.From(string.IsNullOrWhiteSpace(a.Slug) ? a.Name : a.Slug);
+        return Task.CompletedTask;
+    }
+}

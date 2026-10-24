@@ -1,0 +1,19 @@
+<section class="cta-band" id="contact-rapide">
+    <div class="container cta-inner">
+        <div>
+            <h2>@Title</h2>
+            <p>@Text</p>
+        </div>
+        <div class="cta-actions">
+            <a class="btn btn-light" href="@QuoteUrl"><Icon Name="sparkles" Size="18" /> Demander un devis gratuit</a>
+            <a class="btn btn-ghost-light" href="@SiteFormat.PhoneHref(Phone)"><Icon Name="phone" Size="18" /> @Phone</a>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Besoin d'un coup de main ?";
+    [Parameter] public string Text { get; set; } = "Décrivez votre besoin : nous vous rappelons dans un délai d'un jour ouvrable avec une proposition claire.";
+    [Parameter, EditorRequired] public string Phone { get; set; } = string.Empty;
+    [Parameter] public string QuoteUrl { get; set; } = "/devis";
+}

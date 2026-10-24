@@ -1,0 +1,57 @@
+@inject IMediaStorage Media
+
+<div class="image-picker">
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <img src="@Value" alt="" class="image-preview" />
+    }
+    <div class="image-picker-controls">
+        <input type="text" value="@Value" @onchange="OnTextChanged" placeholder="/images/site/… ou adresse complète" />
+        <label class="btn btn-outline btn-sm">
+            @(uploading ? "Envoi…" : "Téléverser")
+            <InputFile OnChange="UploadAsync" accept="image/*" hidden />
+        </label>
+    </div>
+    @if (error is not null)
+    {
+        <span class="field-error">@error</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private bool uploading;
+    private string? error;
+
+    private async Task OnTextChanged(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        error = null;
+        uploading = true;
+        try
+        {
+            // Le flux du navigateur ne se lit qu'en asynchrone : on le copie d'abord en mémoire.
+            await using var browser = e.File.OpenReadStream(maxAllowedSize: 15 * 1024 * 1024);
+            using var buffer = new MemoryStream();
+            await browser.CopyToAsync(buffer);
+            buffer.Position = 0;
+            Value = await Media.SaveImageAsync(buffer, e.File.Name);
+            await ValueChanged.InvokeAsync(Value);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+}

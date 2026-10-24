@@ -1,0 +1,165 @@
+@typeparam T where T : TenantEntity, new()
+@inject IRepository<T> Repository
+
+@* Liste + formulaire d'édition générique du back-office. *@
+<div class="admin-head">
+    <div>
+        <h1>@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Help))
+        {
+            <p class="muted">@Help</p>
+        }
+    </div>
+    @if (editing is null && AllowCreate)
+    {
+        <button class="btn btn-primary btn-sm" @onclick="Create">+ Ajouter</button>
+    }
+</div>
+
+@if (message is not null)
+{
+    <div class="alert @(messageIsError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (editing is not null)
+{
+    <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-card admin-form">
+        <h2>@(isNew ? "Nouvel élément" : "Modifier")</h2>
+        @Form(editing)
+        <div class="admin-actions">
+            <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Enregistrer</button>
+            <button type="button" class="btn btn-outline btn-sm" @onclick="CancelAsync">Annuler</button>
+        </div>
+    </EditForm>
+}
+else if (items is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (items.Count == 0)
+{
+    <div class="admin-card empty">Aucun élément pour l'instant.</div>
+}
+else
+{
+    <div class="admin-card table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    @Header
+                    <th class="actions-col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        @Row(item)
+                        <td class="actions-col">
+                            <button class="btn-link" @onclick="() => Edit(item)">Modifier</button>
+                            @if (AllowDelete)
+                            {
+                                @if (confirmDelete == item.Id)
+                                {
+                                    <button class="btn-link danger" @onclick="() => DeleteAsync(item.Id)">Confirmer</button>
+                                    <button class="btn-link" @onclick="() => confirmDelete = null">Non</button>
+                                }
+                                else
+                                {
+                                    <button class="btn-link danger" @onclick="() => confirmDelete = item.Id">Supprimer</button>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Help { get; set; }
+    [Parameter, EditorRequired] public RenderFragment Header { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment<T> Row { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment<T> Form { get; set; } = default!;
+    [Parameter] public Func<IQueryable<T>, IQueryable<T>>? Query { get; set; }
+    [Parameter] public Func<T>? NewItem { get; set; }
+    [Parameter] public Func<T, string?>? Validate { get; set; }
+    [Parameter] public Func<T, Task>? BeforeSave { get; set; }
+    [Parameter] public bool AllowCreate { get; set; } = true;
+    [Parameter] public bool AllowDelete { get; set; } = true;
+
+    private List<T>? items;
+    private T? editing;
+    private bool isNew;
+    private bool busy;
+    private Guid? confirmDelete;
+    private string? message;
+    private bool messageIsError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    public async Task LoadAsync() => items = await Repository.ListAsync(Query);
+
+    private void Create()
+    {
+        editing = NewItem?.Invoke() ?? new T();
+        isNew = true;
+        message = null;
+    }
+
+    private void Edit(T item)
+    {
+        editing = item;
+        isNew = false;
+        message = null;
+    }
+
+    private async Task CancelAsync()
+    {
+        editing = null;
+        await LoadAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (editing is null) return;
+        var problem = Validate?.Invoke(editing);
+        if (problem is not null)
+        {
+            message = problem;
+            messageIsError = true;
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            if (BeforeSave is not null) await BeforeSave(editing);
+            await Repository.SaveAsync(editing);
+            message = "Enregistré. Le site est à jour.";
+            messageIsError = false;
+            editing = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            message = "Enregistrement impossible : " + (ex.InnerException?.Message ?? ex.Message);
+            messageIsError = true;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        await Repository.DeleteAsync(id);
+        confirmDelete = null;
+        message = "Supprimé.";
+        messageIsError = false;
+        await LoadAsync();
+    }
+}

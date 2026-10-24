@@ -1,0 +1,47 @@
+@page "/admin/avis"
+@rendermode InteractiveServer
+
+<PageTitle>Avis clients</PageTitle>
+
+<CrudEditor T="Review" Title="Avis clients" Context="r"
+            Help="Seulement de vrais avis, avec l'accord du client. Recopiez un avis Google ou Facebook en indiquant sa source et son lien. La section n'apparaît sur l'accueil qu'à partir du premier avis approuvé."
+            Query="@(q => q.OrderByDescending(x => x.ReviewedOn))"
+            Validate="ValidateReview">
+    <Header><th>Client</th><th>Note</th><th>Source</th><th>Date</th><th>Publié</th></Header>
+    <Row>
+        <td>@r.AuthorName</td>
+        <td>@r.Rating / 5</td>
+        <td>@r.Source</td>
+        <td>@r.ReviewedOn.ToString("d MMM yyyy", AdminFormat.Fr)</td>
+        <td>@(r.IsApproved ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Nom affiché</label><InputText @bind-Value="r.AuthorName" placeholder="ex. Marie-Claude T." /></div>
+            <div class="field"><label>Contexte (facultatif)</label><InputText @bind-Value="r.AuthorContext" placeholder="ex. Cliente à Sainte-Foy" /></div>
+        </div>
+        <div class="field"><label>Avis</label><InputTextArea rows="4" @bind-Value="r.Text" /></div>
+        <div class="field-row">
+            <div class="field"><label>Note (1 à 5)</label><InputNumber @bind-Value="r.Rating" min="1" max="5" /></div>
+            <div class="field">
+                <label>Source</label>
+                <InputSelect @bind-Value="r.Source">
+                    @foreach (var s in Enum.GetValues<ReviewSource>())
+                    {
+                        <option value="@s">@s</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="field"><label>Date</label><InputDate @bind-Value="r.ReviewedOn" /></div>
+        </div>
+        <div class="field"><label>Lien vers l'avis original</label><InputText @bind-Value="r.SourceUrl" /></div>
+        <label class="check"><InputCheckbox @bind-Value="r.IsApproved" /> Publier sur le site</label>
+    </Form>
+</CrudEditor>
+
+@code {
+    private static string? ValidateReview(Review r) =>
+        string.IsNullOrWhiteSpace(r.AuthorName) || string.IsNullOrWhiteSpace(r.Text) ? "Le nom et l'avis sont obligatoires."
+        : r.Rating is < 1 or > 5 ? "La note doit être entre 1 et 5."
+        : null;
+}

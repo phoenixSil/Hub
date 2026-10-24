@@ -1,0 +1,65 @@
+@page "/compte/connexion"
+@layout AuthLayout
+@inject SignInManager<HubUser> SignInManager
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+@using Microsoft.AspNetCore.Identity
+
+<PageTitle>Connexion — back-office</PageTitle>
+<HeadContent><meta name="robots" content="noindex, nofollow" /></HeadContent>
+
+<div class="auth-card">
+    <img src="/images/site/logo.png" alt="" class="auth-logo" width="180" height="57" />
+    <h1>Back-office</h1>
+    <p class="muted">Connectez-vous pour gérer le site et les demandes.</p>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-error" role="alert">@error</div>
+    }
+
+    <form method="post" @formname="login" @onsubmit="LoginAsync">
+        <AntiforgeryToken />
+        <div class="field">
+            <label for="email">Courriel</label>
+            <input id="email" name="Input.Email" type="email" value="@Input!.Email" autocomplete="username" required autofocus />
+        </div>
+        <div class="field">
+            <label for="password">Mot de passe</label>
+            <input id="password" name="Input.Password" type="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
+    </form>
+    <p class="small muted center"><a href="/">← Retour au site</a></p>
+</div>
+
+@code {
+    public sealed class LoginInput
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    [SupplyParameterFromForm(FormName = "login")] private LoginInput? Input { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    private string? error;
+
+    protected override void OnInitialized() => Input ??= new LoginInput();
+
+    private async Task LoginAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(Input!.Email.Trim(), Input.Password, isPersistent: true, lockoutOnFailure: true);
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Connexion de {Email}", Input.Email);
+            var target = !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") ? ReturnUrl : "/admin";
+            Navigation.NavigateTo(target, forceLoad: true);
+            return;
+        }
+
+        error = result.IsLockedOut
+            ? "Trop d'essais : le compte est bloqué 15 minutes."
+            : "Courriel ou mot de passe incorrect.";
+    }
+}

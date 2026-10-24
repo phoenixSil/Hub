@@ -1,0 +1,30 @@
+@page "/admin/pages"
+@rendermode InteractiveServer
+
+<PageTitle>Pages</PageTitle>
+
+<CrudEditor T="Page" Title="Pages" Context="p" AllowCreate="false" AllowDelete="false"
+            Help="Champs remplacés automatiquement : {{Nom}}, {{Courriel}}, {{Telephone}}, {{NEQ}}, {{Ville}}, {{Responsable}}, {{CourrielResponsable}}."
+            Query="@(q => q.OrderBy(x => x.Slug))"
+            Validate="@(p => string.IsNullOrWhiteSpace(p.Title) ? "Le titre est obligatoire." : null)">
+    <Header><th>Page</th><th>Adresse</th><th>Publiée</th></Header>
+    <Row>
+        <td>@p.Title</td>
+        <td><a href="/@p.Slug" target="_blank">/@p.Slug</a></td>
+        <td>@(p.IsPublished ? "Oui" : "Non")</td>
+    </Row>
+    <Form>
+        <div class="field"><label>Titre</label><InputText @bind-Value="p.Title" /></div>
+        <div class="field"><label>Chapeau</label><InputTextArea rows="2" @bind-Value="p.Lead" /></div>
+        <div class="field">
+            <label>Contenu</label>
+            <InputTextArea rows="20" @bind-Value="p.Body" />
+            <span class="hint">Ligne vide = nouveau paragraphe · « ## Titre » = intertitre · « - » = liste · **gras**</span>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Titre pour Google</label><InputText @bind-Value="p.SeoTitle" /></div>
+            <div class="field"><label>Description pour Google</label><InputText @bind-Value="p.SeoDescription" /></div>
+        </div>
+        <label class="check"><InputCheckbox @bind-Value="p.IsPublished" /> Publiée</label>
+    </Form>
+</CrudEditor>

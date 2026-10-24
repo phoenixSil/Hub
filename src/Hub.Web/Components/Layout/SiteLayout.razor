@@ -1,0 +1,167 @@
+@inherits LayoutComponentBase
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+
+@if (tenant is null)
+{
+    @Body
+    return;
+}
+
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+
+<div class="topbar">
+    <div class="container topbar-inner">
+        <div class="topbar-contact">
+            <a href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="14" /> @tenant.Phone</a>
+            <a href="mailto:@tenant.PublicEmail" class="hide-sm"><Icon Name="mail" Size="14" /> @tenant.PublicEmail</a>
+        </div>
+        <div class="topbar-social">
+            <SocialLinks Tenant="tenant" Size="15" />
+        </div>
+    </div>
+</div>
+
+<header class="site-header">
+    <div class="container header-inner">
+        <a href="/" class="brand" aria-label="@tenant.Name — accueil">
+            <img src="@SiteFormat.Logo(tenant)" alt="@tenant.Name" width="168" height="53" />
+        </a>
+
+        <nav class="main-nav" aria-label="Navigation principale">
+            <ul>
+                @foreach (var category in catalog)
+                {
+                    <li class="has-menu">
+                        <a href="/#@category.Slug">@category.Name <Icon Name="chevron-down" Size="14" /></a>
+                        <ul class="submenu">
+                            @foreach (var s in category.Services)
+                            {
+                                <li><a href="@s.Url">@s.Title</a></li>
+                            }
+                        </ul>
+                    </li>
+                }
+                <li><a href="/secteurs">Secteurs</a></li>
+                <li><a href="/faq">FAQ</a></li>
+                <li><a href="/a-propos">À propos</a></li>
+                <li><a href="/contact">Contact</a></li>
+            </ul>
+        </nav>
+
+        <div class="header-cta">
+            <a class="btn btn-outline btn-sm hide-sm" href="/rendez-vous"><Icon Name="calendar" Size="16" /> Rendez-vous</a>
+            <a class="btn btn-primary btn-sm" href="/devis">Devis gratuit</a>
+        </div>
+
+        <details class="mobile-nav">
+            <summary aria-label="Ouvrir le menu"><Icon Name="menu" Size="24" /></summary>
+            <div class="mobile-panel">
+                @foreach (var category in catalog)
+                {
+                    <p class="mobile-group">@category.Name</p>
+                    @foreach (var s in category.Services)
+                    {
+                        <a href="@s.Url">@s.Title</a>
+                    }
+                }
+                <p class="mobile-group">ScintiNet</p>
+                <a href="/secteurs">Secteurs desservis</a>
+                <a href="/faq">Questions fréquentes</a>
+                <a href="/a-propos">À propos</a>
+                <a href="/contact">Contact</a>
+                <a class="btn btn-outline" href="/rendez-vous">Demander un rendez-vous</a>
+                <a class="btn btn-primary" href="/devis">Devis gratuit</a>
+            </div>
+        </details>
+    </div>
+</header>
+
+<main id="contenu">
+    @Body
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-grid">
+        <div>
+            <img src="@SiteFormat.Logo(tenant)" alt="@tenant.Name" class="footer-logo" width="150" height="47" loading="lazy" />
+            <p>@(tenant.ServiceAreaSummary ?? tenant.Tagline)</p>
+            <div class="footer-social"><SocialLinks Tenant="tenant" Size="18" /></div>
+        </div>
+        @foreach (var category in catalog)
+        {
+            <div>
+                <h2>@category.Name</h2>
+                <ul>
+                    @foreach (var s in category.Services)
+                    {
+                        <li><a href="@s.Url">@s.Title</a></li>
+                    }
+                </ul>
+            </div>
+        }
+        <div>
+            <h2>Nous joindre</h2>
+            <ul class="footer-contact">
+                <li><a href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="16" /> @tenant.Phone</a></li>
+                <li><a href="mailto:@tenant.PublicEmail"><Icon Name="mail" Size="16" /> @tenant.PublicEmail</a></li>
+                <li>
+                    <Icon Name="map-pin" Size="16" />
+                    @if (tenant.ShowStreetAddress && !string.IsNullOrWhiteSpace(tenant.StreetAddress))
+                    {
+                        <span>@tenant.StreetAddress, @SiteFormat.LocalityLine(tenant)</span>
+                    }
+                    else
+                    {
+                        <span>@SiteFormat.LocalityLine(tenant)</span>
+                    }
+                </li>
+                @if (!string.IsNullOrWhiteSpace(tenant.BusinessHours))
+                {
+                    <li><Icon Name="clock" Size="16" /> <span>@tenant.BusinessHours</span></li>
+                }
+            </ul>
+            <ul>
+                <li><a href="/secteurs">Secteurs desservis</a></li>
+                <li><a href="/faq">Questions fréquentes</a></li>
+                <li><a href="/confidentialite">Politique de confidentialité</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="container footer-legal">
+        <span>© @DateTime.UtcNow.Year @tenant.Name. Tous droits réservés.</span>
+        @if (!string.IsNullOrWhiteSpace(tenant.BusinessNumber))
+        {
+            <span>NEQ : @tenant.BusinessNumber</span>
+        }
+        <button type="button" class="link-button" data-consent-open>Témoins et mesure</button>
+    </div>
+</footer>
+
+<a class="call-fab" href="@SiteFormat.PhoneHref(tenant.Phone)" aria-label="Appeler @tenant.Name"><Icon Name="phone" Size="22" /></a>
+
+<div class="consent" id="consent" hidden role="dialog" aria-labelledby="consent-title">
+    <div class="consent-inner">
+        <p id="consent-title"><strong>Mesure d'audience</strong></p>
+        <p>
+            Avec votre accord, nous comptons les visites de façon anonyme (identifiant aléatoire, aucune publicité)
+            pour améliorer le site. Vous pouvez changer d'avis en tout temps.
+            <a href="/confidentialite">En savoir plus</a>
+        </p>
+        <div class="consent-actions">
+            <button type="button" class="btn btn-outline btn-sm" data-consent="no">Refuser</button>
+            <button type="button" class="btn btn-primary btn-sm" data-consent="yes">Accepter</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Tenant? tenant;
+    private IReadOnlyList<CategoryWithServices> catalog = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        catalog = await Catalog.GetCatalogAsync();
+    }
+}

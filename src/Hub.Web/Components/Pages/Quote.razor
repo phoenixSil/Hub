@@ -1,0 +1,212 @@
+@page "/devis"
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+@inject IContentQueries ContentQueries
+@inject ILeadService Leads
+@inject TurnstileVerifier Turnstile
+@inject NavigationManager Navigation
+
+@if (tenant is null)
+{
+    return;
+}
+
+<Seo Title="Demande de devis gratuit" Description="@($"Obtenez un devis gratuit et sans engagement de {tenant.Name} : réponse dans un délai d'un jour ouvrable.")" SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <h1>Obtenez votre devis gratuit</h1>
+        <p class="hero-lead">Gratuit et sans engagement. Nous vous répondons dans un délai d'un jour ouvrable.</p>
+    </div>
+</section>
+
+<section class="section section-form">
+    <div class="container form-layout">
+        <form method="post" @formname="devis" @onsubmit="SubmitAsync" class="lead-form" data-track-form="devis" novalidate>
+            <AntiforgeryToken />
+
+            @if (error is not null)
+            {
+                <div class="alert alert-error" role="alert">@error</div>
+            }
+
+            <fieldset>
+                <legend><span class="step-num">1</span> Les services qui vous intéressent</legend>
+                <FieldError For="Services" Errors="errors" />
+                @foreach (var category in catalog)
+                {
+                    <p class="field-group-title">@category.Name</p>
+                    <div class="choice-grid">
+                        @foreach (var s in category.Services.Where(x => x.ShowInQuoteForm))
+                        {
+                            <label class="choice">
+                                <input type="checkbox" name="services" value="@s.Title" checked="@selectedServices.Contains(s.Title)" />
+                                <span><Icon Name="@(s.Icon ?? "sparkles")" Size="18" /> @s.Title</span>
+                            </label>
+                        }
+                    </div>
+                }
+            </fieldset>
+
+            <fieldset>
+                <legend><span class="step-num">2</span> Votre propriété</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="propertyType">Type de propriété</label>
+                        <select id="propertyType" name="Model.PropertyType">
+                            <option value="">Choisir…</option>
+                            @foreach (var t in PropertyTypes)
+                            {
+                                <option value="@t" selected="@(Model.PropertyType == t)">@t</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="propertySize">Superficie approximative</label>
+                        <input id="propertySize" name="Model.PropertySize" value="@Model.PropertySize" placeholder="ex. 1 200 pi² ou 5 ½" maxlength="80" />
+                    </div>
+                </div>
+                <div class="field">
+                    <span class="label">Fréquence souhaitée</span>
+                    <div class="pill-group">
+                        @foreach (var f in Frequencies)
+                        {
+                            <label class="pill"><input type="radio" name="Model.Frequency" value="@f" checked="@(Model.Frequency == f)" /><span>@f</span></label>
+                        }
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="area">Secteur</label>
+                        <select id="area" name="Model.AreaSlug">
+                            <option value="">Choisir…</option>
+                            @foreach (var a in areas)
+                            {
+                                <option value="@a.Slug" selected="@(Model.AreaSlug == a.Slug)">@a.Name</option>
+                            }
+                            <option value="autre" selected="@(Model.AreaSlug == "autre")">Autre secteur</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="address">Adresse (facultatif)</label>
+                        <input id="address" name="Model.Address" value="@Model.Address" autocomplete="street-address" maxlength="300" />
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend><span class="step-num">3</span> Vos coordonnées</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="name">Nom complet <span class="req">*</span></label>
+                        <input id="name" name="Model.FullName" value="@Model.FullName" autocomplete="name" required maxlength="160" />
+                        <FieldError For="FullName" Errors="errors" />
+                    </div>
+                    <div class="field">
+                        <label for="phone">Téléphone <span class="req">*</span></label>
+                        <input id="phone" name="Model.Phone" value="@Model.Phone" type="tel" autocomplete="tel" required maxlength="40" />
+                        <FieldError For="Phone" Errors="errors" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="email">Courriel <span class="req">*</span></label>
+                    <input id="email" name="Model.Email" value="@Model.Email" type="email" autocomplete="email" required maxlength="256" />
+                    <FieldError For="Email" Errors="errors" />
+                </div>
+                <div class="field">
+                    <label for="message">Précisions (facultatif)</label>
+                    <textarea id="message" name="Model.Message" rows="4" maxlength="4000" placeholder="État des lieux, accès, animaux, contraintes d'horaire…">@Model.Message</textarea>
+                    <FieldError For="Message" Errors="errors" />
+                </div>
+                <FormExtras ModelName="Model" Consent="Model.ConsentGiven" TenantName="@tenant.Name" Errors="errors" />
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Envoyer ma demande de devis</button>
+        </form>
+
+        <aside class="aside-card">
+            <h2>Ce qui se passe ensuite</h2>
+            <ol class="mini-steps">
+                <li>Vous recevez un accusé de réception par courriel.</li>
+                <li>Nous vous appelons dans un délai d'un jour ouvrable pour préciser votre besoin.</li>
+                <li>Vous recevez une proposition claire, sans frais cachés.</li>
+            </ol>
+            <p class="aside-phone">Pressé ? Appelez-nous<br /><a href="@SiteFormat.PhoneHref(tenant.Phone)">@tenant.Phone</a></p>
+        </aside>
+    </div>
+</section>
+
+@code {
+    private static readonly string[] PropertyTypes = ["Appartement", "Condo", "Maison", "Immeuble à logements", "Bureau ou commerce", "Autre"];
+    private static readonly string[] Frequencies = ["Une fois", "Chaque semaine", "Aux deux semaines", "Chaque mois", "À discuter"];
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "devis")] private QuoteForm? Model { get; set; }
+    [SupplyParameterFromQuery(Name = "service")] private string? ServiceSlug { get; set; }
+    [SupplyParameterFromQuery(Name = "secteur")] private string? AreaSlug { get; set; }
+
+    private Tenant? tenant;
+    private IReadOnlyList<CategoryWithServices> catalog = [];
+    private IReadOnlyList<ServiceArea> areas = [];
+    private HashSet<string> selectedServices = [];
+    private IReadOnlyDictionary<string, string>? errors;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        catalog = await Catalog.GetCatalogAsync();
+        areas = (await ContentQueries.GetAsync()).Areas;
+
+        if (HttpMethods.IsPost(HttpContext.Request.Method))
+        {
+            selectedServices = (await HttpContext.Request.ReadFormAsync())["services"].Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!).ToHashSet();
+        }
+        else
+        {
+            Model ??= new QuoteForm();
+            Model.AreaSlug ??= AreaSlug;
+            var service = catalog.SelectMany(c => c.Services).FirstOrDefault(s => s.Slug == ServiceSlug);
+            if (service is not null) selectedServices.Add(service.Title);
+        }
+        Model ??= new QuoteForm();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (LeadRequest.IsSpam(Model!.Website))
+        {
+            Navigation.NavigateTo("/merci?demande=devis");
+            return;
+        }
+        if (!await Turnstile.VerifyAsync(HttpContext))
+        {
+            error = "La vérification anti-robot a échoué. Réessayez ou appelez-nous.";
+            return;
+        }
+
+        var result = await Leads.SubmitAsync(new LeadSubmission
+        {
+            Kind = LeadKind.Quote,
+            FullName = Model.FullName,
+            Email = Model.Email,
+            Phone = Model.Phone,
+            Address = Model.Address,
+            AreaSlug = Model.AreaSlug,
+            Services = selectedServices.ToList(),
+            PropertyType = Model.PropertyType,
+            PropertySize = Model.PropertySize,
+            Frequency = Model.Frequency,
+            Message = Model.Message,
+            ConsentGiven = Model.ConsentGiven,
+        }.WithVisit(HttpContext));
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/merci?demande=devis");
+            return;
+        }
+        errors = result.FieldErrors;
+        error = result.FieldErrors.Count > 0 ? "Vérifiez les champs indiqués ci-dessous." : result.Error;
+    }
+}

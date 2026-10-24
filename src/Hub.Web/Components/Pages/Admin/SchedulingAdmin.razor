@@ -1,0 +1,83 @@
+@page "/admin/horaires"
+@rendermode InteractiveServer
+@inject ILeadService Leads
+
+<PageTitle>Disponibilités</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Disponibilités</h1>
+        <p class="muted">Ce que le visiteur peut choisir dans le formulaire de demande de rendez-vous.</p>
+    </div>
+</div>
+
+@if (message is not null)
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (settings is not null)
+{
+    <div class="admin-card">
+        <h2>Jours et plages proposés</h2>
+        <div class="day-picker">
+            @foreach (var day in Days)
+            {
+                <label class="check"><input type="checkbox" checked="@openDays.Contains(day.Key)" @onchange="e => ToggleDay(day.Key, (bool)e.Value!)" /> @day.Value</label>
+            }
+        </div>
+        <div class="day-picker">
+            <label class="check"><input type="checkbox" @bind="settings.MorningEnabled" /> Matin (8 h – 12 h)</label>
+            <label class="check"><input type="checkbox" @bind="settings.AfternoonEnabled" /> Après-midi (12 h – 16 h)</label>
+            <label class="check"><input type="checkbox" @bind="settings.LateDayEnabled" /> Fin de journée (16 h – 18 h)</label>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>Délai minimal (jours)</label><input type="number" min="0" max="30" @bind="settings.MinimumNoticeDays" /></div>
+            <div class="field"><label>Réservable jusqu'à (jours)</label><input type="number" min="7" max="365" @bind="settings.MaximumDaysAhead" /></div>
+        </div>
+        <button class="btn btn-primary btn-sm" @onclick="SaveAsync">Enregistrer</button>
+    </div>
+}
+
+<CrudEditor T="ClosedDay" Title="Jours fermés" Context="d"
+            Help="Congés, jours fériés : ces dates ne sont pas proposées aux visiteurs."
+            Query="@(q => q.OrderBy(x => x.Date))"
+            NewItem="@(() => new ClosedDay { Date = DateOnly.FromDateTime(DateTime.Today.AddDays(7)) })">
+    <Header><th>Date</th><th>Motif</th></Header>
+    <Row><td>@d.Date.ToString("dddd d MMMM yyyy", AdminFormat.Fr)</td><td>@d.Reason</td></Row>
+    <Form>
+        <div class="field-row">
+            <div class="field"><label>Date</label><InputDate @bind-Value="d.Date" /></div>
+            <div class="field"><label>Motif</label><InputText @bind-Value="d.Reason" placeholder="ex. Fête nationale" /></div>
+        </div>
+    </Form>
+</CrudEditor>
+
+@code {
+    private static readonly Dictionary<int, string> Days = new()
+    {
+        [1] = "Lundi", [2] = "Mardi", [3] = "Mercredi", [4] = "Jeudi", [5] = "Vendredi", [6] = "Samedi", [0] = "Dimanche",
+    };
+
+    private SchedulingSettings? settings;
+    private HashSet<int> openDays = [];
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await Leads.GetSchedulingAsync();
+        openDays = settings.OpenDaySet().Select(d => (int)d).ToHashSet();
+    }
+
+    private void ToggleDay(int day, bool on)
+    {
+        if (on) openDays.Add(day); else openDays.Remove(day);
+    }
+
+    private async Task SaveAsync()
+    {
+        settings!.OpenDays = string.Join(",", openDays.OrderBy(d => d));
+        await Leads.SaveSchedulingAsync(settings);
+        message = "Disponibilités enregistrées.";
+    }
+}

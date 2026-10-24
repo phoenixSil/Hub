@@ -1,0 +1,96 @@
+@page "/secteurs/{Slug}"
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+@inject IContentQueries ContentQueries
+@inject NavigationManager Navigation
+
+@if (tenant is null || area is null || site is null)
+{
+    return;
+}
+
+<Seo Title="@($"Entretien ménager et aide à domicile à {area.Name}")"
+     Description="@($"{tenant.Name} offre ses services d'entretien, de nettoyage et d'aide aux aînés à {area.Name} ({tenant.City}). Devis gratuit, réponse en un jour ouvrable.")"
+     SiteName="@tenant.Name"
+     JsonLd="@([SiteFormat.ServiceJsonLd(tenant, SiteFormat.BaseUrl(Navigation), $"Entretien et aide à domicile à {area.Name}", $"Services de {tenant.Name} à {area.Name}", $"/secteurs/{area.Slug}", area.Name)])" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <nav class="breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> <span>/</span> <a href="/secteurs">Secteurs</a></nav>
+        <h1>Nos services à @area.Name</h1>
+        <p class="hero-lead">Entretien ménager, nettoyage et soutien à domicile pour les résidents de @area.Name, à @tenant.City.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="/devis?secteur=@area.Slug">Demander un devis gratuit</a>
+            <a class="btn btn-outline btn-lg" href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="18" /> @tenant.Phone</a>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container narrow">
+        @if (!string.IsNullOrWhiteSpace(area.Intro))
+        {
+            <RichText Text="@area.Intro" Class="prose" />
+        }
+        else
+        {
+            <div class="prose">
+                <p>Vous habitez @area.Name ? Notre équipe se déplace chez vous avec son propre matériel, aux heures qui vous conviennent.</p>
+            </div>
+        }
+    </div>
+</section>
+
+@foreach (var category in catalog)
+{
+    <section class="section @(category.RouteSegment == "aines" ? "section-tint" : null)">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">@area.Name</span>
+                <h2>@category.Name</h2>
+            </header>
+            <div class="card-grid">
+                @foreach (var s in category.Services)
+                {
+                    <ServiceCard Service="s" />
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<section class="section">
+    <div class="container">
+        <header class="section-head"><h2>Secteurs voisins</h2></header>
+        <ul class="chips">
+            @foreach (var a in site.Areas.Where(x => x.Id != area.Id))
+            {
+                <li><a href="/secteurs/@a.Slug">@a.Name</a></li>
+            }
+        </ul>
+    </div>
+</section>
+
+<CtaBand Phone="@tenant.Phone" QuoteUrl="@($"/devis?secteur={area.Slug}")" Title="@($"Un besoin à {area.Name} ?")" />
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Tenant? tenant;
+    private ServiceArea? area;
+    private SiteContent? site;
+    private IReadOnlyList<CategoryWithServices> catalog = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        site = await ContentQueries.GetAsync();
+        area = site.FindArea(Slug);
+        if (area is null)
+        {
+            Navigation.NotFound();
+            return;
+        }
+        catalog = await Catalog.GetCatalogAsync();
+    }
+}

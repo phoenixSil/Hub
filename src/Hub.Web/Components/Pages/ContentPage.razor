@@ -1,0 +1,52 @@
+@page "/a-propos"
+@page "/confidentialite"
+@inject ICurrentTenant CurrentTenant
+@inject IContentQueries ContentQueries
+@inject NavigationManager Navigation
+
+@if (tenant is null || page is null)
+{
+    return;
+}
+
+<Seo Title="@(page.SeoTitle ?? page.Title)" Description="@(page.SeoDescription ?? page.Lead ?? tenant.Tagline)" SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container narrow">
+        <h1>@page.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(page.Lead))
+        {
+            <p class="hero-lead">@page.Lead</p>
+        }
+    </div>
+</section>
+
+<section class="section">
+    <div class="container narrow">
+        <RichText Text="@Fill(page.Body)" Class="prose" />
+        <p class="muted small">Dernière mise à jour : @page.UpdatedAt.ToString("d MMMM yyyy", CultureInfo.GetCultureInfo("fr-CA"))</p>
+    </div>
+</section>
+
+@code {
+    private Tenant? tenant;
+    private Page? page;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        var slug = new Uri(Navigation.Uri).AbsolutePath.Trim('/');
+        page = (await ContentQueries.GetAsync()).FindPage(slug);
+        if (page is null) Navigation.NotFound();
+    }
+
+    /// <summary>Remplace les champs {{Nom}}, {{Courriel}}, etc. par les coordonnées de l'entreprise.</summary>
+    private string Fill(string body) => body
+        .Replace("{{Nom}}", tenant!.Name)
+        .Replace("{{Courriel}}", tenant.PublicEmail)
+        .Replace("{{Telephone}}", tenant.Phone)
+        .Replace("{{NEQ}}", tenant.BusinessNumber ?? "")
+        .Replace("{{Ville}}", tenant.City)
+        .Replace("{{Responsable}}", tenant.PrivacyOfficerName ?? "la direction")
+        .Replace("{{CourrielResponsable}}", tenant.PrivacyOfficerEmail ?? tenant.PublicEmail);
+}

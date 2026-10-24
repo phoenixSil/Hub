@@ -1,0 +1,62 @@
+@* Affiche un texte simple saisi dans le back-office :
+   ligne vide = nouveau paragraphe, « ## » = intertitre, « - » = élément de liste.
+   Tout le texte est encodé : aucun HTML saisi n'est interprété. *@
+<div class="rich @Class">@((MarkupString)Render(Text))</div>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    public static string Render(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        var blocks = text.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var raw in blocks)
+        {
+            var lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.TrimEnd()).ToArray();
+            if (lines.Length == 0) continue;
+
+            if (lines.All(l => l.TrimStart().StartsWith("- ")))
+            {
+                sb.Append("<ul>");
+                foreach (var l in lines) sb.Append("<li>").Append(Inline(l.TrimStart()[2..])).Append("</li>");
+                sb.Append("</ul>");
+            }
+            else if (lines[0].StartsWith("## "))
+            {
+                sb.Append("<h2>").Append(Inline(lines[0][3..])).Append("</h2>");
+                if (lines.Length > 1)
+                    sb.Append("<p>").Append(string.Join("<br>", lines.Skip(1).Select(Inline))).Append("</p>");
+            }
+            else if (lines[0].StartsWith("### "))
+            {
+                sb.Append("<h3>").Append(Inline(lines[0][4..])).Append("</h3>");
+                if (lines.Length > 1)
+                    sb.Append("<p>").Append(string.Join("<br>", lines.Skip(1).Select(Inline))).Append("</p>");
+            }
+            else
+            {
+                sb.Append("<p>").Append(string.Join("<br>", lines.Select(Inline))).Append("</p>");
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Encode le texte et rend **gras** en &lt;strong&gt;.</summary>
+    private static string Inline(string s)
+    {
+        var encoded = System.Net.WebUtility.HtmlEncode(s.Trim());
+        var parts = encoded.Split("**");
+        if (parts.Length < 3) return encoded;
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (i % 2 == 1 && i < parts.Length - 1) sb.Append("<strong>").Append(parts[i]).Append("</strong>");
+            else if (i % 2 == 1) sb.Append("**").Append(parts[i]);
+            else sb.Append(parts[i]);
+        }
+        return sb.ToString();
+    }
+}

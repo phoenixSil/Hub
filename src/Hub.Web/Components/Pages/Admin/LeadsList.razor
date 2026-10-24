@@ -1,0 +1,59 @@
+@page "/admin/demandes"
+@rendermode InteractiveServer
+@inject ILeadService Leads
+
+<PageTitle>Demandes</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Demandes</h1>
+        <p class="muted">Toutes les demandes reçues par le site. Les pourriels sont masqués sauf si vous les filtrez.</p>
+    </div>
+</div>
+
+<div class="admin-card filters">
+    <select @bind="status" @bind:after="LoadAsync">
+        <option value="">Tous les statuts</option>
+        @foreach (var s in Enum.GetValues<LeadStatus>())
+        {
+            <option value="@s">@LeadLabels.Of(s) (@counts.GetValueOrDefault(s))</option>
+        }
+    </select>
+    <select @bind="kind" @bind:after="LoadAsync">
+        <option value="">Tous les types</option>
+        @foreach (var k in Enum.GetValues<LeadKind>())
+        {
+            <option value="@k">@LeadLabels.Of(k)</option>
+        }
+    </select>
+    <input type="search" placeholder="Nom, courriel ou téléphone" @bind="search" @bind:event="oninput" @bind:after="LoadAsync" />
+</div>
+
+<div class="admin-card">
+    <LeadTable Items="items" />
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "statut")] private string? StatusQuery { get; set; }
+
+    private string? status;
+    private string? kind;
+    private string? search;
+    private List<Lead> items = [];
+    private Dictionary<LeadStatus, int> counts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        status = StatusQuery;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        counts = await Leads.CountByStatusAsync();
+        items = await Leads.ListAsync(new LeadListFilter(
+            Enum.TryParse<LeadStatus>(status, out var s) ? s : null,
+            Enum.TryParse<LeadKind>(kind, out var k) ? k : null,
+            search));
+    }
+}

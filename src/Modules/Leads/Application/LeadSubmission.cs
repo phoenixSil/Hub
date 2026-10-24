@@ -93,7 +93,10 @@ internal static class LeadValidator
 
     private static bool IsEmail(string value)
     {
+        value = value.Trim();
         if (value.Length > 256 || !value.Contains('@')) return false;
-        return MailAddress.TryCreate(value.Trim(), out var address) && address.Address == value.Trim();
+        var domain = value[(value.LastIndexOf('@') + 1)..];
+        if (!domain.Contains('.') || domain.StartsWith('.') || domain.EndsWith('.')) return false;
+        return MailAddress.TryCreate(value, out var address) && address.Address == value;
     }
 }

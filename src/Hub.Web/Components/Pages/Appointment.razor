@@ -1,0 +1,198 @@
+@page "/rendez-vous"
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+@inject ILeadService Leads
+@inject TurnstileVerifier Turnstile
+@inject NavigationManager Navigation
+
+@if (tenant is null || availability is null)
+{
+    return;
+}
+
+<Seo Title="Demande de rendez-vous" Description="@($"Proposez une date et une plage horaire : {tenant.Name} vous confirme le rendez-vous rapidement.")" SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain">
+    <div class="container">
+        <h1>Demander un rendez-vous</h1>
+        <p class="hero-lead">Proposez une date et une plage horaire. Nous vous confirmons le rendez-vous, ou vous proposons une autre plage, dans un délai d'un jour ouvrable.</p>
+    </div>
+</section>
+
+<section class="section section-form">
+    <div class="container form-layout">
+        <form method="post" @formname="rendez-vous" @onsubmit="SubmitAsync" class="lead-form" data-track-form="rendez-vous" novalidate>
+            <AntiforgeryToken />
+
+            @if (error is not null)
+            {
+                <div class="alert alert-error" role="alert">@error</div>
+            }
+
+            <fieldset>
+                <legend><span class="step-num">1</span> Le service</legend>
+                <div class="field">
+                    <label for="service">Service souhaité</label>
+                    <select id="service" name="Model.Service">
+                        <option value="">Choisir…</option>
+                        @foreach (var category in catalog)
+                        {
+                            <optgroup label="@category.Name">
+                                @foreach (var s in category.Services)
+                                {
+                                    <option value="@s.Title" selected="@(Model!.Service == s.Title)">@s.Title</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend><span class="step-num">2</span> Date et plage horaire</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="date">Date souhaitée <span class="req">*</span></label>
+                        <select id="date" name="Model.Date" required>
+                            <option value="">Choisir une date…</option>
+                            @foreach (var d in AvailableDates())
+                            {
+                                var value = d.ToString("yyyy-MM-dd");
+                                <option value="@value" selected="@(Model!.Date == value)">@d.ToString("dddd d MMMM", Fr)</option>
+                            }
+                        </select>
+                        <FieldError For="PreferredDate" Errors="errors" />
+                    </div>
+                    <div class="field">
+                        <span class="label">Plage horaire <span class="req">*</span></span>
+                        <div class="pill-group pill-stack">
+                            @foreach (var slot in availability.Slots)
+                            {
+                                <label class="pill"><input type="radio" name="Model.Slot" value="@slot" checked="@(Model!.Slot == slot.ToString())" /><span>@LeadLabels.Of(slot)</span></label>
+                            }
+                        </div>
+                        <FieldError For="PreferredSlot" Errors="errors" />
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend><span class="step-num">3</span> Vos coordonnées</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="name">Nom complet <span class="req">*</span></label>
+                        <input id="name" name="Model.FullName" value="@Model!.FullName" autocomplete="name" required maxlength="160" />
+                        <FieldError For="FullName" Errors="errors" />
+                    </div>
+                    <div class="field">
+                        <label for="phone">Téléphone <span class="req">*</span></label>
+                        <input id="phone" name="Model.Phone" value="@Model.Phone" type="tel" autocomplete="tel" required maxlength="40" />
+                        <FieldError For="Phone" Errors="errors" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="email">Courriel <span class="req">*</span></label>
+                    <input id="email" name="Model.Email" value="@Model.Email" type="email" autocomplete="email" required maxlength="256" />
+                    <FieldError For="Email" Errors="errors" />
+                </div>
+                <div class="field">
+                    <label for="address">Adresse de l'intervention (facultatif)</label>
+                    <input id="address" name="Model.Address" value="@Model.Address" autocomplete="street-address" maxlength="300" />
+                </div>
+                <div class="field">
+                    <label for="message">Précisions (facultatif)</label>
+                    <textarea id="message" name="Model.Message" rows="3" maxlength="4000">@Model.Message</textarea>
+                </div>
+                <FormExtras ModelName="Model" Consent="Model.ConsentGiven" TenantName="@tenant.Name" Errors="errors" />
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Envoyer ma demande de rendez-vous</button>
+            <p class="muted small center">Ce n'est pas encore une réservation : nous vous écrivons pour confirmer.</p>
+        </form>
+
+        <aside class="aside-card">
+            <h2>Bon à savoir</h2>
+            <ul class="check-list">
+                <li><Icon Name="check" Size="16" /> Annulation sans frais jusqu'à 24 h avant</li>
+                <li><Icon Name="check" Size="16" /> Nous apportons tout le matériel</li>
+                <li><Icon Name="check" Size="16" /> Confirmation par courriel</li>
+            </ul>
+            <p class="aside-phone">Une urgence ? Appelez-nous<br /><a href="@SiteFormat.PhoneHref(tenant.Phone)">@tenant.Phone</a></p>
+        </aside>
+    </div>
+</section>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "rendez-vous")] private AppointmentForm? Model { get; set; }
+    [SupplyParameterFromQuery(Name = "service")] private string? ServiceSlug { get; set; }
+
+    private Tenant? tenant;
+    private AppointmentAvailability? availability;
+    private IReadOnlyList<CategoryWithServices> catalog = [];
+    private IReadOnlyDictionary<string, string>? errors;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        catalog = await Catalog.GetCatalogAsync();
+        availability = await Leads.GetAvailabilityAsync();
+
+        if (Model is null)
+        {
+            Model = new AppointmentForm();
+            Model.Service = catalog.SelectMany(c => c.Services).FirstOrDefault(s => s.Slug == ServiceSlug)?.Title;
+        }
+    }
+
+    private IEnumerable<DateOnly> AvailableDates()
+    {
+        for (var d = availability!.FirstDate; d <= availability.LastDate; d = d.AddDays(1))
+        {
+            if (availability.OpenDays.Contains(d.DayOfWeek) && !availability.ClosedDays.Contains(d))
+                yield return d;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (LeadRequest.IsSpam(Model!.Website))
+        {
+            Navigation.NavigateTo("/merci?demande=rendez-vous");
+            return;
+        }
+        if (!await Turnstile.VerifyAsync(HttpContext))
+        {
+            error = "La vérification anti-robot a échoué. Réessayez ou appelez-nous.";
+            return;
+        }
+
+        DateOnly? date = DateOnly.TryParseExact(Model.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : null;
+        TimeSlot? slot = Enum.TryParse<TimeSlot>(Model.Slot, out var s) ? s : null;
+
+        var result = await Leads.SubmitAsync(new LeadSubmission
+        {
+            Kind = LeadKind.Appointment,
+            FullName = Model.FullName,
+            Email = Model.Email,
+            Phone = Model.Phone,
+            Address = Model.Address,
+            Services = string.IsNullOrWhiteSpace(Model.Service) ? new List<string>() : new List<string> { Model.Service },
+            Message = Model.Message,
+            PreferredDate = date,
+            PreferredSlot = slot,
+            ConsentGiven = Model.ConsentGiven,
+        }.WithVisit(HttpContext));
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/merci?demande=rendez-vous");
+            return;
+        }
+        errors = result.FieldErrors;
+        error = result.FieldErrors.Count > 0 ? "Vérifiez les champs indiqués ci-dessous." : result.Error;
+    }
+}

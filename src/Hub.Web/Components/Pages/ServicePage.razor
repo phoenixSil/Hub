@@ -1,0 +1,130 @@
+@page "/services/{Slug}"
+@page "/aines/{Slug}"
+@inject ICurrentTenant CurrentTenant
+@inject ICatalogQueries Catalog
+@inject IContentQueries ContentQueries
+@inject NavigationManager Navigation
+
+@if (tenant is null || detail is null || site is null)
+{
+    return;
+}
+
+<Seo Title="@(detail.Service.SeoTitle ?? $"{detail.Service.Title} à {tenant.City}")"
+     Description="@(detail.Service.SeoDescription ?? detail.Service.Summary)"
+     SiteName="@tenant.Name" Image="@detail.Service.ImageUrl"
+     JsonLd="@JsonLd()" />
+
+<section class="page-hero" style="--hero-image:url('@(detail.Service.ImageUrl ?? "/images/site/hero.webp")')">
+    <div class="container">
+        <nav class="breadcrumb" aria-label="Fil d'Ariane">
+            <a href="/">Accueil</a> <span>/</span> <a href="/#@detail.Category.Slug">@detail.Category.Name</a>
+        </nav>
+        <h1>@detail.Service.Title</h1>
+        <p class="hero-lead">@detail.Service.Summary</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="/devis?service=@detail.Service.Slug">Demander un devis gratuit</a>
+            <a class="btn btn-ghost-light btn-lg" href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="18" /> @tenant.Phone</a>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container content-with-aside">
+        <article>
+            <RichText Text="@detail.Service.Body" Class="prose" />
+
+            @if (detail.PublicPricing is { } price)
+            {
+                <div class="price-box">
+                    <h2>Tarif indicatif</h2>
+                    <p>@PriceText(price)</p>
+                    @if (!string.IsNullOrWhiteSpace(price.Notes)) {<p class="muted">@price.Notes</p>}
+                </div>
+            }
+
+            @if (serviceFaq.Count > 0)
+            {
+                <h2>Questions fréquentes</h2>
+                <FaqList Items="serviceFaq" />
+            }
+        </article>
+
+        <aside class="aside-card">
+            <h2>Obtenir un prix</h2>
+            <p>Chaque intervention est différente. Décrivez votre besoin et nous vous répondons dans un délai d'un jour ouvrable.</p>
+            <a class="btn btn-primary btn-block" href="/devis?service=@detail.Service.Slug">Demander un devis</a>
+            <a class="btn btn-outline btn-block" href="/rendez-vous?service=@detail.Service.Slug"><Icon Name="calendar" Size="16" /> Demander un rendez-vous</a>
+            <p class="aside-phone">ou appelez-nous<br /><a href="@SiteFormat.PhoneHref(tenant.Phone)">@tenant.Phone</a></p>
+        </aside>
+    </div>
+</section>
+
+@if (detail.Related.Count > 0)
+{
+    <section class="section section-tint">
+        <div class="container">
+            <header class="section-head">
+                <span class="eyebrow">@detail.Category.Name</span>
+                <h2>Autres services</h2>
+            </header>
+            <div class="card-grid">
+                @foreach (var s in detail.Related.Take(3))
+                {
+                    <ServiceCard Service="s" />
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<CtaBand Phone="@tenant.Phone" QuoteUrl="@($"/devis?service={detail.Service.Slug}")" />
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Tenant? tenant;
+    private ServiceDetail? detail;
+    private SiteContent? site;
+    private List<FaqItem> serviceFaq = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        var segment = new Uri(Navigation.Uri).AbsolutePath.Trim('/').Split('/')[0];
+        detail = await Catalog.GetServiceAsync(segment, Slug);
+        if (detail is null)
+        {
+            Navigation.NotFound();
+            return;
+        }
+        site = await ContentQueries.GetAsync();
+        serviceFaq = site.Faq.Where(f => f.ServiceSlug == detail.Service.Slug).ToList();
+    }
+
+    private IEnumerable<string> JsonLd()
+    {
+        var baseUrl = SiteFormat.BaseUrl(Navigation);
+        var url = $"/{detail!.Category.RouteSegment}/{detail.Service.Slug}";
+        yield return SiteFormat.ServiceJsonLd(tenant!, baseUrl, detail.Service.Title, detail.Service.Summary, url);
+        if (serviceFaq.Count > 0)
+            yield return SiteFormat.FaqJsonLd(serviceFaq);
+    }
+
+    private static string PriceText(PricingModel p)
+    {
+        var fr = CultureInfo.GetCultureInfo("fr-CA");
+        string Amount(decimal? v) => v is { } d ? d.ToString("0.## $", fr) : "";
+        var range = p.MinAmount is not null && p.MaxAmount is not null && p.MaxAmount != p.MinAmount
+            ? $"de {Amount(p.MinAmount)} à {Amount(p.MaxAmount)}"
+            : $"à partir de {Amount(p.MinAmount ?? p.MaxAmount)}";
+        return p.Kind switch
+        {
+            PricingKind.Hourly => $"{range} l'heure" + (p.MinimumHours is { } h ? $" (minimum {h:0.#} h)" : ""),
+            PricingKind.PerShift => $"{range} par quart" + (p.ShiftHours is { } sh ? $" de {sh:0.#} h" : ""),
+            PricingKind.Monthly => $"{range} par mois",
+            PricingKind.Flat => range,
+            _ => "Prix établi après une courte évaluation, sans frais.",
+        };
+    }
+}
