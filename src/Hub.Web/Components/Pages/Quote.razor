@@ -193,6 +193,7 @@
             Phone = Model.Phone,
             Address = Model.Address,
             AreaSlug = Model.AreaSlug,
+            AreaName = Model.AreaSlug == "autre" ? "Autre secteur" : areas.FirstOrDefault(a => a.Slug == Model.AreaSlug)?.Name,
             Services = selectedServices.ToList(),
             PropertyType = Model.PropertyType,
             PropertySize = Model.PropertySize,

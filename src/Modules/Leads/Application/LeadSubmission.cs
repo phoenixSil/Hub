@@ -13,6 +13,8 @@ public sealed class LeadSubmission
     public string? Phone { get; set; }
     public string? Address { get; set; }
     public string? AreaSlug { get; set; }
+    /// <summary>Nom du secteur tel qu'affiché sur le site, pour les courriels (non enregistré).</summary>
+    public string? AreaName { get; set; }
     public List<string> Services { get; set; } = [];
     public string? PropertyType { get; set; }
     public string? PropertySize { get; set; }

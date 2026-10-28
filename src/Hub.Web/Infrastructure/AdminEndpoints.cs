@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Hub.Modules.Content.Application;
 using Hub.Modules.Leads.Application;
 using Hub.Modules.Leads.Domain;
 using Hub.Modules.Platform.Domain;
@@ -13,12 +14,15 @@ public static class AdminEndpoints
     /// <summary>GET /admin/demandes/export.csv : toutes les demandes, ouvrable dans Excel (séparateur « ; », UTF-8).</summary>
     public static void MapAdminExports(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/admin/demandes/export.csv", async (HttpContext ctx, ITenantContext tenant, ILeadService leads) =>
+        app.MapGet("/admin/demandes/export.csv", async (HttpContext ctx, ITenantContext tenant, ILeadService leads, IContentQueries content) =>
         {
             // L'entreprise de l'administrateur connecté prime sur celle du nom de domaine.
             if (Guid.TryParse(ctx.User.FindFirst(HubClaims.TenantId)?.Value, out var tenantId))
                 tenant.Set(tenantId);
 
+            var areaNames = (await content.GetAsync(ctx.RequestAborted)).Areas
+                .GroupBy(a => a.Slug).ToDictionary(g => g.Key, g => g.First().Name);
+            areaNames["autre"] = "Autre secteur";
             var rows = await leads.ListAsync(new LeadListFilter(Take: 100_000), ctx.RequestAborted);
             var fr = CultureInfo.GetCultureInfo("fr-CA");
             var sb = new StringBuilder();
@@ -37,7 +41,7 @@ public static class AdminEndpoints
                 string?[] cells =
                 [
                     Local(l.CreatedAt), LeadLabels.Of(l.Kind), LeadLabels.Of(l.Status), l.FullName, l.Email, l.Phone,
-                    l.Address, l.AreaSlug, l.Services, l.PropertyType, l.PropertySize, l.Frequency, l.Subject, l.Message,
+                    l.Address, l.AreaSlug is { } a ? areaNames.GetValueOrDefault(a, a) : null, l.Services, l.PropertyType, l.PropertySize, l.Frequency, l.Subject, l.Message,
                     l.PreferredDate?.ToString("yyyy-MM-dd"), l.PreferredSlot is { } s ? LeadLabels.Of(s) : null,
                     l.ConfirmedFor is { } c ? Local(c) : null, l.Source, l.Medium, l.Campaign, l.LandingPage,
                 ];

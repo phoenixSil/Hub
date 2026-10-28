@@ -102,17 +102,17 @@ internal sealed class LeadService(
             tenant.TenantId, lead.Id, lead.Kind, lead.Source, lead.Medium, lead.Campaign,
             lead.LandingPage, lead.VisitorId, clock.GetUtcNow()), ct);
 
-        await SendSubmissionEmailsAsync(lead, ct);
+        await SendSubmissionEmailsAsync(lead, Clean(s.AreaName), ct);
         return Result<Guid>.Success(lead.Id);
     }
 
-    private async Task SendSubmissionEmailsAsync(Lead lead, CancellationToken ct)
+    private async Task SendSubmissionEmailsAsync(Lead lead, string? areaName, CancellationToken ct)
     {
         try
         {
             var info = await tenantInfo.GetCurrentAsync(ct);
 
-            var (adminSubject, adminHtml) = LeadEmails.AdminNotification(lead, info);
+            var (adminSubject, adminHtml) = LeadEmails.AdminNotification(lead, info, areaName);
             var adminResult = await email.SendAsync(new EmailMessage(info.AdminNotificationEmail, adminSubject, adminHtml, ReplyTo: lead.Email, FromName: info.Name), ct);
 
             var (ackSubject, ackHtml) = LeadEmails.Acknowledgement(lead, info);

@@ -14,7 +14,7 @@ internal static class LeadEmails
 
     private static string E(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
-    public static (string Subject, string Html) AdminNotification(Lead lead, TenantInfo tenant)
+    public static (string Subject, string Html) AdminNotification(Lead lead, TenantInfo tenant, string? areaName = null)
     {
         var subject = $"[{tenant.Name}] {LeadLabels.Of(lead.Kind)} — {lead.FullName}";
         var rows = new StringBuilder();
@@ -28,7 +28,7 @@ internal static class LeadEmails
         Row("Courriel", lead.Email);
         Row("Téléphone", lead.Phone);
         Row("Adresse", lead.Address);
-        Row("Secteur", lead.AreaSlug);
+        Row("Secteur", areaName ?? lead.AreaSlug);
         Row("Services", lead.Services);
         Row("Propriété", lead.PropertyType);
         Row("Superficie", lead.PropertySize);

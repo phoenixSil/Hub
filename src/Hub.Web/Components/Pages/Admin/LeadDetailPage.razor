@@ -1,6 +1,7 @@
 @page "/admin/demandes/{Id:guid}"
 @rendermode InteractiveServer
 @inject ILeadService Leads
+@inject IContentQueries ContentQueries
 @inject AuthenticationStateProvider Auth
 
 <PageTitle>Demande</PageTitle>
@@ -45,7 +46,7 @@
             <dt>Courriel</dt><dd><a href="mailto:@l.Email">@l.Email</a></dd>
             @if (l.Phone is not null) { <dt>Téléphone</dt><dd><a href="tel:@l.Phone">@l.Phone</a></dd> }
             @if (l.Address is not null) { <dt>Adresse</dt><dd>@l.Address</dd> }
-            @if (l.AreaSlug is not null) { <dt>Secteur</dt><dd>@l.AreaSlug</dd> }
+            @if (l.AreaSlug is not null) { <dt>Secteur</dt><dd>@AreaName(l.AreaSlug)</dd> }
         </dl>
 
         <h2>Demande</h2>
@@ -128,8 +129,14 @@
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
+    private IReadOnlyList<ServiceArea> areas = [];
+
+    private string AreaName(string slug) =>
+        slug == "autre" ? "Autre secteur" : areas.FirstOrDefault(a => a.Slug == slug)?.Name ?? slug;
+
     private async Task LoadAsync()
     {
+        if (areas.Count == 0) areas = (await ContentQueries.GetAsync()).Areas;
         detail = await Leads.GetAsync(Id);
         notFound = detail is null;
         if (detail?.Lead.PreferredDate is { } d && confirmAt is null)
