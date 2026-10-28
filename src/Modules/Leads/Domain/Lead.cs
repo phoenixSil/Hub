@@ -56,6 +56,9 @@ public sealed class Lead : TenantEntity
 
     public bool ConsentGiven { get; set; }
     public string? IpHash { get; set; }
+
+    /// <summary>Date du rappel envoyé quand la demande est restée « Nouvelle » plus de 24 h.</summary>
+    public DateTimeOffset? ReminderSentAt { get; set; }
 }
 
 /// <summary>Historique de suivi d'une demande.</summary>

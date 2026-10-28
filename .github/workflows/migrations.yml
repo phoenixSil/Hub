@@ -40,6 +40,22 @@ jobs:
               --context "$context" --output-dir Infrastructure/Migrations --no-build
           done
 
+      - name: Retirer les migrations vides (modules sans changement)
+        run: |
+          python3 - <<'PY'
+          import glob, os, re
+          for f in glob.glob('src/Modules/*/Infrastructure/Migrations/*.cs'):
+              if f.endswith('.Designer.cs') or f.endswith('ModelSnapshot.cs'):
+                  continue
+              s = open(f, encoding='utf-8').read()
+              m = re.search(r'void Up\(MigrationBuilder migrationBuilder\)\s*\{(.*?)\n        \}', s, re.S)
+              if m and 'migrationBuilder.' not in m.group(1):
+                  os.remove(f)
+                  os.remove(f[:-3] + '.Designer.cs')
+                  print('Migration vide supprimée :', f)
+          PY
+          git status --short
+
       - name: Vérifier que tout compile avec les migrations
         run: dotnet build Hub.slnx -c Debug
 

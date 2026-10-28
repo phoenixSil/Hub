@@ -56,6 +56,11 @@ public sealed class PricingModel : TenantEntity
     public decimal? MaxAmount { get; set; }
     public decimal? MinimumHours { get; set; }
     public decimal? ShiftHours { get; set; }
+
+    /// <summary>Notes internes (hypothèses, sources) : jamais affichées sur le site.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>Précision affichée sous le prix sur le site (ex. « Taxes en sus »).</summary>
+    public string? PublicNote { get; set; }
     public bool IsPublic { get; set; }
 }

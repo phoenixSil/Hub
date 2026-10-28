@@ -50,6 +50,8 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             e.Property(x => x.MinimumHours).HasPrecision(5, 2);
             e.Property(x => x.ShiftHours).HasPrecision(5, 2);
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.Property(x => x.PublicNote).HasMaxLength(300);
             e.HasIndex(x => x.ServiceId);
         });
     }
