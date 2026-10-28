@@ -96,7 +96,7 @@
         <div class="admin-card">
             <h2>Suivi</h2>
             <div class="field">
-                <textarea rows="3" @bind="note" placeholder="Ajouter une note (appel, devis envoyé, prix proposé…)"></textarea>
+                <textarea rows="3" @bind="note" @bind:event="oninput" placeholder="Ajouter une note (appel, devis envoyé, prix proposé…)"></textarea>
             </div>
             <button class="btn btn-outline btn-sm" @onclick="AddNoteAsync" disabled="@string.IsNullOrWhiteSpace(note)">Ajouter la note</button>
 

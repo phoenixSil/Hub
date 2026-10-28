@@ -75,7 +75,7 @@ else
                 <li>
                     Entrez le code à 6 chiffres affiché par l'application :
                     <div class="credit-input">
-                        <input @bind="verificationCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456" />
+                        <input @bind="verificationCode" @bind:event="oninput" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456" />
                         <button class="btn btn-primary btn-sm" @onclick="EnableAsync" disabled="@string.IsNullOrWhiteSpace(verificationCode)">Activer</button>
                     </div>
                 </li>
@@ -86,8 +86,8 @@ else
     <div class="admin-card">
         <h2>Changer le mot de passe</h2>
         <div class="field-row">
-            <div class="field"><label>Mot de passe actuel</label><input type="password" @bind="currentPassword" autocomplete="current-password" /></div>
-            <div class="field"><label>Nouveau mot de passe (12 caractères minimum)</label><input type="password" @bind="newPassword" autocomplete="new-password" /></div>
+            <div class="field"><label>Mot de passe actuel</label><input type="password" @bind="currentPassword" @bind:event="oninput" autocomplete="current-password" /></div>
+            <div class="field"><label>Nouveau mot de passe (12 caractères minimum)</label><input type="password" @bind="newPassword" @bind:event="oninput" autocomplete="new-password" /></div>
         </div>
         <button class="btn btn-outline btn-sm" @onclick="ChangePasswordAsync" disabled="@(string.IsNullOrEmpty(currentPassword) || string.IsNullOrEmpty(newPassword))">Changer le mot de passe</button>
     </div>
@@ -136,7 +136,7 @@ else
         var uri = $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(user!.Email!)}?secret={key}&issuer={Uri.EscapeDataString(issuer)}&digits=6";
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
-        qrSvg = new SvgQRCode(data).GetGraphic(5);
+        qrSvg = new SvgQRCode(data).GetGraphic(5, "#000000", "#ffffff", true, SvgQRCode.SizingMode.ViewBoxAttribute);
     }
 
     private async Task EnableAsync()
