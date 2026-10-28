@@ -36,9 +36,9 @@ else
                 Chacun permet une connexion si vous perdez votre téléphone. Ils ne seront plus affichés.
             </div>
             <ul class="recovery-codes">
-                @foreach (var code in recoveryCodes)
+                @foreach (var recoveryCode in recoveryCodes)
                 {
-                    <li><code>@code</code></li>
+                    <li><code>@recoveryCode</code></li>
                 }
             </ul>
             <button class="btn btn-outline btn-sm" @onclick="() => recoveryCodes = null">J'ai noté mes codes</button>
