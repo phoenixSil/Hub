@@ -71,4 +71,10 @@ dotnet ef migrations add NomDeLaMigration --project src/Modules/Leads --startup-
 
 ## Déploiement
 
-Workflow **Déployer sur Azure** (manuel). Secrets GitHub : `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_PUBLISH_PROFILE`.
+Guide complet : [docs/deploiement-azure.md](docs/deploiement-azure.md). En résumé :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\azure-deployer.ps1
+```
+
+crée l'infrastructure décrite dans `infra/main.bicep` (App Service B1, Azure SQL Basic, stockage des images) et déploie le site. Ensuite, le workflow **Déployer sur Azure** (manuel) met le site à jour depuis GitHub (secrets `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_PUBLISH_PROFILE`).

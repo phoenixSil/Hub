@@ -18,6 +18,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Vérifier l'infrastructure (Bicep)
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
       - name: Restaurer
         run: dotnet restore Hub.slnx
 

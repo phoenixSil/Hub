@@ -111,6 +111,23 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/introuvable");
 app.UseHttpsRedirection();
+
+// Une seule adresse pour Google : scintinet.com → www.scintinet.com (si Hub:CanonicalHost est défini).
+var canonicalHost = app.Configuration["Hub:CanonicalHost"];
+if (!string.IsNullOrWhiteSpace(canonicalHost))
+{
+    app.Use(async (ctx, next) =>
+    {
+        var host = ctx.Request.Host.Host;
+        if (canonicalHost.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(host, canonicalHost[4..], StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.Redirect($"https://{canonicalHost}{ctx.Request.PathBase}{ctx.Request.Path}{ctx.Request.QueryString}", permanent: true);
+            return;
+        }
+        await next();
+    });
+}
 app.UseStaticFiles(); // images envoyées par le back-office (wwwroot/uploads)
 
 app.UseMiddleware<TenantResolutionMiddleware>();
