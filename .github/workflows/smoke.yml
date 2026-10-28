@@ -49,6 +49,12 @@ jobs:
           grep -E "fail|crit|Exception|error" app.log | head -30 | while read -r line; do echo "::error::$line"; done
           exit 1
 
+      - name: Publier les prix (base de test seulement)
+        run: |
+          SQL=$(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest")
+          docker exec "$SQL" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Hub_Smoke_2026!' -d HubSmoke \
+            -Q "UPDATE catalog.PricingModels SET IsPublic = 1 WHERE Kind IN ('Hourly','Flat'); SELECT COUNT(*) FROM catalog.PricingModels WHERE IsPublic = 1;"
+
       - name: Parcourir les pages et envoyer un devis
         run: python3 .github/smoke/smoke.py http://localhost:5080
 

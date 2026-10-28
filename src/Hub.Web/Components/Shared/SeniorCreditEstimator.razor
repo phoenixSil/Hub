@@ -1,0 +1,52 @@
+@using Microsoft.Extensions.Options
+@inject IOptions<SeniorCreditOptions> CreditOptions
+
+@* Estimateur du coût réel après le crédit d'impôt pour maintien à domicile.
+   Formulaire GET : fonctionne sans JavaScript et l'adresse peut être partagée. *@
+<div class="credit-box" id="credit-impot">
+    <h2>Combien ça coûte vraiment ?</h2>
+    <p>
+        Les personnes de <strong>@Credit.MinAge ans et plus</strong> peuvent récupérer
+        <strong>@Percent(Credit.Rate)</strong> des services admissibles grâce au crédit d'impôt
+        pour maintien à domicile des aînés (taux @Credit.Year).
+        À @Money(HourlyRate) l'heure, une heure revient à environ <strong>@Money(HourlyRate * (1 - Credit.Rate))</strong>.
+    </p>
+
+    <form method="get" action="@($"{Path}#credit-impot")" class="credit-form">
+        <label for="heures">Heures d'aide par semaine</label>
+        <div class="credit-input">
+            <input id="heures" name="heures" type="number" min="1" max="60" step="1" value="@HoursPerWeek" />
+            <button type="submit" class="btn btn-outline btn-sm">Calculer</button>
+        </div>
+    </form>
+
+    <dl class="credit-result">
+        <div><dt>Facturé par semaine</dt><dd>@Money(Weekly)</dd></div>
+        <div><dt>Crédit d'impôt estimé</dt><dd>− @Money(Weekly * Credit.Rate)</dd></div>
+        <div class="credit-net"><dt>Coût réel par semaine</dt><dd>@Money(Weekly * (1 - Credit.Rate))</dd></div>
+        <div><dt>Soit par mois (environ)</dt><dd>@Money(Weekly * (1 - Credit.Rate) * WeeksPerMonth)</dd></div>
+    </dl>
+
+    <p class="muted small">
+        Estimation avant taxes, sous réserve d'admissibilité. Le crédit diminue lorsque le revenu familial dépasse
+        un certain seuil et les dépenses admissibles sont plafonnées chaque année.
+        Détails : <a href="https://www.revenuquebec.ca/fr/citoyens/declaration-de-revenus/produire-votre-declaration-de-revenus/comment-remplir-votre-declaration-de-revenus/aide-par-ligne/451-a-480-remboursement-ou-solde-a-payer/ligne-458/" target="_blank" rel="noopener">Revenu Québec, ligne 458</a>.
+        Nos factures détaillent les services pour que vous puissiez le réclamer.
+    </p>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
+    private const decimal WeeksPerMonth = 4.33m;
+
+    [Parameter, EditorRequired] public decimal HourlyRate { get; set; }
+    [Parameter, EditorRequired] public string Path { get; set; } = "/";
+    [SupplyParameterFromQuery(Name = "heures")] private int? Hours { get; set; }
+
+    private SeniorCreditOptions Credit => CreditOptions.Value;
+    private int HoursPerWeek => Math.Clamp(Hours ?? 10, 1, 60);
+    private decimal Weekly => HourlyRate * HoursPerWeek;
+
+    private static string Money(decimal value) => value.ToString("C2", Fr);
+    private static string Percent(decimal rate) => (rate * 100).ToString("0.#", Fr) + " %";
+}

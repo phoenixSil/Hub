@@ -295,3 +295,17 @@ h1:focus, h1:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Tarif et crédit d'impôt (pages des services aux aînés) */
+.price-line { font-size: 1.25rem; font-weight: 600; color: var(--ink); margin-bottom: .3em; }
+.credit-box { margin: 32px 0; padding: 26px; border-radius: var(--radius); background: var(--tint); border: 1px solid var(--line); }
+.credit-box h2 { font-size: 1.3rem; margin-top: 0; }
+.credit-form { margin: 18px 0 12px; }
+.credit-form label { display: block; font-weight: 500; color: var(--ink); margin-bottom: 6px; font-size: .92rem; }
+.credit-input { display: flex; gap: 10px; align-items: center; }
+.credit-input input { width: 110px; font: inherit; padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 10px; }
+.credit-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.credit-result div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.credit-result dt { font-size: .8rem; color: var(--muted); }
+.credit-result dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.credit-result .credit-net { border: 2px solid var(--green); }

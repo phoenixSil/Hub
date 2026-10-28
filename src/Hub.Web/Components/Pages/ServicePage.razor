@@ -37,10 +37,15 @@
             @if (detail.PublicPricing is { } price)
             {
                 <div class="price-box">
-                    <h2>Tarif indicatif</h2>
-                    <p>@PriceText(price)</p>
-                    @if (!string.IsNullOrWhiteSpace(price.Notes)) {<p class="muted">@price.Notes</p>}
+                    <h2>Tarif</h2>
+                    <p class="price-line">@PriceText(price)</p>
+                    @if (!string.IsNullOrWhiteSpace(price.PublicNote)) {<p class="muted">@price.PublicNote</p>}
                 </div>
+
+                @if (IsSeniorService && price.MinAmount is { } rate && price.Kind is PricingKind.Hourly or PricingKind.PerShift)
+                {
+                    <SeniorCreditEstimator HourlyRate="rate" Path="@($"/{detail.Category.RouteSegment}/{detail.Service.Slug}")" />
+                }
             }
 
             @if (serviceFaq.Count > 0)
@@ -102,6 +107,8 @@
         serviceFaq = site.Faq.Where(f => f.ServiceSlug == detail.Service.Slug).ToList();
     }
 
+    private bool IsSeniorService => detail?.Category.RouteSegment == "aines";
+
     private IEnumerable<string> JsonLd()
     {
         var baseUrl = SiteFormat.BaseUrl(Navigation);
@@ -114,7 +121,7 @@
     private static string PriceText(PricingModel p)
     {
         var fr = CultureInfo.GetCultureInfo("fr-CA");
-        string Amount(decimal? v) => v is { } d ? d.ToString("0.## $", fr) : "";
+        string Amount(decimal? v) => v is { } d ? d.ToString("0.## ' $'", fr) : "";
         var range = p.MinAmount is not null && p.MaxAmount is not null && p.MaxAmount != p.MinAmount
             ? $"de {Amount(p.MinAmount)} à {Amount(p.MaxAmount)}"
             : $"à partir de {Amount(p.MinAmount ?? p.MaxAmount)}";

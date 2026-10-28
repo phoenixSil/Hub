@@ -19,6 +19,20 @@ public static class ScintiNetSeeder
 {
     public static async Task SeedAsync(IServiceProvider services, CancellationToken ct = default)
     {
+        await SeedInitialAsync(services, ct);
+
+        // Mises à niveau : appliquées aussi aux bases déjà créées, sans écraser les modifications.
+        var tenant = await services.GetRequiredService<ITenantStore>()
+            .GetAsync(services.GetRequiredService<ITenantContext>().TenantId, ct);
+        if (tenant?.Slug != "scintinet") return;
+
+        await ScintiNetUpgrades.SeedPricingAsync(services, ct);
+        await ScintiNetUpgrades.FillAreaTextsAsync(services, ct);
+        services.GetRequiredService<Hub.SharedKernel.Caching.ContentCache>().Invalidate();
+    }
+
+    private static async Task SeedInitialAsync(IServiceProvider services, CancellationToken ct)
+    {
         var tenantContext = services.GetRequiredService<ITenantContext>();
         var store = services.GetRequiredService<ITenantStore>();
         var tenant = await store.GetAsync(tenantContext.TenantId, ct);

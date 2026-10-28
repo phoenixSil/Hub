@@ -64,6 +64,7 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{MediaOptions.Section}:Bl
 else
     builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
 
+builder.Services.Configure<SeniorCreditOptions>(builder.Configuration.GetSection(SeniorCreditOptions.Section));
 builder.Services.Configure<TurnstileOptions>(builder.Configuration.GetSection(TurnstileOptions.Section));
 builder.Services.AddHttpClient<TurnstileVerifier>();
 

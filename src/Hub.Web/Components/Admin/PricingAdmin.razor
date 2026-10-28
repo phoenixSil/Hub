@@ -1,5 +1,5 @@
 <CrudEditor T="PricingModel" Title="Modèles de prix" Context="p"
-            Help="Préparé pour l'analyse des prix et le futur agent IA. Un prix n'apparaît sur le site que si « Afficher » est coché."
+            Help="Grille issue de l'analyse des prix (phase 2). Un prix n'apparaît sur le site que si « Afficher » est coché ; sur les pages aînés, il active aussi l'estimateur du crédit d'impôt."
             NewItem="@(() => new PricingModel { ServiceId = Services.FirstOrDefault()?.Id ?? Guid.Empty })">
     <Header><th>Service</th><th>Type</th><th>Montant</th><th>Affiché</th></Header>
     <Row>
@@ -35,7 +35,8 @@
             <div class="field"><label>Heures minimum</label><InputNumber @bind-Value="p.MinimumHours" /></div>
             <div class="field"><label>Durée d'un quart (h)</label><InputNumber @bind-Value="p.ShiftHours" /></div>
         </div>
-        <div class="field"><label>Notes</label><InputTextArea rows="2" @bind-Value="p.Notes" /></div>
+        <div class="field"><label>Note affichée sous le prix (facultatif)</label><InputText @bind-Value="p.PublicNote" placeholder="ex. Taxes en sus. Minimum 3 heures par visite." /></div>
+        <div class="field"><label>Notes internes (jamais affichées)</label><InputTextArea rows="2" @bind-Value="p.Notes" /></div>
         <label class="check"><InputCheckbox @bind-Value="p.IsPublic" /> Afficher ce prix sur la page du service</label>
     </Form>
 </CrudEditor>
