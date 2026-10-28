@@ -32,7 +32,12 @@ def get(path, expect=200, contains=None, follow=True):
     status = "OK" if ok else "ÉCHEC"
     print(f"{status} GET {path} -> {code}" + (f" (manque « {contains} »)" if contains and contains not in body else ""))
     if not ok:
-        failures.append(f"GET {path} -> {code}, attendu {expect}" + (f" avec « {contains} »" if contains else ""))
+        detail = ""
+        if contains and code == expect:
+            probe = contains[:12]
+            i = body.find(probe)
+            detail = f" ; extrait : {body[i:i + 80]!r}" if i >= 0 else f" ; « {probe} » absent"
+        failures.append(f"GET {path} -> {code}, attendu {expect}" + (f" avec « {contains} »" if contains else "") + detail)
     return body, location
 
 
