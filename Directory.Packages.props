@@ -1,5 +1,11 @@
 <Project>
+  <PropertyGroup>
+    <!-- Les versions ci-dessous s'imposent aussi aux dépendances indirectes (correctifs de sécurité). -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
   <ItemGroup>
+    <!-- Dépendance indirecte (SQL Server, Identity) : 9.0.4 a deux failles connues (NU1902, NU1903). -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
