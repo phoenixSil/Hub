@@ -53,7 +53,12 @@ namespace Hub.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("decimal(5,2)");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PublicNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<Guid>("ServiceId")
                         .HasColumnType("uniqueidentifier");

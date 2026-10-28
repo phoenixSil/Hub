@@ -140,6 +140,9 @@ namespace Hub.Modules.Leads.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<DateTimeOffset?>("ReminderSentAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Services")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
