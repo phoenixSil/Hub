@@ -123,6 +123,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapSeo();
 app.MapTracking();
+app.MapAdminExports();
 
 app.MapPost("/compte/deconnexion", async (SignInManager<HubUser> signIn) =>
 {

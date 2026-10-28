@@ -89,6 +89,28 @@ internal static class LeadEmails
         return ($"{tenant.Name} — rendez-vous confirmé", Layout(tenant, "Rendez-vous confirmé", body));
     }
 
+    public static (string Subject, string Html) Reminder(IReadOnlyList<Lead> leads, TenantInfo tenant)
+    {
+        var baseUrl = tenant.SiteUrl?.TrimEnd('/');
+        var rows = new StringBuilder();
+        foreach (var lead in leads)
+        {
+            var hours = (int)(DateTimeOffset.UtcNow - lead.CreatedAt).TotalHours;
+            var name = string.IsNullOrEmpty(baseUrl)
+                ? E(lead.FullName)
+                : $"<a href=\"{E(baseUrl)}/admin/demandes/{lead.Id}\">{E(lead.FullName)}</a>";
+            rows.Append($"<tr><td style=\"padding:6px 12px 6px 0\">{name}</td><td style=\"padding:6px 12px 6px 0;color:#64748b\">{E(LeadLabels.Of(lead.Kind))}</td><td style=\"padding:6px 0;color:#64748b\">reçue il y a {hours} h</td></tr>");
+        }
+
+        var body = $"""
+            <p>{(leads.Count == 1 ? "Une demande attend" : $"{leads.Count} demandes attendent")} toujours une réponse depuis plus de 24 heures.</p>
+            <table style="border-collapse:collapse;font-size:14px">{rows}</table>
+            <p style="margin-top:16px;color:#64748b;font-size:13px">Passez la demande au statut « Contactée » (ou un autre) pour ne plus recevoir ce rappel.</p>
+            """;
+        var subject = $"[{tenant.Name}] Rappel : {leads.Count} demande{(leads.Count > 1 ? "s" : "")} sans réponse";
+        return (subject, Layout(tenant, "Demandes en attente", body));
+    }
+
     private static string Digits(string phone) => "+" + new string(phone.Where(char.IsDigit).ToArray());
 
     private static string Layout(TenantInfo tenant, string title, string content) => $"""

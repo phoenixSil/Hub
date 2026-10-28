@@ -1,0 +1,95 @@
+@page "/compte/connexion-2fa"
+@layout AuthLayout
+@inject SignInManager<HubUser> SignInManager
+@inject NavigationManager Navigation
+@inject ILogger<LoginWith2fa> Logger
+@using Microsoft.AspNetCore.Identity
+
+<PageTitle>Vérification en deux étapes</PageTitle>
+<HeadContent><meta name="robots" content="noindex, nofollow" /></HeadContent>
+
+<div class="auth-card">
+    <img src="/images/site/logo.png" alt="" class="auth-logo" width="180" height="57" />
+    <h1>Vérification en deux étapes</h1>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-error" role="alert">@error</div>
+    }
+
+    @if (UseRecovery)
+    {
+        <p class="muted">Entrez l'un de vos codes de récupération. Chaque code ne fonctionne qu'une fois.</p>
+    }
+    else
+    {
+        <p class="muted">Entrez le code à 6 chiffres affiché dans votre application d'authentification.</p>
+    }
+
+    <form method="post" @formname="deux-etapes" @onsubmit="VerifyAsync">
+        <AntiforgeryToken />
+        <div class="field">
+            <label for="code">@(UseRecovery ? "Code de récupération" : "Code")</label>
+            <input id="code" name="Input.Code" autocomplete="one-time-code" inputmode="@(UseRecovery ? "text" : "numeric")" required autofocus />
+        </div>
+        @if (!UseRecovery)
+        {
+            <label class="check"><input type="checkbox" name="Input.RememberDevice" value="true" /> Ne plus demander sur cet appareil pendant 30 jours</label>
+        }
+        <button type="submit" class="btn btn-primary btn-block">Vérifier</button>
+    </form>
+
+    <p class="small muted center">
+        @if (UseRecovery)
+        {
+            <a href="@($"/compte/connexion-2fa?returnUrl={Uri.EscapeDataString(Target)}")">Utiliser l'application d'authentification</a>
+        }
+        else
+        {
+            <a href="@($"/compte/connexion-2fa?recuperation=1&returnUrl={Uri.EscapeDataString(Target)}")">Je n'ai pas accès à mon téléphone</a>
+        }
+    </p>
+</div>
+
+@code {
+    public sealed class TwoFactorInput
+    {
+        public string Code { get; set; } = string.Empty;
+        public bool RememberDevice { get; set; }
+    }
+
+    [SupplyParameterFromForm(FormName = "deux-etapes")] private TwoFactorInput? Input { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "recuperation")] private string? Recovery { get; set; }
+
+    private string? error;
+    private bool UseRecovery => Recovery == "1";
+    private string Target => !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") ? ReturnUrl : "/admin";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new TwoFactorInput();
+        // Pas d'étape 1 réussie : retour à la connexion.
+        if (await SignInManager.GetTwoFactorAuthenticationUserAsync() is null)
+            Navigation.NavigateTo("/compte/connexion", forceLoad: true);
+    }
+
+    private async Task VerifyAsync()
+    {
+        var code = Input!.Code.Replace(" ", string.Empty).Replace("-", string.Empty).Trim();
+        var result = UseRecovery
+            ? await SignInManager.TwoFactorRecoveryCodeSignInAsync(code)
+            : await SignInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent: true, rememberClient: Input.RememberDevice);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Connexion en deux étapes réussie{Recovery}", UseRecovery ? " (code de récupération)" : "");
+            Navigation.NavigateTo(Target, forceLoad: true);
+            return;
+        }
+
+        error = result.IsLockedOut
+            ? "Trop d'essais : le compte est bloqué 15 minutes."
+            : "Code invalide. Vérifiez l'heure de votre téléphone et réessayez.";
+    }
+}

@@ -23,6 +23,7 @@ ADMIN = [
     ("admin-demandes", "/admin/demandes"),
     ("admin-services", "/admin/services"),
     ("admin-entreprise", "/admin/entreprise"),
+    ("admin-securite", "/admin/securite"),
 ]
 
 with sync_playwright() as p:

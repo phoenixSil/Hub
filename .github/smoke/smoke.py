@@ -141,6 +141,8 @@ post_form("/compte/connexion", "login", [
 ], "/admin")
 get("/admin", contains="Tableau de bord")
 get("/admin/demandes", contains="Test Fumée")
+get("/admin/demandes/export.csv", contains="Test Fumée")
+get("/admin/securite", contains="Vérification en deux étapes")
 for p in ["/admin/services", "/admin/secteurs", "/admin/offres", "/admin/faq", "/admin/avis",
           "/admin/textes", "/admin/pages", "/admin/images", "/admin/entreprise", "/admin/canaux", "/admin/horaires"]:
     get(p)

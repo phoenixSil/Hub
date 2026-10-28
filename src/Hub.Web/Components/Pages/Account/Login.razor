@@ -50,11 +50,16 @@
     private async Task LoginAsync()
     {
         var result = await SignInManager.PasswordSignInAsync(Input!.Email.Trim(), Input.Password, isPersistent: true, lockoutOnFailure: true);
+        var target = !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") ? ReturnUrl : "/admin";
         if (result.Succeeded)
         {
             Logger.LogInformation("Connexion de {Email}", Input.Email);
-            var target = !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") ? ReturnUrl : "/admin";
             Navigation.NavigateTo(target, forceLoad: true);
+            return;
+        }
+        if (result.RequiresTwoFactor)
+        {
+            Navigation.NavigateTo($"/compte/connexion-2fa?returnUrl={Uri.EscapeDataString(target)}", forceLoad: true);
             return;
         }
 

@@ -15,6 +15,7 @@ public static class LeadsModule
         services.AddModuleDbContext<LeadsDbContext>(connectionString, LeadsDbContext.SchemaName);
         services.AddRepository<LeadsDbContext, ClosedDay>();
         services.AddScoped<ILeadService, LeadService>();
+        services.AddHostedService<LeadReminderService>();
         services.AddSingleton<IModuleInitializer, LeadsInitializer>();
         return services;
     }

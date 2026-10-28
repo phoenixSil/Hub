@@ -27,6 +27,7 @@ jobs:
       Hub__AdminPassword: "SmokeTest-Password-2026"
       ASPNETCORE_URLS: "http://localhost:5080"
       ASPNETCORE_ENVIRONMENT: "Production"
+      Leads__RemindersAnyHour: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -54,9 +55,21 @@ jobs:
           SQL=$(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest")
           docker exec "$SQL" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Hub_Smoke_2026!' -d HubSmoke \
             -Q "UPDATE catalog.PricingModels SET IsPublic = 1 WHERE Kind IN ('Hourly','Flat'); SELECT COUNT(*) FROM catalog.PricingModels WHERE IsPublic = 1;"
+          # Une demande vieille de 2 jours, pour déclencher le rappel automatique
+          docker exec "$SQL" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Hub_Smoke_2026!' -d HubSmoke \
+            -Q "INSERT INTO leads.Leads (Id, TenantId, CreatedAt, UpdatedAt, Kind, Status, FullName, Email, ConsentGiven) SELECT NEWID(), Id, DATEADD(day, -2, SYSDATETIMEOFFSET()), DATEADD(day, -2, SYSDATETIMEOFFSET()), 'Quote', 'New', 'Ancienne Demande', 'ancienne@example.com', 1 FROM platform.Tenants;"
 
       - name: Parcourir les pages et envoyer un devis
         run: python3 .github/smoke/smoke.py http://localhost:5080
+
+      - name: Rappel des demandes en attente
+        run: |
+          for i in $(seq 1 30); do
+            if grep -q "Rappel : 1 demande" app.log; then echo "::notice::Rappel automatique envoyé"; exit 0; fi
+            sleep 3
+          done
+          echo "::error::Le rappel des demandes en attente n'a pas été envoyé"
+          exit 1
 
       - name: Captures d'écran
         if: always()
