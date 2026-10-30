@@ -1,0 +1,38 @@
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Entreprise scintinet créée.
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Administrateur admin@smoke.test créé.
+info: Seed[0]
+      Préparation des données de départ de ScintiNet.
+info: Seed[0]
+      Données de départ prêtes.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {7e8857a9-e036-4d32-a959-0ee7d8bb16b5} may be persisted to storage in unencrypted form.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/runner/work/Hub/Hub/publish
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Devis — Test Fumée
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre demande de devis
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Contact — Test Fumée
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre message
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Rappel : 1 demande sans réponse
+info: Hub.Modules.Leads.Application.LeadReminderService[0]
+      Rappel envoyé pour 1 demande(s) en attente.
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Components.Pages.Account.LoginWith2fa[0]
+      Connexion en deux étapes réussie
