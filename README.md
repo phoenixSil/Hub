@@ -49,7 +49,7 @@ compile, lance les tests puis démarre le site.
 
 Options : `-Reinitialiser` (repartir d'une base vide), `-SansTests`, `-SansLancer`.
 
-Dans Visual Studio : ouvrir `Hub.slnx`, choisir le profil **https** de `Hub.Web` et lancer (F5). Il faut avoir exécuté le script une fois pour l'administrateur et le certificat.
+Dans Visual Studio : ouvrir `Hub.slnx`, définir `Hub.Web` comme projet de démarrage, choisir le profil **Visual Studio** et lancer (F5) : le site s'ouvre sur https://localhost:7280. Le script, lui, utilise https://localhost:7180 : les deux peuvent tourner en même temps sans se gêner. Il faut avoir exécuté le script une fois pour l'administrateur et le certificat.
 
 ## Configuration (variables d'environnement sur Azure)
 
