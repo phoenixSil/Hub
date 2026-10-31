@@ -120,3 +120,26 @@
 .recovery-codes code { display: block; background: #f4f7f9; padding: 8px; border-radius: 6px; text-align: center; font-size: .95rem; }
 .btn-danger { background: #b42318; color: #fff; }
 .btn-danger:hover { background: #912018; color: #fff; }
+
+/* Assistant de devis */
+.assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.assistant-head h2 { margin: 0; }
+.tag-ai { background: #efe9fb; color: #4a2f8f; }
+.tag-sim { background: #fff4e0; color: #8a5300; }
+.alert-warning { background: #fff8e6; border: 1px solid #f5d48a; color: #6b4a00; border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+.alert-warning ul { margin: 6px 0 0; padding-left: 18px; }
+.quote-lines { margin: 10px 0 4px; }
+.quote-lines td { padding: 6px 4px; vertical-align: middle; }
+.quote-lines input, .quote-lines select { padding: 6px 8px; font-size: .88rem; }
+.quote-lines .num-input { width: 84px; text-align: right; }
+.quote-lines tfoot td { border-top: 1px solid var(--line); padding-top: 10px; }
+.btn-xs { padding: .3em .8em; font-size: .8rem; }
+.btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
+.btn-ghost:hover { color: #b42318; }
+.btn-icon { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: .95rem; padding: 4px 6px; border-radius: 6px; }
+.btn-icon:hover { background: #fdecea; color: #b42318; }
+.assistant .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.assistant-notes, .assistant-history { margin: 10px 0; font-size: .9rem; }
+.assistant-notes summary, .assistant-history summary { cursor: pointer; color: var(--blue-dark); font-weight: 600; }
+.assistant-notes ul, .assistant-history ul { margin: 6px 0 10px; padding-left: 18px; }
+@media (max-width: 700px) { .quote-lines thead { display: none; } .quote-lines .num-input { width: 64px; } }

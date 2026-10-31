@@ -10,6 +10,8 @@ using Hub.Modules.Leads;
 using Hub.Modules.Platform;
 using Hub.Modules.Platform.Application;
 using Hub.Modules.Platform.Domain;
+using Hub.Modules.Quotes;
+using Hub.Modules.Quotes.Application;
 using Hub.SharedKernel.Caching;
 using Hub.SharedKernel.Email;
 using Hub.SharedKernel.Events;
@@ -43,7 +45,9 @@ builder.Services
     .AddContentModule(connectionString)
     .AddLeadsModule(connectionString)
     .AddAnalyticsModule(connectionString)
-    .AddChannelsModule(connectionString);
+    .AddChannelsModule(connectionString)
+    .AddQuotesModule(builder.Configuration, connectionString);
+builder.Services.AddScoped<IQuoteContextSource, QuoteContextSource>();
 
 // Courriels : Resend si une clé est fournie ; sinon, en local, fichiers .html dans un dossier ; sinon journal.
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection(ResendOptions.Section));

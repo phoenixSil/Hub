@@ -64,6 +64,23 @@ with sync_playwright() as p:
         link.click()
         page.wait_for_timeout(2000)
         page.screenshot(path=f"{OUT}/admin-demande.png", full_page=True)
+    # Assistant de devis : la proposition préparée pour le devis du test, puis l'envoi validé.
+    page.goto(BASE + "/admin/demandes", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    page.locator("tr:has(.tag-quote) a[href^='/admin/demandes/']").first.click()
+    page.wait_for_selector(".assistant", timeout=15000)
+    page.wait_for_timeout(1500)
+    if page.locator(".quote-lines").count() == 0 and page.locator("text=Actualiser").count() > 0:
+        page.click("text=Actualiser")
+        page.wait_for_timeout(1500)
+    page.wait_for_selector(".quote-lines", timeout=15000)
+    page.screenshot(path=f"{OUT}/admin-assistant-devis.png", full_page=True)
+    page.click("text=Valider et envoyer au client")
+    page.wait_for_selector("text=Proposition envoyée au client", timeout=15000)
+    page.wait_for_timeout(800)
+    page.screenshot(path=f"{OUT}/admin-assistant-envoye.png", full_page=True)
+    print("::notice::Assistant de devis : proposition affichée puis envoyée")
+
     # Vérification en deux étapes, de bout en bout : activation puis reconnexion avec un code.
     def totp(secret, at=None):
         key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))

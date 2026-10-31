@@ -77,6 +77,11 @@
     </div>
 
     <div>
+        @if (l.Kind == LeadKind.Quote || l.Services is not null)
+        {
+            <QuoteAssistantPanel LeadId="@l.Id" Kind="@l.Kind" OnSent="QuoteSentAsync" />
+        }
+
         @if (l.Kind == LeadKind.Appointment || l.PreferredDate is not null)
         {
             <div class="admin-card">
@@ -165,6 +170,19 @@
     {
         await Leads.AddNoteAsync(Id, note!, await AuthorAsync());
         note = null;
+        await LoadAsync();
+    }
+
+    private async Task QuoteSentAsync((decimal Sent, decimal Proposed) totals)
+    {
+        var author = await AuthorAsync();
+        var fr = AdminFormat.Fr;
+        var noteText = totals.Sent == totals.Proposed
+            ? $"Proposition de l'assistant envoyée telle quelle : {totals.Sent.ToString("#,##0.00 $", fr)} avant taxes."
+            : $"Proposition envoyée : {totals.Sent.ToString("#,##0.00 $", fr)} avant taxes (l'assistant proposait {totals.Proposed.ToString("#,##0.00 $", fr)}).";
+        await Leads.AddNoteAsync(Id, noteText, author);
+        if (detail?.Lead.Status is LeadStatus.New or LeadStatus.Contacted)
+            await Leads.ChangeStatusAsync(Id, LeadStatus.QuoteSent, author);
         await LoadAsync();
     }
 

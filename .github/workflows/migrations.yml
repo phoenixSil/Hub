@@ -33,7 +33,7 @@ jobs:
           set -e
           NAME=$(cat .github/next-migration 2>/dev/null || echo "Migration$(date -u +%Y%m%d%H%M)")
           echo "Nom : $NAME"
-          for pair in Platform:PlatformDbContext Catalog:CatalogDbContext Content:ContentDbContext Leads:LeadsDbContext Analytics:AnalyticsDbContext Channels:ChannelsDbContext; do
+          for pair in Platform:PlatformDbContext Catalog:CatalogDbContext Content:ContentDbContext Leads:LeadsDbContext Analytics:AnalyticsDbContext Channels:ChannelsDbContext Quotes:QuotesDbContext; do
             module=${pair%%:*}; context=${pair##*:}
             dotnet ef migrations add "$NAME" \
               --project "src/Modules/$module" --startup-project src/Hub.Web \

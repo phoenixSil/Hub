@@ -60,8 +60,8 @@ public sealed class QuoteProposal : TenantEntity
     public int OutputTokens { get; set; }
 }
 
-/// <summary>Une ligne de devis : quantité × prix unitaire, avant taxes.</summary>
-public sealed record QuoteLine(string Description, decimal Quantity, string Unit, decimal UnitPrice)
+/// <summary>Une ligne de devis : quantité × prix unitaire, avant taxes. <paramref name="Service"/> : nom exact dans la grille.</summary>
+public sealed record QuoteLine(string Description, decimal Quantity, string Unit, decimal UnitPrice, string? Service = null)
 {
     public decimal Total => Math.Round(Quantity * UnitPrice, 2);
 }

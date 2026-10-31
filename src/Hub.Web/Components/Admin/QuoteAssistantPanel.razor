@@ -1,0 +1,251 @@
+@inject IQuoteService Quotes
+@inject AuthenticationStateProvider Auth
+
+<div class="admin-card assistant">
+    <div class="assistant-head">
+        <h2>Assistant de devis</h2>
+        <span class="tag @(Quotes.UsesRealModel ? "tag-ai" : "tag-sim")" title="Modèle utilisé">
+            @(Quotes.UsesRealModel ? Quotes.ModelName : "Modèle simulé (sans IA)")
+        </span>
+    </div>
+
+    @if (!Quotes.UsesRealModel)
+    {
+        <p class="muted small">Aucune clé Claude n'est configurée : les propositions sont calculées sans IA, à partir de la grille. Le fonctionnement est identique.</p>
+    }
+
+    @if (feedback is not null)
+    {
+        <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+    }
+
+    @if (current is null)
+    {
+        @if (Kind == LeadKind.Quote && proposals.Count == 0 && !busy)
+        {
+            <p class="muted">L'assistant prépare une proposition (quelques secondes)…</p>
+            <button class="btn btn-outline btn-sm" @onclick="LoadAsync">Actualiser</button>
+        }
+        <button class="btn btn-primary btn-sm" @onclick="GenerateAsync" disabled="@busy">
+            @(busy ? "Préparation en cours…" : proposals.Count == 0 ? "Préparer une proposition" : "Préparer une nouvelle proposition")
+        </button>
+    }
+    else
+    {
+        var p = current.Proposal;
+        <p class="muted small">
+            Proposée le @AdminFormat.Local(p.CreatedAt) · @p.EstimatedHours.ToString("0.#", AdminFormat.Fr) h estimées
+            @if (p.Confidence is not null) { <text> · confiance @p.Confidence</text> }
+        </p>
+
+        @if (p.Warnings is not null)
+        {
+            <div class="alert alert-warning">
+                <strong>Contrôle des prix</strong>
+                <ul>@foreach (var w in Lines(p.Warnings)) { <li>@w</li> }</ul>
+            </div>
+        }
+
+        <table class="admin-table quote-lines">
+            <thead><tr><th>Description</th><th>Qté</th><th>Unité</th><th>Prix unitaire</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var line in edit)
+                {
+                    <tr>
+                        <td><input @bind="line.Description" @bind:event="oninput" /></td>
+                        <td><input type="number" step="0.5" min="0" class="num-input" @bind="line.Quantity" @bind:event="oninput" /></td>
+                        <td>
+                            <select @bind="line.Unit">
+                                @foreach (var u in Units) { <option value="@u">@u</option> }
+                            </select>
+                        </td>
+                        <td><input type="number" step="1" min="0" class="num-input" @bind="line.UnitPrice" @bind:event="oninput" /></td>
+                        <td class="num nowrap">@Money(line.Quantity * line.UnitPrice)</td>
+                        <td><button class="btn-icon" title="Retirer la ligne" @onclick="() => RemoveLine(line)">✕</button></td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4"><button class="btn btn-outline btn-xs" @onclick="AddLine">+ Ajouter une ligne</button></td>
+                    <td class="num nowrap"><strong>@Money(Total)</strong></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+        <p class="muted small">
+            Avant taxes. Proposé par l'assistant : @Money(p.ProposedTotal)@(Total != p.ProposedTotal ? $" (modifié : {Money(Total - p.ProposedTotal)})" : "").
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(p.Reasoning) || p.Assumptions is not null || p.Questions is not null)
+        {
+            <details class="assistant-notes">
+                <summary>Raisonnement de l'assistant</summary>
+                @if (!string.IsNullOrWhiteSpace(p.Reasoning)) { <p>@p.Reasoning</p> }
+                @if (p.Assumptions is not null)
+                {
+                    <strong>Hypothèses</strong>
+                    <ul>@foreach (var a in Lines(p.Assumptions)) { <li>@a</li> }</ul>
+                }
+                @if (p.Questions is not null)
+                {
+                    <strong>Questions à poser au client</strong>
+                    <ul>@foreach (var q in Lines(p.Questions)) { <li>@q</li> }</ul>
+                }
+            </details>
+        }
+
+        <div class="field">
+            <label for="quote-message">Message au client <span class="muted small">(le tableau des prix est ajouté dessous à l'envoi)</span></label>
+            <textarea id="quote-message" rows="9" @bind="message" @bind:event="oninput"></textarea>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" @onclick="SendAsync" disabled="@(busy || Total <= 0 || string.IsNullOrWhiteSpace(message))">
+                @(busy ? "Envoi…" : $"Valider et envoyer au client ({Money(Total)})")
+            </button>
+            <button class="btn btn-outline btn-sm" @onclick="GenerateAsync" disabled="@busy">Nouvelle proposition</button>
+            <button class="btn btn-ghost btn-sm" @onclick="DiscardAsync" disabled="@busy">Écarter</button>
+        </div>
+        <p class="muted small">Rien n'est envoyé au client sans ce clic.</p>
+    }
+
+    @{ var history = proposals.Where(v => v != current).ToList(); }
+    @if (history.Count > 0)
+    {
+        <details class="assistant-history">
+            <summary>Historique (@history.Count)</summary>
+            <ul>
+                @foreach (var h in history)
+                {
+                    <li>
+                        <span class="muted small">@AdminFormat.Local(h.Proposal.CreatedAt)</span>
+                        <strong>@StatusLabel(h.Proposal.Status)</strong>
+                        @if (h.Proposal.Status == ProposalStatus.Sent)
+                        {
+                            <text> · @Money(h.Proposal.FinalTotal ?? 0) (proposé @Money(h.Proposal.ProposedTotal)) par @h.Proposal.DecidedBy</text>
+                        }
+                        else if (h.Proposal.Status == ProposalStatus.Failed)
+                        {
+                            <text> · @h.Proposal.Error</text>
+                        }
+                        else
+                        {
+                            <text> · @Money(h.Proposal.ProposedTotal)</text>
+                        }
+                    </li>
+                }
+            </ul>
+        </details>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid LeadId { get; set; }
+    [Parameter] public LeadKind Kind { get; set; }
+
+    /// <summary>Appelé après l'envoi au client, avec le total envoyé et le total proposé.</summary>
+    [Parameter] public EventCallback<(decimal Sent, decimal Proposed)> OnSent { get; set; }
+
+    private static readonly string[] Units = ["heure", "visite", "forfait", "quart", "mois"];
+
+    private sealed class EditLine
+    {
+        public string Description { get; set; } = "";
+        public decimal Quantity { get; set; } = 1;
+        public string Unit { get; set; } = "heure";
+        public decimal UnitPrice { get; set; }
+        public string? Service { get; set; }
+    }
+
+    private IReadOnlyList<ProposalView> proposals = [];
+    private ProposalView? current;
+    private List<EditLine> edit = [];
+    private string? message;
+    private bool busy;
+    private string? feedback;
+    private bool feedbackIsError;
+    private Guid loadedFor;
+
+    private decimal Total => Math.Round(edit.Sum(l => l.Quantity * l.UnitPrice), 2);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor != LeadId) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loadedFor = LeadId;
+        proposals = await Quotes.ListForLeadAsync(LeadId);
+        var draft = proposals.FirstOrDefault(p => p.Proposal.Status == ProposalStatus.Draft);
+        if (draft?.Proposal.Id != current?.Proposal.Id)
+        {
+            current = draft;
+            edit = draft?.Lines.Select(l => new EditLine
+            {
+                Description = l.Description, Quantity = l.Quantity, Unit = l.Unit, UnitPrice = l.UnitPrice, Service = l.Service,
+            }).ToList() ?? [];
+            message = draft?.Proposal.CustomerMessage;
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        busy = true;
+        feedback = null;
+        // Une nouvelle proposition remplace le brouillon en cours.
+        if (current is not null) await Quotes.DiscardAsync(current.Proposal.Id, await AuthorAsync());
+        current = null;
+        var result = await Quotes.GenerateAsync(LeadId);
+        busy = false;
+        if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; }
+        await LoadAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        if (current is null) return;
+        busy = true;
+        var proposed = current.Proposal.ProposedTotal;
+        var total = Total;
+        var lines = edit.Select(l => new QuoteLine(l.Description.Trim(), l.Quantity, l.Unit, l.UnitPrice, l.Service)).ToList();
+        var result = await Quotes.ApproveAndSendAsync(current.Proposal.Id, lines, message ?? "", await AuthorAsync());
+        busy = false;
+        feedback = result.IsSuccess ? $"Proposition envoyée au client ({Money(total)} avant taxes)." : result.Error;
+        feedbackIsError = result.IsFailure;
+        if (result.IsSuccess)
+        {
+            current = null;
+            await OnSent.InvokeAsync((total, proposed));
+        }
+        await LoadAsync();
+    }
+
+    private async Task DiscardAsync()
+    {
+        if (current is null) return;
+        await Quotes.DiscardAsync(current.Proposal.Id, await AuthorAsync());
+        current = null;
+        await LoadAsync();
+    }
+
+    private void AddLine() => edit.Add(new EditLine());
+    private void RemoveLine(EditLine line) => edit.Remove(line);
+
+    private async Task<string> AuthorAsync()
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+        return user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur";
+    }
+
+    private static IEnumerable<string> Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private static string Money(decimal v) => v.ToString("#,##0.00 $", AdminFormat.Fr);
+    private static string StatusLabel(ProposalStatus s) => s switch
+    {
+        ProposalStatus.Sent => "Envoyée",
+        ProposalStatus.Discarded => "Écartée",
+        ProposalStatus.Failed => "Échec",
+        _ => "Brouillon",
+    };
+}

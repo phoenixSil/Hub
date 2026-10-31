@@ -11,6 +11,7 @@
     <Project Path="src/Modules/Leads.Contracts/Hub.Modules.Leads.Contracts.csproj" />
     <Project Path="src/Modules/Analytics/Hub.Modules.Analytics.csproj" />
     <Project Path="src/Modules/Channels/Hub.Modules.Channels.csproj" />
+    <Project Path="src/Modules/Quotes/Hub.Modules.Quotes.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hub.ArchitectureTests/Hub.ArchitectureTests.csproj" />
