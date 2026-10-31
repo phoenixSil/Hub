@@ -19,8 +19,8 @@ public sealed class AnthropicOptions
 }
 
 /// <summary>
-/// Proposition de devis par Claude. La réponse est imposée sous forme d'appel
-/// d'outil (« proposer_devis ») : on reçoit toujours un JSON structuré.
+/// Proposition de devis par Claude. La réponse est contrainte par un schéma JSON
+/// (sorties structurées, <c>output_config.format</c>) : on reçoit toujours un JSON valide.
 /// </summary>
 internal sealed class ClaudeQuoteModel(HttpClient http, IOptions<AnthropicOptions> options) : IQuoteModel
 {
@@ -36,8 +36,10 @@ internal sealed class ClaudeQuoteModel(HttpClient http, IOptions<AnthropicOption
             ["model"] = _options.Model,
             ["max_tokens"] = _options.MaxTokens,
             ["system"] = SystemPrompt(context),
-            ["tools"] = new JsonArray(Tool()),
-            ["tool_choice"] = new JsonObject { ["type"] = "tool", ["name"] = "proposer_devis" },
+            ["output_config"] = new JsonObject
+            {
+                ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = Schema() },
+            },
             ["messages"] = new JsonArray(new JsonObject
             {
                 ["role"] = "user",
@@ -58,9 +60,18 @@ internal sealed class ClaudeQuoteModel(HttpClient http, IOptions<AnthropicOption
             throw new QuoteModelException($"L'API Claude a répondu {(int)response.StatusCode} : {Trim(json, 300)}");
 
         var root = JsonNode.Parse(json)!;
-        var input = root["content"]?.AsArray()
-            .FirstOrDefault(c => c?["type"]?.GetValue<string>() == "tool_use")?["input"]
-            ?? throw new QuoteModelException("La réponse de Claude ne contient pas de proposition.");
+        var stop = root["stop_reason"]?.GetValue<string>();
+        if (stop == "refusal")
+            throw new QuoteModelException("Claude a refusé de traiter cette demande.");
+        if (stop == "max_tokens")
+            throw new QuoteModelException("Réponse de Claude incomplète (limite de longueur atteinte). Réessayez.");
+
+        var text = string.Concat((root["content"]?.AsArray() ?? [])
+            .Where(c => c?["type"]?.GetValue<string>() == "text")
+            .Select(c => c!["text"]?.GetValue<string>()));
+        JsonNode input;
+        try { input = JsonNode.Parse(text) ?? throw new JsonException(); }
+        catch (JsonException) { throw new QuoteModelException("La réponse de Claude n'est pas un JSON valide."); }
 
         var lines = (input["lignes"]?.AsArray() ?? [])
             .Where(l => l is not null)
@@ -137,40 +148,38 @@ internal sealed class ClaudeQuoteModel(HttpClient http, IOptions<AnthropicOption
         if (l.Frequency is not null) sb.AppendLine($"Fréquence : {l.Frequency}");
         if (l.Area is not null) sb.AppendLine($"Secteur : {l.Area}");
         if (l.Message is not null) sb.AppendLine($"Message du client : {l.Message}");
-        sb.AppendLine("</demande>\n\nPrépare la proposition avec l'outil proposer_devis.");
+        sb.AppendLine("</demande>\n\nPrépare la proposition au format JSON demandé.");
         return sb.ToString();
     }
 
-    private static JsonObject Tool() => JsonNode.Parse("""
+    private static JsonObject Schema() => JsonNode.Parse("""
         {
-          "name": "proposer_devis",
-          "description": "Enregistre la proposition de devis pour validation humaine.",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "heures_estimees": { "type": "number", "description": "Heures de travail estimées par visite." },
-              "lignes": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "service": { "type": "string", "description": "Nom exact du service dans la grille." },
-                    "description": { "type": "string" },
-                    "quantite": { "type": "number" },
-                    "unite": { "type": "string", "enum": ["heure", "visite", "forfait", "quart", "mois"] },
-                    "prix_unitaire": { "type": "number", "description": "Avant taxes, en dollars canadiens." }
-                  },
-                  "required": ["service", "description", "quantite", "unite", "prix_unitaire"]
-                }
-              },
-              "raisonnement": { "type": "string", "description": "Pour l'administrateur : comment les heures et les prix ont été établis." },
-              "hypotheses": { "type": "array", "items": { "type": "string" } },
-              "questions_au_client": { "type": "array", "items": { "type": "string" } },
-              "message_client": { "type": "string", "description": "Message au client, sans aucun montant." },
-              "confiance": { "type": "string", "enum": ["faible", "moyenne", "elevee"] }
+          "type": "object",
+          "properties": {
+            "heures_estimees": { "type": "number", "description": "Heures de travail estimées par visite." },
+            "lignes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": { "type": "string", "description": "Nom exact du service dans la grille." },
+                  "description": { "type": "string" },
+                  "quantite": { "type": "number" },
+                  "unite": { "type": "string", "enum": ["heure", "visite", "forfait", "quart", "mois"] },
+                  "prix_unitaire": { "type": "number", "description": "Avant taxes, en dollars canadiens." }
+                },
+                "required": ["service", "description", "quantite", "unite", "prix_unitaire"],
+                "additionalProperties": false
+              }
             },
-            "required": ["heures_estimees", "lignes", "raisonnement", "message_client", "confiance"]
-          }
+            "raisonnement": { "type": "string", "description": "Pour l'administrateur : comment les heures et les prix ont été établis." },
+            "hypotheses": { "type": "array", "items": { "type": "string" } },
+            "questions_au_client": { "type": "array", "items": { "type": "string" } },
+            "message_client": { "type": "string", "description": "Message au client, sans aucun montant." },
+            "confiance": { "type": "string", "enum": ["faible", "moyenne", "elevee"] }
+          },
+          "required": ["heures_estimees", "lignes", "raisonnement", "hypotheses", "questions_au_client", "message_client", "confiance"],
+          "additionalProperties": false
         }
         """)!.AsObject();
 

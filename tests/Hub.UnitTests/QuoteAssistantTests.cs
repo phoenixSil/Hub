@@ -131,3 +131,57 @@ public class QuoteAssistantTests
         Assert.Contains("31", prompt);
     }
 }
+
+public class ClaudeQuoteModelTests
+{
+    private sealed class FakeHandler(string response) : HttpMessageHandler
+    {
+        public string? RequestBody { get; private set; }
+        public HttpRequestMessage? Request { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Request = request;
+            RequestBody = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(response, System.Text.Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    [Fact]
+    public async Task La_reponse_structuree_de_Claude_est_lue()
+    {
+        var proposal = """
+            {"heures_estimees":3.5,"lignes":[{"service":"Nettoyage résidentiel","description":"Ménage hebdomadaire","quantite":3.5,"unite":"heure","prix_unitaire":37}],
+             "raisonnement":"Maison de 1500 pi²","hypotheses":["Deux salles de bain"],"questions_au_client":[],"message_client":"Bonjour Marie,","confiance":"moyenne"}
+            """;
+        var response = new System.Text.Json.Nodes.JsonObject
+        {
+            ["stop_reason"] = "end_turn",
+            ["content"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "text", ["text"] = proposal }),
+            ["usage"] = new System.Text.Json.Nodes.JsonObject { ["input_tokens"] = 900, ["output_tokens"] = 300 },
+        }.ToJsonString();
+
+        var handler = new FakeHandler(response);
+        var model = new ClaudeQuoteModel(new HttpClient(handler),
+            Microsoft.Extensions.Options.Options.Create(new AnthropicOptions { ApiKey = "test", Model = "claude-sonnet-5-5" }));
+
+        var ctx = new QuoteContext("ScintiNet", "418",
+            new QuoteLeadFacts(Guid.NewGuid(), "Marie", "m@x.com", ["Nettoyage résidentiel"], "Maison", "1500 pi²", null, null, null),
+            [], new Dictionary<string, decimal> { ["services"] = 31m });
+        var quote = await model.ProposeAsync(ctx);
+
+        Assert.Equal(3.5m, quote.EstimatedHours);
+        Assert.Single(quote.Lines);
+        Assert.Equal("Nettoyage résidentiel", quote.Lines[0].Service);
+        Assert.Equal(37m, quote.Lines[0].UnitPrice);
+        Assert.Equal("Bonjour Marie,", quote.CustomerMessage);
+        Assert.Equal(900, quote.InputTokens);
+        Assert.Contains("\"output_config\"", handler.RequestBody);
+        Assert.Contains("\"json_schema\"", handler.RequestBody);
+        Assert.DoesNotContain("tool_choice", handler.RequestBody);
+        Assert.True(handler.Request!.Headers.Contains("x-api-key"));
+    }
+}
