@@ -86,6 +86,7 @@ if (-not $CodeSeulement) {
         if (-not $valide) { Attention 'Mot de passe trop faible, recommencez.' }
     } while (-not $valide)
     $resend = EnClair (Read-Host '    Clé API Resend (Entrée pour plus tard)' -AsSecureString)
+    $claude = EnClair (Read-Host '    Clé API Claude pour l''assistant de devis (Entrée pour plus tard)' -AsSecureString)
     $mdpSql = MotDePasseAleatoire
 
     Etape 'Création de l''infrastructure (5 à 10 minutes)'
@@ -93,7 +94,8 @@ if (-not $CodeSeulement) {
         "sqlAdminPassword=$mdpSql",
         "adminEmail=$courriel",
         "adminPassword=$mdp",
-        "resendApiKey=$resend"
+        "resendApiKey=$resend",
+        "anthropicApiKey=$claude"
     )
     $sortie = & az deployment group create --resource-group $GroupeRessources `
         --template-file (Join-Path $racine 'infra\main.bicep') `

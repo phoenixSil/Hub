@@ -19,6 +19,7 @@ src/
     Leads/ (+ Contracts)   demandes de devis, rendez-vous, contact ; courriels
     Analytics/             pages vues, clics, conversions (écritures par lots)
     Channels/              canaux (site, Facebook…) — point d'accroche des phases suivantes
+    Quotes/                assistant de devis : prix proposé par Claude (ou modèle simulé), validé par un humain
 tests/
   Hub.UnitTests/           règles métier
   Hub.ArchitectureTests/   les modules ne se parlent que par leurs Contracts
@@ -51,6 +52,20 @@ Options : `-Reinitialiser` (repartir d'une base vide), `-SansTests`, `-SansLance
 
 Dans Visual Studio : ouvrir `Hub.slnx`, définir `Hub.Web` comme projet de démarrage, choisir le profil **Visual Studio** et lancer (F5) : le site s'ouvre sur https://localhost:7280. Le script, lui, utilise https://localhost:7180 : les deux peuvent tourner en même temps sans se gêner. Il faut avoir exécuté le script une fois pour l'administrateur et le certificat.
 
+## Assistant de devis
+
+À chaque demande de devis, l'assistant prépare une proposition : heures estimées, lignes de prix tirées de la grille interne
+(back-office → Services → Modèles de prix, prix publiés ou non), raisonnement et brouillon de message au client.
+Le code vérifie ensuite chaque ligne : jamais sous le plancher horaire de la catégorie, ni sous le minimum d'heures.
+La proposition s'affiche dans la fiche de la demande ; l'administrateur ajuste les lignes et le message, puis clique
+« Valider et envoyer » : rien ne part sans ce clic. Chaque proposition et sa version finale sont conservées (schéma `quotes`).
+
+Clé Claude en local (facultative, sinon modèle simulé) :
+
+```powershell
+dotnet user-secrets set "Anthropic:ApiKey" "<clé>" --project src\Hub.Web
+```
+
 ## Configuration (variables d'environnement sur Azure)
 
 | Clé | Rôle |
@@ -60,6 +75,8 @@ Dans Visual Studio : ouvrir `Hub.slnx`, définir `Hub.Web` comme projet de déma
 | `Resend__ApiKey`, `Resend__FromEmail` | Envoi des courriels |
 | `Media__BlobConnectionString`, `Media__Container` | Stockage des images (sinon `wwwroot/uploads`) |
 | `Turnstile__SiteKey`, `Turnstile__SecretKey` | Anti-pourriel Cloudflare (facultatif) |
+| `Anthropic__ApiKey` | Clé Claude de l'assistant de devis (sinon modèle simulé, sans IA) |
+| `Quotes__FloorHourlyRates__services`, `__aines` | Planchers horaires (coût de revient) : 31 et 35 par défaut |
 
 ## Migrations
 

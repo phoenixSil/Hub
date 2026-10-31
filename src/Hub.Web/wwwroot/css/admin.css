@@ -131,7 +131,9 @@
 .quote-lines { margin: 10px 0 4px; }
 .quote-lines td { padding: 6px 4px; vertical-align: middle; }
 .quote-lines input, .quote-lines select { padding: 6px 8px; font-size: .88rem; }
-.quote-lines .num-input { width: 84px; text-align: right; }
+.quote-lines td:first-child { width: 100%; min-width: 180px; }
+.quote-lines .num-input { width: 72px; text-align: right; }
+.quote-lines select { width: 92px; }
 .quote-lines tfoot td { border-top: 1px solid var(--line); padding-top: 10px; }
 .btn-xs { padding: .3em .8em; font-size: .8rem; }
 .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }

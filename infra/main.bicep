@@ -30,6 +30,10 @@ param adminPassword string
 @description('Clé API Resend pour l\'envoi des courriels (vide = courriels journalisés seulement).')
 param resendApiKey string = ''
 
+@secure()
+@description('Clé de l\'API Claude pour l\'assistant de devis (vide = modèle simulé, sans IA).')
+param anthropicApiKey string = ''
+
 @description('Adresse d\'expédition des courriels (domaine vérifié dans Resend).')
 param fromEmail string = 'noreply@scintinet.com'
 
@@ -146,6 +150,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'Hub__AdminPassword', value: adminPassword }
         { name: 'Resend__ApiKey', value: resendApiKey }
         { name: 'Resend__FromEmail', value: fromEmail }
+        { name: 'Anthropic__ApiKey', value: anthropicApiKey }
         { name: 'Media__BlobConnectionString', value: storageConnection }
         { name: 'Media__Container', value: mediaContainer.name }
       ]

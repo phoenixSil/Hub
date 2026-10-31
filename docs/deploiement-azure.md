@@ -29,6 +29,7 @@ Le script installe Azure CLI au besoin, ouvre la connexion à Azure, puis demand
 
 - le courriel et le mot de passe de l'administrateur du back-office en ligne ;
 - la clé API Resend : appuyer sur Entrée pour la saisir plus tard.
+- la clé API Claude de l'assistant de devis : Entrée pour la saisir plus tard (l'assistant utilise alors le modèle simulé).
 
 Il crée ensuite le groupe de ressources `rg-scintinet` et les ressources, publie le site et le déploie. À la fin, il affiche :
 
@@ -97,6 +98,16 @@ Le domaine est géré chez OVH. On ajoute les enregistrements DNS **avant** de r
 3. Envoyer une demande de test depuis le site et vérifier les deux courriels : l'accusé de réception au client et l'avis à l'administrateur.
 
 Les enregistrements MX de la messagerie `contact@scintinet.com` ne doivent pas être modifiés.
+
+## 4 bis. Assistant de devis (Claude)
+
+Les crédits d'API mensuels du forfait Claude Max couvrent l'assistant (environ un sou par devis). Dans la console Claude, créer une clé « Hub - production », puis :
+
+```powershell
+az webapp config appsettings set -g rg-scintinet -n <nom-du-site> --settings Anthropic__ApiKey=<clé>
+```
+
+Laisser le rechargement automatique désactivé dans la console : une fois les crédits du mois épuisés, l'assistant s'arrête simplement jusqu'au mois suivant, sans frais.
 
 ## 5. Déploiement automatique depuis GitHub
 

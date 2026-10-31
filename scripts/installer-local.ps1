@@ -123,6 +123,20 @@ else {
     Ok "Déjà configuré ($ligne)"
 }
 
+# 4 bis. Assistant de devis (facultatif) ------------------------------------
+Etape 'Assistant de devis (clé Claude, facultative)'
+$secrets = & dotnet user-secrets list --project $web 2>$null
+if (-not ($secrets -match '^Anthropic:ApiKey')) {
+    $securiseCle = Read-Host '    Clé API Claude (console Claude > API Keys ; Entrée pour utiliser le modèle simulé)' -AsSecureString
+    $cle = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securiseCle))
+    if ($cle) {
+        & dotnet user-secrets set 'Anthropic:ApiKey' $cle --project $web | Out-Null
+        Ok 'Clé enregistrée dans les secrets utilisateur : l''assistant utilisera Claude'
+    }
+    else { Ok 'Aucune clé : l''assistant utilisera le modèle simulé (sans IA)' }
+}
+else { Ok 'Clé Claude déjà configurée' }
+
 # 5. Compilation et tests ---------------------------------------------------
 Etape 'Compilation'
 & dotnet build $solution -c Debug --nologo -v quiet
