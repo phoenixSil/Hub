@@ -11,6 +11,10 @@ public static class SeoEndpoints
     {
         app.MapGet("/robots.txt", (HttpContext ctx) =>
         {
+            // Adresse technique d'Azure (…azurewebsites.net) : ne pas l'indexer, sinon Google voit le site en double.
+            if (ctx.Request.Host.Host.EndsWith(".azurewebsites.net", StringComparison.OrdinalIgnoreCase))
+                return Results.Text("User-agent: *\nDisallow: /\n", "text/plain", Encoding.UTF8);
+
             var baseUrl = BaseUrl(ctx);
             var text = $"User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /api\nSitemap: {baseUrl}/sitemap.xml\n";
             return Results.Text(text, "text/plain", Encoding.UTF8);
