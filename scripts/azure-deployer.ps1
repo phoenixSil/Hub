@@ -58,8 +58,12 @@ if (-not (Existe 'az')) {
 }
 Ok 'Azure CLI présent'
 
-& az account show --only-show-errors *> $null
-if ($LASTEXITCODE -ne 0) {
+# Sans connexion, « az account show » écrit sur la sortie d'erreur : on ne doit pas en faire une exception.
+$ErrorActionPreference = 'Continue'
+& az account show --only-show-errors 2>&1 | Out-Null
+$connecte = $LASTEXITCODE -eq 0
+$ErrorActionPreference = 'Stop'
+if (-not $connecte) {
     Attention 'Connexion à Azure : une fenêtre du navigateur va s''ouvrir.'
     & az login --only-show-errors | Out-Null
 }
