@@ -132,7 +132,18 @@ if (Test-Path $publication) { Remove-Item $publication -Recurse -Force }
 if (Test-Path $archive) { Remove-Item $archive -Force }
 & dotnet publish $web -c Release -o $publication --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw 'La publication a échoué.' }
-Compress-Archive -Path (Join-Path $publication '*') -DestinationPath $archive
+# Archive construite à la main : sous Windows PowerShell 5.1, Compress-Archive écrit des chemins avec « \ »,
+# qu'App Service Linux refuse. Ici, chaque fichier est rangé avec des « / ».
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::Open($archive, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    $base = (Resolve-Path $publication).Path.TrimEnd('\') + '\'
+    foreach ($fichier in Get-ChildItem $publication -Recurse -File) {
+        $nom = $fichier.FullName.Substring($base.Length).Replace('\', '/')
+        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $fichier.FullName, $nom, [System.IO.Compression.CompressionLevel]::Optimal)
+    }
+}
+finally { $zip.Dispose() }
 Ok 'Archive prête'
 
 Etape 'Déploiement sur Azure (2 à 4 minutes)'
