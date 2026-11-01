@@ -137,7 +137,8 @@ if ($LASTEXITCODE -ne 0) { throw 'La publication a échoué.' }
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open($archive, [System.IO.Compression.ZipArchiveMode]::Create)
 try {
-    $base = (Resolve-Path $publication).Path.TrimEnd('\') + '\'
+    # Même forme de chemin que Get-ChildItem (le dossier temporaire peut avoir un nom court du type TSILL~1).
+    $base = (Get-Item $publication).FullName.TrimEnd('\') + '\'
     foreach ($fichier in Get-ChildItem $publication -Recurse -File) {
         $nom = $fichier.FullName.Substring($base.Length).Replace('\', '/')
         [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $fichier.FullName, $nom, [System.IO.Compression.CompressionLevel]::Optimal)
