@@ -65,7 +65,13 @@ $connecte = $LASTEXITCODE -eq 0
 $ErrorActionPreference = 'Stop'
 if (-not $connecte) {
     Attention 'Connexion à Azure : une fenêtre du navigateur va s''ouvrir.'
-    & az login --only-show-errors | Out-Null
+    # Sortie visible : Azure CLI peut demander de choisir l'abonnement après la connexion.
+    & az login
+    $ErrorActionPreference = 'Continue'
+    & az account show --only-show-errors 2>&1 | Out-Null
+    $connecte = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = 'Stop'
+    if (-not $connecte) { throw 'Connexion à Azure non établie : tapez « az login », choisissez l''abonnement, puis relancez ce script.' }
 }
 $compte = & az account show --query '{nom:name, id:id, utilisateur:user.name}' -o json | ConvertFrom-Json
 Ok "Abonnement : $($compte.nom) ($($compte.utilisateur))"
@@ -80,6 +86,7 @@ if ($reponse -match '^[nN]') {
 if (-not $CodeSeulement) {
     Etape "Groupe de ressources $GroupeRessources ($Region)"
     & az group create --name $GroupeRessources --location $Region --only-show-errors -o none
+    if ($LASTEXITCODE -ne 0) { throw 'Création du groupe de ressources impossible : voir le message ci-dessus.' }
     Ok 'Prêt'
 
     Etape 'Paramètres'
