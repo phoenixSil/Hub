@@ -29,23 +29,15 @@ internal sealed partial class SimulatedQuoteModel : IQuoteModel
                 continue;
             }
 
-            switch (item.Kind)
+            var line = QuotePricingRules.For(item.Kind).SimulatedLine(item, hours);
+            if (line is not null)
             {
-                case "Hourly" when item.MinAmount is { } rate:
-                    var h = Math.Max(hours, item.MinimumHours ?? 0);
-                    lines.Add(new QuoteLine($"{item.Service} : main-d'œuvre", h, "heure", rate, item.Service));
-                    break;
-                case "PerShift" when item.MinAmount is { } shiftRate:
-                    lines.Add(new QuoteLine($"{item.Service} : quart de {item.ShiftHours ?? 8:0.#} h", 1, "quart", shiftRate * (item.ShiftHours ?? 8), item.Service));
-                    break;
-                case "Flat" when item.MinAmount is { } min:
-                    var price = item.MaxAmount is { } max ? Math.Round((min + max) / 2, 0) : min;
-                    lines.Add(new QuoteLine(item.Service, 1, "forfait", price, item.Service));
-                    break;
-                default:
-                    lines.Add(new QuoteLine($"{item.Service} : visite d'évaluation (gratuite)", 1, "visite", 0, item.Service));
-                    assumptions.Add($"« {item.Service} » se chiffre après une visite d'évaluation.");
-                    break;
+                lines.Add(line);
+            }
+            else
+            {
+                lines.Add(new QuoteLine($"{item.Service} : visite d'évaluation (gratuite)", 1, "visite", 0, item.Service));
+                assumptions.Add($"« {item.Service} » se chiffre après une visite d'évaluation.");
             }
         }
 

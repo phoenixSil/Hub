@@ -22,9 +22,9 @@
             <div class="field">
                 <label>Type de prix</label>
                 <InputSelect @bind-Value="p.Kind">
-                    @foreach (var k in Enum.GetValues<PricingKind>())
+                    @foreach (var d in PricingKinds.All)
                     {
-                        <option value="@k">@KindLabel(k)</option>
+                        <option value="@d.Kind">@d.AdminLabel</option>
                     }
                 </InputSelect>
             </div>
@@ -44,12 +44,5 @@
 @code {
     [Parameter] public List<Service> Services { get; set; } = [];
 
-    public static string KindLabel(PricingKind k) => k switch
-    {
-        PricingKind.Hourly => "À l'heure",
-        PricingKind.PerShift => "Par quart",
-        PricingKind.Flat => "Forfait",
-        PricingKind.Monthly => "Par mois",
-        _ => "Sur évaluation",
-    };
+    public static string KindLabel(PricingKind k) => PricingKinds.Of(k).AdminLabel;
 }

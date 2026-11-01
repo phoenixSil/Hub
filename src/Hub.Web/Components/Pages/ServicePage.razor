@@ -42,7 +42,7 @@
                     @if (!string.IsNullOrWhiteSpace(price.PublicNote)) {<p class="muted">@price.PublicNote</p>}
                 </div>
 
-                @if (IsSeniorService && price.MinAmount is { } rate && price.Kind is PricingKind.Hourly or PricingKind.PerShift)
+                @if (IsSeniorService && price.MinAmount is { } rate && PricingKinds.Of(price.Kind).IsHourlyRate)
                 {
                     <SeniorCreditEstimator HourlyRate="rate" Path="@($"/{detail.Category.RouteSegment}/{detail.Service.Slug}")" />
                 }
@@ -118,20 +118,5 @@
             yield return SiteFormat.FaqJsonLd(serviceFaq);
     }
 
-    private static string PriceText(PricingModel p)
-    {
-        var fr = CultureInfo.GetCultureInfo("fr-CA");
-        string Amount(decimal? v) => v is { } d ? d.ToString("0.## $", fr) : "";
-        var range = p.MinAmount is not null && p.MaxAmount is not null && p.MaxAmount != p.MinAmount
-            ? $"de {Amount(p.MinAmount)} à {Amount(p.MaxAmount)}"
-            : $"à partir de {Amount(p.MinAmount ?? p.MaxAmount)}";
-        return p.Kind switch
-        {
-            PricingKind.Hourly => $"{range} l'heure" + (p.MinimumHours is { } h ? $" (minimum {h:0.#} h)" : ""),
-            PricingKind.PerShift => $"{range} par quart" + (p.ShiftHours is { } sh ? $" de {sh:0.#} h" : ""),
-            PricingKind.Monthly => $"{range} par mois",
-            PricingKind.Flat => range,
-            _ => "Prix établi après une courte évaluation, sans frais.",
-        };
-    }
+    private static string PriceText(PricingModel p) => PricingKinds.Of(p.Kind).PublicText(p);
 }

@@ -11,6 +11,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Azure.Communication.Email" />
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="QRCoder" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />

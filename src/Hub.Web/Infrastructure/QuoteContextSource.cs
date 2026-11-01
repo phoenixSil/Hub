@@ -14,7 +14,7 @@ namespace Hub.Web.Infrastructure;
 /// de prix interne (module Catalogue, prix publiés ou non) et les planchers.
 /// </summary>
 internal sealed class QuoteContextSource(
-    ILeadService leads,
+    ILeadInbox leads,
     ICatalogQueries catalog,
     IRepository<PricingModel> pricing,
     IContentQueries content,

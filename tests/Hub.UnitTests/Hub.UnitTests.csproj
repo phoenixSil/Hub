@@ -16,5 +16,6 @@
     <ProjectReference Include="..\..\src\Modules\Leads\Hub.Modules.Leads.csproj" />
     <ProjectReference Include="..\..\src\Modules\Content\Hub.Modules.Content.csproj" />
     <ProjectReference Include="..\..\src\Modules\Quotes\Hub.Modules.Quotes.csproj" />
+    <ProjectReference Include="..\..\src\Hub.Web\Hub.Web.csproj" />
   </ItemGroup>
 </Project>

@@ -77,7 +77,7 @@ internal sealed class FileEmailSender(string folder, ILogger<FileEmailSender> lo
     }
 }
 
-/// <summary>Sans clé Resend ni dossier local : le courriel est écrit dans le journal.</summary>
+/// <summary>Aucun fournisseur configuré : le courriel est seulement écrit dans le journal.</summary>
 internal sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
 {
     public Task<Result> SendAsync(EmailMessage message, CancellationToken ct = default)

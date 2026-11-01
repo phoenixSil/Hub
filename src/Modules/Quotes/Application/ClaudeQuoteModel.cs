@@ -183,14 +183,7 @@ internal sealed class ClaudeQuoteModel(HttpClient http, IOptions<AnthropicOption
         }
         """)!.AsObject();
 
-    private static string KindLabel(string kind) => kind switch
-    {
-        "Hourly" => "à l'heure",
-        "PerShift" => "par quart (taux horaire)",
-        "Flat" => "forfait",
-        "Monthly" => "mensuel",
-        _ => "sur évaluation",
-    };
+    private static string KindLabel(string kind) => QuotePricingRules.For(kind).PromptLabel;
 
     private static string Money(decimal v) => v.ToString("0.## $", Fr);
     private static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s) ? s.Trim() : null;

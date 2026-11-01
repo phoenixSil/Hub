@@ -1,7 +1,8 @@
 @page "/rendez-vous"
 @inject ICurrentTenant CurrentTenant
 @inject ICatalogQueries Catalog
-@inject ILeadService Leads
+@inject ILeadIntake Leads
+@inject ILeadScheduling Scheduling
 @inject TurnstileVerifier Turnstile
 @inject NavigationManager Navigation
 
@@ -139,7 +140,7 @@
     {
         tenant = await CurrentTenant.GetAsync();
         catalog = await Catalog.GetCatalogAsync();
-        availability = await Leads.GetAvailabilityAsync();
+        availability = await Scheduling.GetAvailabilityAsync();
 
         if (Model is null)
         {

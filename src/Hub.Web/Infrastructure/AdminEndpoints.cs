@@ -14,7 +14,7 @@ public static class AdminEndpoints
     /// <summary>GET /admin/demandes/export.csv : toutes les demandes, ouvrable dans Excel (séparateur « ; », UTF-8).</summary>
     public static void MapAdminExports(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/admin/demandes/export.csv", async (HttpContext ctx, ITenantContext tenant, ILeadService leads, IContentQueries content) =>
+        app.MapGet("/admin/demandes/export.csv", async (HttpContext ctx, ITenantContext tenant, ILeadInbox leads, IContentQueries content) =>
         {
             // L'entreprise de l'administrateur connecté prime sur celle du nom de domaine.
             if (Guid.TryParse(ctx.User.FindFirst(HubClaims.TenantId)?.Value, out var tenantId))

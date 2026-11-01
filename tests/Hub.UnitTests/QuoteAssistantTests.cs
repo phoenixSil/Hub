@@ -112,7 +112,7 @@ public class QuoteAssistantTests
     public void Le_courriel_au_client_contient_le_tableau_et_echappe_le_html()
     {
         var tenant = new TenantInfo(Guid.NewGuid(), "ScintiNet", null, "contact@scintinet.com", "418 953-3284", "admin@x.com", "#0097CE", null);
-        var html = QuoteService.BuildEmail(tenant, "Bonjour <b>Marie</b>,\n\nVoici notre offre.",
+        var html = QuoteEmailTemplate.Render(tenant, "Bonjour <b>Marie</b>,\n\nVoici notre offre.",
             [new QuoteLine("Ménage", 3, "heure", 37m), new QuoteLine("Évaluation", 1, "visite", 0)], 111m, "Taxes en sus.");
 
         Assert.Contains("&lt;b&gt;Marie&lt;/b&gt;", html);

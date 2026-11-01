@@ -25,6 +25,11 @@ tests/
   Hub.ArchitectureTests/   les modules ne se parlent que par leurs Contracts
 ```
 
+Les services extérieurs sont derrière des interfaces : le métier ne connaît que `IEmailSender`, `IMediaStorage` et `IQuoteModel`.
+Changer de fournisseur (par exemple passer de Resend à Azure Communication Services) se fait par configuration, sans toucher au métier ;
+en ajouter un demande une nouvelle classe, rien d'autre. De même, chaque type de tarification (à l'heure, au quart, forfait…) est une classe
+(`PricingKinds` côté catalogue, `QuotePricingRules` côté assistant).
+
 Chaque module a son schéma SQL (`platform`, `catalog`, `content`, `leads`, `analytics`, `channels`) et son propre historique de migrations.
 
 ## Démarrer en local (Windows)
@@ -72,7 +77,9 @@ dotnet user-secrets set "Anthropic:ApiKey" "<clé>" --project src\Hub.Web
 | --- | --- |
 | `ConnectionStrings__Hub` | Chaîne de connexion Azure SQL |
 | `Hub__AdminEmail`, `Hub__AdminPassword` | Premier administrateur (créé une seule fois) |
-| `Resend__ApiKey`, `Resend__FromEmail` | Envoi des courriels |
+| `Email__Provider` | Fournisseur de courriel : `Resend`, `AzureCommunication`, `Dossier` ou `Journal` (vide = détection automatique) |
+| `Resend__ApiKey`, `Resend__FromEmail` | Envoi des courriels par Resend |
+| `AzureCommunication__ConnectionString`, `AzureCommunication__FromEmail` | Envoi des courriels par Azure Communication Services |
 | `Media__BlobConnectionString`, `Media__Container` | Stockage des images (sinon `wwwroot/uploads`) |
 | `Turnstile__SiteKey`, `Turnstile__SecretKey` | Anti-pourriel Cloudflare (facultatif) |
 | `Anthropic__ApiKey` | Clé Claude de l'assistant de devis (sinon modèle simulé, sans IA) |

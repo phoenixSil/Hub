@@ -49,17 +49,8 @@ builder.Services
     .AddQuotesModule(builder.Configuration, connectionString);
 builder.Services.AddScoped<IQuoteContextSource, QuoteContextSource>();
 
-// Courriels : Resend si une clé est fournie ; sinon, en local, fichiers .html dans un dossier ; sinon journal.
-builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection(ResendOptions.Section));
-var devEmailFolder = builder.Configuration["DevEmail:Folder"];
-if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{ResendOptions.Section}:ApiKey"]))
-    builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
-else if (!string.IsNullOrWhiteSpace(devEmailFolder))
-    builder.Services.AddSingleton<IEmailSender>(sp => new FileEmailSender(
-        Path.Combine(builder.Environment.ContentRootPath, devEmailFolder),
-        sp.GetRequiredService<ILogger<FileEmailSender>>()));
-else
-    builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+// Courriels : fournisseur choisi par Email:Provider, sinon détecté (Resend, Azure Communication, dossier local, journal).
+builder.Services.AddEmail(builder.Configuration, builder.Environment);
 
 // Images : Blob Storage si configuré, sinon wwwroot/uploads.
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.Section));
@@ -90,6 +81,7 @@ builder.Services.ConfigureApplicationCookie(o =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+app.Logger.LogInformation("Courriels envoyés par : {Provider}", app.Services.GetRequiredService<EmailProviderInfo>().Name);
 
 // Migrations et données de départ
 await using (var scope = app.Services.CreateAsyncScope())
