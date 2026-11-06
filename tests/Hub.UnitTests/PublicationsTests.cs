@@ -62,7 +62,7 @@ public class FacebookPublisherTests
     {
         var handler = new FakeHandler(status, body);
         var publisher = new FacebookPagePublisher(new HttpClient(handler),
-            Options.Create(new FacebookOptions { GraphVersion = "v23.0" }), NullLogger<FacebookPagePublisher>.Instance);
+            Options.Create(new FacebookOptions { GraphVersion = "v27.0" }), NullLogger<FacebookPagePublisher>.Instance);
         return (publisher, handler);
     }
 
@@ -77,7 +77,7 @@ public class FacebookPublisherTests
         Assert.True(result.Success);
         Assert.Equal("123_456", result.ExternalId);
         Assert.Equal("https://www.facebook.com/123_456", result.ExternalUrl);
-        Assert.Equal("https://graph.facebook.com/v23.0/123/feed", handler.Request!.RequestUri!.ToString());
+        Assert.Equal("https://graph.facebook.com/v27.0/123/feed", handler.Request!.RequestUri!.ToString());
         Assert.Contains("message=Bonjour", handler.Body);
         Assert.Contains("link=https", handler.Body);
         Assert.Contains("access_token=jeton-secret", handler.Body);

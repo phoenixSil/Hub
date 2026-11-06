@@ -10,7 +10,7 @@ public sealed class FacebookOptions
     public const string Section = "Facebook";
 
     /// <summary>Version de l'API Graph de Meta.</summary>
-    public string GraphVersion { get; set; } = "v23.0";
+    public string GraphVersion { get; set; } = "v27.0";
     public string GraphBaseUrl { get; set; } = "https://graph.facebook.com";
 }
 
