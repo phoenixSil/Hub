@@ -27,12 +27,22 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
 
     public async Task<Result<string>> TestAsync(ChannelCredentials c, CancellationToken ct = default)
     {
-        var url = Url($"{Uri.EscapeDataString(c.AccountId)}?fields=name&access_token={Uri.EscapeDataString(c.AccessToken)}");
+        // Avec un jeton de page, « me » désigne la page elle-même. Avec un jeton d'utilisateur, « me » est la personne :
+        // Facebook refuserait alors toute publication (erreur « publish_actions »). On le détecte dès la connexion.
+        var url = Url($"me?fields=id,name&access_token={Uri.EscapeDataString(c.AccessToken)}");
         using var response = await http.GetAsync(url, ct);
         var json = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
         if (!response.IsSuccessStatusCode)
             return Result<string>.Failure(ErrorOf(json) ?? $"Facebook a répondu {(int)response.StatusCode}.");
-        return Result<string>.Success(json?["name"]?.GetValue<string>() ?? c.AccountId);
+
+        var id = json?["id"]?.GetValue<string>();
+        var name = json?["name"]?.GetValue<string>();
+        if (!string.Equals(id, c.AccountId.Trim(), StringComparison.Ordinal))
+            return Result<string>.Failure(
+                $"Ce jeton appartient à « {name ?? id} », pas à la page n° {c.AccountId}. " +
+                "Il faut le jeton DE LA PAGE : dans l'Explorateur de l'API Graph, choisissez la page dans « Utilisateur ou Page », " +
+                "ou copiez l'access_token renvoyé par la requête « ID_DE_LA_PAGE?fields=name,access_token ».");
+        return Result<string>.Success(name ?? c.AccountId);
     }
 
     public async Task<PublishResult> PublishAsync(PublishRequest r, ChannelCredentials c, CancellationToken ct = default)

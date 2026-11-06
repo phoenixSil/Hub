@@ -113,7 +113,18 @@ public class FacebookPublisherTests
         var result = await fb.TestAsync(Page);
 
         Assert.Equal("ScintiNet", result.Value);
-        Assert.Contains("fields=name", handler.Request!.RequestUri!.Query);
+        Assert.EndsWith("/v27.0/me", handler.Request!.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task Un_jeton_d_utilisateur_est_refuse_a_la_connexion()
+    {
+        // « me » renvoie la personne (autre id que la page) : ce n'est pas un jeton de page.
+        var (fb, _) = Create(HttpStatusCode.OK, """{"name":"Sillery Talla","id":"999"}""");
+        var result = await fb.TestAsync(Page);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("jeton DE LA PAGE", result.Error);
     }
 }
 
