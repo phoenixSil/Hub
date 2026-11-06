@@ -166,3 +166,5 @@ code.break { word-break: break-all; }
 .fb-image { display: block; width: 100%; max-height: 360px; object-fit: cover; }
 .fb-link { background: #f0f2f5; padding: 10px 14px; border-top: 1px solid #dddfe2; }
 .fb-link strong { display: block; color: #050505; }
+.field .check { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; }
+.field .check input[type=checkbox] { width: auto; flex: none; margin: 0; }
