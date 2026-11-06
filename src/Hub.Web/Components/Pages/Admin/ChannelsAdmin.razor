@@ -2,10 +2,24 @@
 @rendermode InteractiveServer
 @using Hub.Modules.Channels
 
+@inject IPublisherResolver Publishers
+
 <PageTitle>Canaux</PageTitle>
 
+<div class="admin-head">
+    <div>
+        <h1>Connexions aux réseaux</h1>
+        <p class="muted">Reliez vos pages pour publier depuis le back-office (menu Publications).</p>
+    </div>
+</div>
+
+@foreach (var c in Publishers.Supported)
+{
+    <ChannelConnectionPanel Channel="c" />
+}
+
 <CrudEditor T="Channel" Title="Canaux de présence en ligne" Context="c" AllowDelete="false"
-            Help="Phase 1 : seul le site est piloté. Les réseaux sociaux seront branchés ici un par un (Facebook en premier, en phase 3)."
+            Help="Liste de vos présences en ligne (adresse, état). Les réseaux sont branchés un par un : Facebook d'abord, puis Instagram et Google Business."
             Query="@(q => q.OrderBy(x => x.Phase).ThenBy(x => x.Type))">
     <Header><th>Canal</th><th>État</th><th>Phase</th><th>Adresse</th></Header>
     <Row>

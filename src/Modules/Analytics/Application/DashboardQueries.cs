@@ -27,13 +27,36 @@ public sealed record DashboardStats(
     public double ConversionRate => PageViews == 0 ? 0 : 100.0 * Leads / PageViews;
 }
 
+/// <summary>Résultats d'une campagne (ex. une publication) : pages vues et demandes arrivées par ses liens.</summary>
+public sealed record CampaignStats(int PageViews, int Leads);
+
 public interface IDashboardQueries
 {
     Task<DashboardStats> GetAsync(int days, CancellationToken ct = default);
+
+    /// <summary>Pages vues et demandes par identifiant de campagne (utm_campaign).</summary>
+    Task<IReadOnlyDictionary<string, CampaignStats>> GetCampaignStatsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default);
 }
 
 internal sealed class DashboardQueries(IDbContextFactory<AnalyticsDbContext> factory, TimeProvider clock) : IDashboardQueries
 {
+    public async Task<IReadOnlyDictionary<string, CampaignStats>> GetCampaignStatsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
+    {
+        if (campaigns.Count == 0) return new Dictionary<string, CampaignStats>();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.Campaign != null && campaigns.Contains(e.Campaign)
+                        && (e.Type == AnalyticsEventType.PageView || e.Type == AnalyticsEventType.LeadSubmitted))
+            .GroupBy(e => new { e.Campaign, e.Type })
+            .Select(g => new { g.Key.Campaign, g.Key.Type, Count = g.Count() })
+            .ToListAsync(ct);
+        return rows.GroupBy(r => r.Campaign!).ToDictionary(
+            g => g.Key,
+            g => new CampaignStats(
+                g.Where(r => r.Type == AnalyticsEventType.PageView).Sum(r => r.Count),
+                g.Where(r => r.Type == AnalyticsEventType.LeadSubmitted).Sum(r => r.Count)));
+    }
+
     public async Task<DashboardStats> GetAsync(int days, CancellationToken ct = default)
     {
         var to = Hub.SharedKernel.Time.BusinessTime.Today(clock);

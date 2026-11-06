@@ -8,4 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Hub.SharedKernel\Hub.SharedKernel.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hub.UnitTests" />
+  </ItemGroup>
 </Project>

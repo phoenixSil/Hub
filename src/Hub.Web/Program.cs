@@ -45,9 +45,15 @@ builder.Services
     .AddContentModule(connectionString)
     .AddLeadsModule(connectionString)
     .AddAnalyticsModule(connectionString)
-    .AddChannelsModule(connectionString)
+    .AddChannelsModule(builder.Configuration, connectionString)
     .AddQuotesModule(builder.Configuration, connectionString);
 builder.Services.AddScoped<IQuoteContextSource, QuoteContextSource>();
+
+// IA générique (rédaction des publications…) : Claude si une clé est fournie, sinon aucun (replis sans IA).
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AnthropicOptions.Section}:ApiKey"]))
+    builder.Services.AddHttpClient<Hub.SharedKernel.Ai.IAiTextGenerator, ClaudeTextGenerator>(c => c.Timeout = TimeSpan.FromSeconds(90));
+else
+    builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiTextGenerator, NoAiTextGenerator>();
 
 // Courriels : fournisseur choisi par Email:Provider, sinon détecté (Resend, Azure Communication, dossier local, journal).
 builder.Services.AddEmail(builder.Configuration, builder.Environment);

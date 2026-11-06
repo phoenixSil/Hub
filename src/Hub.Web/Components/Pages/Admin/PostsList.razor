@@ -1,0 +1,78 @@
+@page "/admin/publications"
+@rendermode InteractiveServer
+@inject IPostService Posts
+@inject IDashboardQueries Stats
+@inject IPublisherResolver Publishers
+
+<PageTitle>Publications</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Publications</h1>
+        <p class="muted">Vos publications sur les réseaux sociaux. Chaque lien est mesuré : vous voyez les visites et les demandes qu'il apporte.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">+ Nouvelle publication</a>
+</div>
+
+@if (Publishers.IsSimulated)
+{
+    <div class="alert alert-warning">Mode simulé : les publications ne partent pas vraiment sur les réseaux (développement et tests).</div>
+}
+
+@if (items is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (items.Count == 0)
+{
+    <div class="admin-card empty">
+        <p>Aucune publication pour l'instant.</p>
+        <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">Préparer la première</a>
+    </div>
+}
+else
+{
+    <div class="admin-card table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr><th>Date</th><th>Publication</th><th>Réseaux</th><th>Statut</th><th class="num">Visites</th><th class="num">Demandes</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var v in items)
+                {
+                    var p = v.Post;
+                    var s = stats.GetValueOrDefault(p.Campaign);
+                    <tr>
+                        <td class="nowrap">@DateOf(p)</td>
+                        <td><a href="/admin/publications/@p.Id">@p.Title</a><div class="muted small truncate">@p.Message</div></td>
+                        <td class="nowrap">
+                            @foreach (var t in v.Targets)
+                            {
+                                <span class="tag @(t.Status == PostTargetStatus.Published ? "tag-ok" : t.Status == PostTargetStatus.Failed ? "tag-ko" : "")" title="@(t.Error ?? "")">@PostLabels.Of(t.Channel)</span>
+                            }
+                        </td>
+                        <td><span class="status status-@PostLabels.Css(p.Status)">@PostLabels.Of(p.Status)</span></td>
+                        <td class="num">@(s?.PageViews ?? 0)</td>
+                        <td class="num"><strong>@(s?.Leads ?? 0)</strong></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<PostView>? items;
+    private IReadOnlyDictionary<string, CampaignStats> stats = new Dictionary<string, CampaignStats>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Posts.ListAsync();
+        stats = await Stats.GetCampaignStatsAsync(items.Select(i => i.Post.Campaign).ToList());
+    }
+
+    private static string DateOf(Post p) =>
+        p.PublishedAt is { } pub ? AdminFormat.Local(pub)
+        : p.ScheduledAt is { } at ? "Prévue " + AdminFormat.Local(at)
+        : AdminFormat.Local(p.CreatedAt);
+}

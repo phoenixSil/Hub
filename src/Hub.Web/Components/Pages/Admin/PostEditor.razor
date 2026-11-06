@@ -1,0 +1,423 @@
+@page "/admin/publications/nouvelle"
+@page "/admin/publications/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPostService Posts
+@inject IPostWriter Writer
+@inject IChannelConnections Connections
+@inject IPublisherResolver Publishers
+@inject ICatalogQueries Catalog
+@inject IContentQueries Content
+@inject ICurrentTenant Tenant
+@inject IDashboardQueries Stats
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>@(Id is null ? "Nouvelle publication" : "Publication")</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <p class="muted small"><a href="/admin/publications">← Publications</a></p>
+        <h1>@(Id is null ? "Nouvelle publication" : draft.Title)</h1>
+    </div>
+    @if (view is not null)
+    {
+        <span class="status status-@PostLabels.Css(view.Post.Status)">@PostLabels.Of(view.Post.Status)</span>
+    }
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+}
+
+@if (!loaded)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    <div class="admin-columns">
+        <div>
+            @if (Editable)
+            {
+                <div class="admin-card">
+                    <h2>1. Le sujet</h2>
+                    <div class="field">
+                        <label>À partir de</label>
+                        <select @bind="topicKey" @bind:after="OnTopicChanged">
+                            <option value="">Sujet libre</option>
+                            <optgroup label="Services">
+                                @foreach (var s in services)
+                                {
+                                    <option value="@("s:" + s.Url)">@s.Title</option>
+                                }
+                            </optgroup>
+                            @if (promotions.Count > 0)
+                            {
+                                <optgroup label="Offres">
+                                    @foreach (var p in promotions)
+                                    {
+                                        <option value="@("o:" + p.Id)">@p.Title</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    </div>
+                    <div class="field"><label>Sujet</label><input @bind="topic" @bind:event="oninput" placeholder="ex. Grand ménage du printemps" /></div>
+                    <div class="field"><label>Précisions pour l'IA (facultatif)</label><textarea rows="3" @bind="details" @bind:event="oninput" placeholder="ex. disponibilités en mai, produits écologiques, quartier Sillery"></textarea></div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Ton</label>
+                            <select @bind="tone">@foreach (var t in PostWriterTones) { <option value="@t">@t</option> }</select>
+                        </div>
+                        <div class="field" style="align-self:end">
+                            <button class="btn btn-outline btn-sm" @onclick="SuggestAsync" disabled="@(busy || string.IsNullOrWhiteSpace(topic))">
+                                @(busy ? "Rédaction…" : Writer.UsesAi ? "✨ Proposer 3 textes (Claude)" : "Proposer 3 textes (modèles)")
+                            </button>
+                        </div>
+                    </div>
+                    @if (suggestions.Count > 0)
+                    {
+                        <div class="suggestions">
+                            @foreach (var s in suggestions)
+                            {
+                                <div class="suggestion">
+                                    <p>@s.Text</p>
+                                    <button class="btn btn-xs btn-outline" @onclick="() => Use(s)">Utiliser ce texte</button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="admin-card">
+                    <h2>2. La publication</h2>
+                    <div class="field">
+                        <label>Titre interne <span class="muted small">(jamais publié)</span></label>
+                        <input @bind="draft.Title" @bind:event="oninput" />
+                        <FieldError Errors="errors" For="Title" />
+                    </div>
+                    <div class="field">
+                        <label>Texte <span class="muted small">(@draft.Message.Length caractères ; le lien est ajouté automatiquement)</span></label>
+                        <textarea id="post-message" rows="9" @bind="draft.Message" @bind:event="oninput"></textarea>
+                        <FieldError Errors="errors" For="Message" />
+                    </div>
+                    <div class="field">
+                        <label>Lien vers le site</label>
+                        <select @bind="draft.LinkPath">
+                            <option value="">Aucun lien</option>
+                            <option value="/devis">Demande de devis</option>
+                            <option value="/rendez-vous">Demande de rendez-vous</option>
+                            <option value="/">Accueil</option>
+                            @foreach (var s in services) { <option value="@s.Url">@s.Title</option> }
+                        </select>
+                    </div>
+                    <div class="field"><label>Image (recommandée)</label><ImagePicker @bind-Value="draft.ImageUrl" /></div>
+                    <div class="field">
+                        <label>Réseaux</label>
+                        @foreach (var c in Publishers.Supported)
+                        {
+                            <label class="check">
+                                <input type="checkbox" checked="@draft.Channels.Contains(c)" @onchange="e => Toggle(c, (bool)e.Value!)" />
+                                @PostLabels.Of(c)
+                                @if (!connected.GetValueOrDefault(c) && !Publishers.IsSimulated)
+                                {
+                                    <span class="muted small"> — non connecté (<a href="/admin/canaux">connecter</a>)</span>
+                                }
+                            </label>
+                        }
+                        <span class="muted small">Instagram et Google Business arriveront ensuite.</span>
+                        <FieldError Errors="errors" For="Channels" />
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <h2>3. Envoi</h2>
+                    <div class="actions">
+                        <button class="btn btn-primary btn-sm" @onclick="PublishNowAsync" disabled="@busy">Publier maintenant</button>
+                        <button class="btn btn-outline btn-sm" @onclick="SaveAsync" disabled="@busy">Enregistrer le brouillon</button>
+                    </div>
+                    <div class="field-row schedule">
+                        <div class="field"><label>Ou programmer le</label><input type="datetime-local" @bind="scheduleLocal" @bind:event="oninput" /></div>
+                        <div class="field" style="align-self:end"><button class="btn btn-outline btn-sm" @onclick="ScheduleAsync" disabled="@(busy || scheduleLocal is null)">Programmer</button></div>
+                    </div>
+                    @if (view?.Post.Status == PostStatus.Scheduled)
+                    {
+                        <p class="muted small">
+                            Prévue le @AdminFormat.Local(view.Post.ScheduledAt!.Value, "d MMMM yyyy à HH:mm").
+                            <button class="btn btn-ghost btn-xs" @onclick="CancelAsync">Annuler la programmation</button>
+                        </p>
+                    }
+                    @if (Id is not null)
+                    {
+                        <p><button class="btn btn-ghost btn-xs" @onclick="DeleteAsync">Supprimer ce brouillon</button></p>
+                    }
+                </div>
+            }
+            else if (view is not null)
+            {
+                <div class="admin-card">
+                    <h2>Résultat</h2>
+                    <dl class="details">
+                        <dt>Publiée le</dt><dd>@(view.Post.PublishedAt is { } d ? AdminFormat.Local(d, "d MMMM yyyy à HH:mm") : "—")</dd>
+                        <dt>Visites par ce lien</dt><dd>@(stats?.PageViews ?? 0)</dd>
+                        <dt>Demandes reçues</dt><dd><strong>@(stats?.Leads ?? 0)</strong></dd>
+                        <dt>Campagne</dt><dd><code>@view.Post.Campaign</code></dd>
+                    </dl>
+                    <ul class="targets">
+                        @foreach (var t in view.Targets)
+                        {
+                            <li>
+                                <strong>@PostLabels.Of(t.Channel)</strong> :
+                                @if (t.Status == PostTargetStatus.Published)
+                                {
+                                    <span>publiée</span>
+                                    @if (t.ExternalUrl is not null) { <text> — </text><a href="@t.ExternalUrl" target="_blank" rel="noopener">voir sur le réseau ↗</a> }
+                                }
+                                else
+                                {
+                                    <span class="field-error">@(t.Error ?? "en attente")</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (view.Post.Status is PostStatus.PartiallyPublished)
+                    {
+                        <button class="btn btn-outline btn-sm" @onclick="PublishNowAsync" disabled="@busy">Réessayer les réseaux en échec</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div>
+            <div class="admin-card">
+                <h2>Aperçu</h2>
+                <div class="fb-preview">
+                    <div class="fb-head">
+                        <div class="fb-avatar">@(companyName.Length > 0 ? companyName[..1] : "?")</div>
+                        <div><strong>@companyName</strong><div class="muted small">À l'instant · 🌐</div></div>
+                    </div>
+                    <div class="fb-text">@(string.IsNullOrWhiteSpace(draft.Message) ? "Le texte de la publication apparaîtra ici." : draft.Message)</div>
+                    @if (!string.IsNullOrWhiteSpace(draft.ImageUrl))
+                    {
+                        <img class="fb-image" src="@draft.ImageUrl" alt="" />
+                        @if (previewLink is not null) { <div class="fb-text fb-link-inline">@previewLink</div> }
+                    }
+                    else if (previewLink is not null)
+                    {
+                        <div class="fb-link">
+                            <div class="muted small">@(new Uri(previewLink).Host.ToUpperInvariant())</div>
+                            <strong>@LinkLabel(draft.LinkPath)</strong>
+                        </div>
+                    }
+                </div>
+                @if (previewLink is not null)
+                {
+                    <p class="muted small">Lien mesuré : <code class="break">@previewLink</code></p>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private static readonly string[] PostWriterTones = ["Chaleureux", "Professionnel", "Promotionnel", "Informatif"];
+
+    private PostDraft draft = new();
+    private PostView? view;
+    private CampaignStats? stats;
+    private bool loaded;
+    private bool busy;
+    private string? feedback;
+    private bool feedbackIsError;
+    private IReadOnlyDictionary<string, string> errors = new Dictionary<string, string>();
+
+    private List<ServiceSummary> services = [];
+    private List<Promotion> promotions = [];
+    private Dictionary<ChannelType, bool> connected = [];
+    private string companyName = "";
+    private string city = "Québec";
+
+    private string topicKey = "";
+    private string? topic;
+    private string? details;
+    private string tone = "Chaleureux";
+    private IReadOnlyList<PostSuggestion> suggestions = [];
+    private DateTime? scheduleLocal;
+    private string? previewLink;
+    private string? previewFor;
+
+    private bool Editable => view is null || view.Post.Status is PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var company = await Tenant.GetAsync();
+        companyName = company.Name;
+        city = string.IsNullOrWhiteSpace(company.City) ? "Québec" : company.City;
+        services = (await Catalog.GetCatalogAsync()).SelectMany(c => c.Services).ToList();
+        promotions = (await Content.GetAsync()).Promotions.Where(p => p.IsActive).ToList();
+        foreach (var c in Publishers.Supported)
+            connected[c] = (await Connections.GetStatusAsync(c)).IsConnected;
+
+        if (Id is { } id)
+        {
+            view = await Posts.GetAsync(id);
+            if (view is null) { Nav.NavigateTo("/admin/publications"); return; }
+            var p = view.Post;
+            draft = new PostDraft
+            {
+                Id = p.Id, Title = p.Title, Message = p.Message, LinkPath = p.LinkPath, ImageUrl = p.ImageUrl,
+                Channels = view.Targets.Select(t => t.Channel).ToList(), AiModel = p.AiModel,
+            };
+            stats = (await Stats.GetCampaignStatsAsync([p.Campaign])).GetValueOrDefault(p.Campaign);
+        }
+        loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Aperçu du lien mesuré, recalculé quand la page visée change.
+        var key = draft.LinkPath ?? "";
+        if (loaded && previewFor != key)
+        {
+            previewFor = key;
+            previewLink = await Posts.PreviewLinkAsync(draft.LinkPath, ChannelType.Facebook, view?.Post.Campaign ?? "apercu");
+            StateHasChanged();
+        }
+    }
+
+    private void OnTopicChanged()
+    {
+        if (topicKey.StartsWith("s:"))
+        {
+            var s = services.First(x => x.Url == topicKey[2..]);
+            topic = s.Title;
+            details = s.Summary;
+            draft.LinkPath = s.Url;
+            draft.ImageUrl ??= s.ImageUrl;
+        }
+        else if (topicKey.StartsWith("o:"))
+        {
+            var p = promotions.First(x => x.Id.ToString() == topicKey[2..]);
+            topic = p.Title + (string.IsNullOrWhiteSpace(p.Highlight) ? "" : " " + p.Highlight);
+            details = p.Text;
+            draft.LinkPath = p.PrimaryUrl;
+            draft.ImageUrl ??= p.ImageUrl;
+        }
+        if (string.IsNullOrWhiteSpace(draft.Title) && topic is not null) draft.Title = topic;
+    }
+
+    private async Task SuggestAsync()
+    {
+        busy = true;
+        feedback = null;
+        var result = await Writer.SuggestAsync(new PostIdea(companyName, city, topic ?? "", details, tone, ChannelType.Facebook));
+        busy = false;
+        if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
+        suggestions = result.Value!;
+    }
+
+    private void Use(PostSuggestion s)
+    {
+        draft.Message = s.Text;
+        draft.AiModel = s.Model;
+        if (string.IsNullOrWhiteSpace(draft.Title)) draft.Title = topic ?? "Publication";
+    }
+
+    private void Toggle(ChannelType c, bool on)
+    {
+        if (on && !draft.Channels.Contains(c)) draft.Channels.Add(c);
+        if (!on) draft.Channels.Remove(c);
+    }
+
+    private async Task<Guid?> SaveDraftInternalAsync()
+    {
+        var result = await Posts.SaveDraftAsync(draft, await AuthorAsync());
+        errors = result.FieldErrors;
+        if (result.IsFailure)
+        {
+            feedback = result.FieldErrors.Count == 0 ? result.Error : "Vérifiez les champs signalés.";
+            feedbackIsError = true;
+            return null;
+        }
+        draft.Id = result.Value;
+        return result.Value;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var id = await SaveDraftInternalAsync();
+        busy = false;
+        if (id is null) return;
+        if (Id is null) { Nav.NavigateTo($"/admin/publications/{id}"); return; }
+        feedback = "Brouillon enregistré.";
+        feedbackIsError = false;
+        view = await Posts.GetAsync(id.Value);
+    }
+
+    private async Task PublishNowAsync()
+    {
+        busy = true;
+        feedback = null;
+        Guid? id = view?.Post.Status == PostStatus.PartiallyPublished ? view.Post.Id : await SaveDraftInternalAsync();
+        if (id is null) { busy = false; return; }
+        var result = await Posts.PublishNowAsync(id.Value);
+        busy = false;
+        feedback = result.IsSuccess ? "Publication envoyée." : $"Publication incomplète : {result.Error}";
+        feedbackIsError = result.IsFailure;
+        await ReloadAsync(id.Value);
+    }
+
+    private async Task ScheduleAsync()
+    {
+        if (scheduleLocal is null) return;
+        busy = true;
+        var id = await SaveDraftInternalAsync();
+        if (id is null) { busy = false; return; }
+        var result = await Posts.ScheduleAsync(id.Value, Hub.SharedKernel.Time.BusinessTime.FromLocal(scheduleLocal.Value));
+        busy = false;
+        feedback = result.IsSuccess ? $"Publication programmée le {scheduleLocal.Value.ToString("d MMMM 'à' HH:mm", AdminFormat.Fr)}." : result.Error;
+        feedbackIsError = result.IsFailure;
+        await ReloadAsync(id.Value);
+    }
+
+    private async Task CancelAsync()
+    {
+        if (view is null) return;
+        var result = await Posts.CancelAsync(view.Post.Id);
+        feedback = result.IsSuccess ? "Programmation annulée : la publication est revenue en brouillon." : result.Error;
+        feedbackIsError = result.IsFailure;
+        await ReloadAsync(view.Post.Id);
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Id is not { } id) return;
+        var result = await Posts.DeleteAsync(id);
+        if (result.IsSuccess) Nav.NavigateTo("/admin/publications");
+        else { feedback = result.Error; feedbackIsError = true; }
+    }
+
+    private async Task ReloadAsync(Guid id)
+    {
+        if (Id is null) { Nav.NavigateTo($"/admin/publications/{id}"); return; }
+        view = await Posts.GetAsync(id);
+        if (view is not null)
+            stats = (await Stats.GetCampaignStatsAsync([view.Post.Campaign])).GetValueOrDefault(view.Post.Campaign);
+        previewFor = null;
+    }
+
+    private string LinkLabel(string? path) =>
+        services.FirstOrDefault(s => s.Url == path)?.Title
+        ?? path switch { "/devis" => "Demandez votre devis gratuit", "/rendez-vous" => "Demandez un rendez-vous", _ => companyName };
+
+    private async Task<string> AuthorAsync()
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+        return user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur";
+    }
+}

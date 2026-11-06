@@ -1,0 +1,92 @@
+@inject IChannelConnections Connections
+@inject IPublisherResolver Publishers
+
+<div class="admin-card">
+    <div class="assistant-head">
+        <h2>@PostLabels.Of(Channel)</h2>
+        @if (status?.IsConnected == true)
+        {
+            <span class="tag tag-ok">Connectée : @status.AccountName</span>
+        }
+        else
+        {
+            <span class="tag tag-ko">Non connectée</span>
+        }
+    </div>
+
+    @if (Publishers.IsSimulated)
+    {
+        <p class="muted small">Mode simulé : la connexion est acceptée sans appeler le réseau, et rien n'est publié pour de vrai.</p>
+    }
+
+    @if (feedback is not null)
+    {
+        <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+    }
+
+    @if (status?.IsConnected == true && !editing)
+    {
+        <p class="muted small">Page n° @status.AccountId, connectée le @AdminFormat.Local(status.ConnectedAt!.Value, "d MMMM yyyy"). Le jeton est chiffré et n'est jamais réaffiché.</p>
+        <div class="actions">
+            <button class="btn btn-outline btn-sm" @onclick="() => editing = true">Changer de page ou de jeton</button>
+            <button class="btn btn-ghost btn-sm" @onclick="DisconnectAsync">Déconnecter</button>
+        </div>
+    }
+    else
+    {
+        <details class="assistant-notes" open="@(status?.IsConnected != true)">
+            <summary>Comment obtenir l'identifiant et le jeton de la page</summary>
+            <ol>
+                <li>Sur <strong>developers.facebook.com</strong>, créez une application (type « Entreprise ») et ajoutez le produit « Pages ».</li>
+                <li>Dans l'<strong>Explorateur de l'API Graph</strong>, choisissez votre application, demandez les autorisations <code>pages_show_list</code>, <code>pages_read_engagement</code> et <code>pages_manage_posts</code>, puis générez un jeton d'utilisateur.</li>
+                <li>Transformez-le en jeton longue durée (outil « Débogueur de jeton d'accès » → « Étendre le jeton d'accès »).</li>
+                <li>Appelez <code>me/accounts</code> avec ce jeton : copiez l'<strong>id</strong> et l'<strong>access_token</strong> de la page ScintiNet. Ce jeton de page n'expire pas.</li>
+            </ol>
+        </details>
+        <div class="field-row">
+            <div class="field"><label>Identifiant de la page</label><input @bind="accountId" @bind:event="oninput" placeholder="ex. 61583803468197" /></div>
+            <div class="field"><label>Jeton de la page</label><input type="password" autocomplete="off" @bind="token" @bind:event="oninput" placeholder="EAAG…" /></div>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" @onclick="ConnectAsync" disabled="@(busy || string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(token))">
+                @(busy ? "Vérification…" : "Vérifier et connecter")
+            </button>
+            @if (editing) { <button class="btn btn-ghost btn-sm" @onclick="() => editing = false">Annuler</button> }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ChannelType Channel { get; set; }
+
+    private ConnectionStatus? status;
+    private string? accountId;
+    private string? token;
+    private bool busy;
+    private bool editing;
+    private string? feedback;
+    private bool feedbackIsError;
+
+    protected override async Task OnInitializedAsync() => status = await Connections.GetStatusAsync(Channel);
+
+    private async Task ConnectAsync()
+    {
+        busy = true;
+        feedback = null;
+        var result = await Connections.ConnectAsync(Channel, accountId ?? "", token ?? "");
+        busy = false;
+        token = null; // le jeton ne reste pas en mémoire de l'écran
+        feedback = result.IsSuccess ? $"Page « {result.Value} » connectée." : result.Error;
+        feedbackIsError = result.IsFailure;
+        if (result.IsSuccess) editing = false;
+        status = await Connections.GetStatusAsync(Channel);
+    }
+
+    private async Task DisconnectAsync()
+    {
+        await Connections.DisconnectAsync(Channel);
+        feedback = "Page déconnectée.";
+        feedbackIsError = false;
+        status = await Connections.GetStatusAsync(Channel);
+    }
+}

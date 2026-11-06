@@ -1,9 +1,13 @@
+using Hub.Modules.Channels.Application;
+using Hub.Modules.Channels.Domain;
+using Hub.Modules.Channels.Publishers;
 using Hub.SharedKernel.Data;
 using Hub.SharedKernel.Domain;
 using Hub.SharedKernel.Modules;
 using Hub.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Hub.Modules.Channels;
@@ -17,6 +21,7 @@ public enum ChannelType
     TikTok = 4,
     X = 5,
     GoogleBusiness = 6,
+    LinkedIn = 7,
 }
 
 public enum ChannelStatus
@@ -49,6 +54,8 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public override string Schema => SchemaName;
 
     public DbSet<Channel> Channels => Set<Channel>();
+    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<PostTarget> PostTargets => Set<PostTarget>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -61,6 +68,32 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Notes).HasMaxLength(1000);
             e.HasIndex(x => new { x.TenantId, x.Type }).IsUnique();
         });
+
+        b.Entity<Post>(e =>
+        {
+            e.ToTable("Posts");
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Message).HasMaxLength(5000);
+            e.Property(x => x.LinkPath).HasMaxLength(500);
+            e.Property(x => x.ImageUrl).HasMaxLength(1000);
+            e.Property(x => x.Campaign).HasMaxLength(100);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.CreatedBy).HasMaxLength(200);
+            e.Property(x => x.AiModel).HasMaxLength(80);
+            e.HasIndex(x => new { x.Status, x.ScheduledAt });
+            e.HasIndex(x => new { x.TenantId, x.Campaign });
+        });
+
+        b.Entity<PostTarget>(e =>
+        {
+            e.ToTable("PostTargets");
+            e.Property(x => x.Channel).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ExternalId).HasMaxLength(200);
+            e.Property(x => x.ExternalUrl).HasMaxLength(500);
+            e.Property(x => x.Error).HasMaxLength(1000);
+            e.HasIndex(x => new { x.TenantId, x.PostId });
+        });
     }
 }
 
@@ -72,10 +105,22 @@ public sealed class ChannelsDbContextDesignFactory : IDesignTimeDbContextFactory
 
 public static class ChannelsModule
 {
-    public static IServiceCollection AddChannelsModule(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddChannelsModule(this IServiceCollection services, IConfiguration configuration, string connectionString)
     {
         services.AddModuleDbContext<ChannelsDbContext>(connectionString, ChannelsDbContext.SchemaName);
         services.AddRepository<ChannelsDbContext, Channel>();
+        services.Configure<ChannelsOptions>(configuration.GetSection(ChannelsOptions.Section));
+        services.Configure<FacebookOptions>(configuration.GetSection(FacebookOptions.Section));
+
+        // Un connecteur par réseau : ajouter Instagram ou Google Business = une ligne ici.
+        services.AddHttpClient<ISocialPublisher, FacebookPagePublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
+
+        services.AddScoped<IPublisherResolver, PublisherResolver>();
+        services.AddScoped<IChannelConnections, ChannelConnections>();
+        services.AddScoped<PostPublishing>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<IPostWriter, PostWriter>();
+        services.AddHostedService<PostScheduler>();
         services.AddSingleton<IModuleInitializer, ChannelsInitializer>();
         return services;
     }

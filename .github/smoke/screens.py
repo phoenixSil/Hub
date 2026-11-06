@@ -81,6 +81,29 @@ with sync_playwright() as p:
     page.screenshot(path=f"{OUT}/admin-assistant-envoye.png", full_page=True)
     print("::notice::Assistant de devis : proposition affichée puis envoyée")
 
+    # Publications : rédiger (modèles, sans IA), publier (réseau simulé), retrouver dans la liste.
+    page.goto(BASE + "/admin/canaux", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    page.screenshot(path=f"{OUT}/admin-canaux.png", full_page=True)
+    page.goto(BASE + "/admin/publications/nouvelle", wait_until="networkidle")
+    page.wait_for_selector("text=1. Le sujet", timeout=15000)
+    page.wait_for_timeout(1000)
+    page.locator("select").first.select_option(index=1)
+    page.wait_for_timeout(500)
+    page.click("text=Proposer 3 textes")
+    page.wait_for_selector(".suggestion", timeout=15000)
+    page.locator(".suggestion button").first.click()
+    page.wait_for_timeout(800)
+    page.screenshot(path=f"{OUT}/admin-publication-editeur.png", full_page=True)
+    page.click("text=Publier maintenant")
+    page.wait_for_selector(".status-won", timeout=20000)
+    page.wait_for_timeout(800)
+    page.screenshot(path=f"{OUT}/admin-publication-publiee.png", full_page=True)
+    page.goto(BASE + "/admin/publications", wait_until="networkidle")
+    page.wait_for_selector("text=Publiée", timeout=15000)
+    page.screenshot(path=f"{OUT}/admin-publications.png", full_page=True)
+    print("::notice::Publication rédigée puis publiée (réseau simulé)")
+
     # Vérification en deux étapes, de bout en bout : activation puis reconnexion avec un code.
     def totp(secret, at=None):
         key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))

@@ -1,0 +1,29 @@
+using Hub.SharedKernel;
+
+namespace Hub.Modules.Channels.Publishers;
+
+/// <summary>Ce qui part sur le réseau : texte, lien mesuré (absolu), image publique (absolue).</summary>
+public sealed record PublishRequest(string Message, string? Link, string? ImageUrl);
+
+public sealed record PublishResult(bool Success, string? ExternalId, string? ExternalUrl, string? Error)
+{
+    public static PublishResult Ok(string id, string? url) => new(true, id, url, null);
+    public static PublishResult Fail(string error) => new(false, null, null, error);
+}
+
+/// <summary>Identifiants de connexion d'un réseau (déchiffrés, jamais affichés).</summary>
+public sealed record ChannelCredentials(string AccountId, string AccessToken, string? AccountName = null);
+
+/// <summary>
+/// Connecteur d'un réseau social. Ajouter un réseau = une classe qui implémente
+/// cette interface, enregistrée dans <see cref="ChannelsModule"/> : rien d'autre ne change.
+/// </summary>
+public interface ISocialPublisher
+{
+    ChannelType Channel { get; }
+
+    /// <summary>Vérifie la connexion ; renvoie le nom du compte (ex. le nom de la page).</summary>
+    Task<Result<string>> TestAsync(ChannelCredentials credentials, CancellationToken ct = default);
+
+    Task<PublishResult> PublishAsync(PublishRequest request, ChannelCredentials credentials, CancellationToken ct = default);
+}
