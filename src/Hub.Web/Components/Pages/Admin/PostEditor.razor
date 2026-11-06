@@ -41,6 +41,19 @@ else
         <div>
             @if (Editable)
             {
+                @if (view is not null && view.Targets.Any(t => t.Status == PostTargetStatus.Failed))
+                {
+                    <div class="alert alert-error">
+                        <strong>La dernière tentative a échoué.</strong>
+                        <ul>
+                            @foreach (var t in view.Targets.Where(t => t.Status == PostTargetStatus.Failed))
+                            {
+                                <li>@PostLabels.Of(t.Channel) : @t.Error</li>
+                            }
+                        </ul>
+                        Corrigez si besoin, puis cliquez de nouveau sur « Publier maintenant ».
+                    </div>
+                }
                 <div class="admin-card">
                     <h2>1. Le sujet</h2>
                     <div class="field">
