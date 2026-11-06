@@ -190,7 +190,7 @@ internal sealed class PostPublishing(
             var request = new PublishRequest(
                 post.Message,
                 TrackedLink.Build(info.SiteUrl, post.LinkPath, target.Channel, post.Campaign),
-                TrackedLink.Absolute(info.SiteUrl, post.ImageUrl));
+                TrackedLink.SocialImage(info.SiteUrl, post.ImageUrl));
             var result = await publishers.For(target.Channel).PublishAsync(request, credentials ?? new ChannelCredentials("simulé", "simulé"), ct);
 
             target.Status = result.Success ? PostTargetStatus.Published : PostTargetStatus.Failed;

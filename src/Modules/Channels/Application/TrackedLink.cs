@@ -29,6 +29,18 @@ public static class TrackedLink
         return $"{siteUrl.TrimEnd('/')}/{pathOrUrl.TrimStart('/')}";
     }
 
+    /// <summary>
+    /// Adresse de l'image à donner au réseau. Les WebP du site passent par « /media/social.jpg »,
+    /// qui les convertit en JPEG (format accepté par Facebook et Instagram).
+    /// </summary>
+    public static string? SocialImage(string? siteUrl, string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl)) return null;
+        var path = imageUrl.Split('?')[0];
+        if (!path.EndsWith(".webp", StringComparison.OrdinalIgnoreCase)) return Absolute(siteUrl, imageUrl);
+        return Absolute(siteUrl, $"/media/social.jpg?src={Uri.EscapeDataString(imageUrl)}");
+    }
+
     /// <summary>Identifiant de campagne lisible et unique : « 2026-11-menage-d-automne-3f2a ».</summary>
     public static string NewCampaign(string title, DateTimeOffset now)
     {

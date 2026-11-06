@@ -28,7 +28,12 @@ public interface IMediaStorage
 
 internal static class ImageProcessor
 {
-    public static byte[] ToWebp(Stream input, int maxWidth, int quality)
+    public static byte[] ToWebp(Stream input, int maxWidth, int quality) => Encode(input, maxWidth, quality, SKEncodedImageFormat.Webp);
+
+    /// <summary>JPEG pour les réseaux sociaux (l'API de Facebook n'accepte pas le WebP pour les photos).</summary>
+    public static byte[] ToJpeg(Stream input, int maxWidth, int quality) => Encode(input, maxWidth, quality, SKEncodedImageFormat.Jpeg);
+
+    private static byte[] Encode(Stream input, int maxWidth, int quality, SKEncodedImageFormat format)
     {
         using var source = SKBitmap.Decode(input)
             ?? throw new InvalidOperationException("Ce fichier n'est pas une image lisible (JPG, PNG ou WebP).");
@@ -45,7 +50,7 @@ internal static class ImageProcessor
         try
         {
             using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
+            using var data = image.Encode(format, quality);
             return data.ToArray();
         }
         finally

@@ -182,3 +182,15 @@ public class PublisherResolverTests
         Assert.Throws<InvalidOperationException>(() => resolver.For(ChannelType.TikTok));
     }
 }
+
+public class SocialImageTests
+{
+    [Fact]
+    public void Une_image_WebP_passe_par_la_conversion_JPEG() =>
+        Assert.Equal("https://www.scintinet.com/media/social.jpg?src=%2Fimages%2Fsite%2Fmaison.webp",
+            TrackedLink.SocialImage("https://www.scintinet.com", "/images/site/maison.webp"));
+
+    [Fact]
+    public void Une_image_JPEG_est_donnee_telle_quelle() =>
+        Assert.Equal("https://www.scintinet.com/uploads/a.jpg", TrackedLink.SocialImage("https://www.scintinet.com", "/uploads/a.jpg"));
+}

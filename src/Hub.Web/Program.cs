@@ -143,6 +143,7 @@ app.MapStaticAssets();
 app.MapSeo();
 app.MapTracking();
 app.MapAdminExports();
+app.MapSocialImages();
 
 app.MapPost("/compte/deconnexion", async (SignInManager<HubUser> signIn) =>
 {
