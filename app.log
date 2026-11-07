@@ -1,0 +1,60 @@
+info: Hub.Web[0]
+      Courriels envoyés par : Journal
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Entreprise scintinet créée.
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Administrateur admin@smoke.test créé.
+info: Seed[0]
+      Préparation des données de départ de ScintiNet.
+info: Seed[0]
+      Données de départ prêtes.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {372df281-bc9a-4800-80c8-1a0f031a8ad8} may be persisted to storage in unencrypted form.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/runner/work/Hub/Hub/publish
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Devis — Test Fumée
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre demande de devis
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Contact — Test Fumée
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre message
+info: Hub.Modules.Quotes.Application.QuoteService[0]
+      Proposition de devis Draft pour la demande 01a1b61f-67e1-720e-8668-12338af33577 (simulé, 111.00 $)
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Rappel : 1 demande sans réponse
+info: Hub.Modules.Leads.Application.LeadReminderService[0]
+      Rappel envoyé pour 1 demande(s) en attente.
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — votre proposition de prix
+info: Hub.Channels.Simulated[0]
+      Publication simulée sur Facebook : ✨ Nettoyage résidentiel
+      
+      Nettoyage complet de votre maison, condo ou appartement, une seule fois ou selon un horaire régulier.
+      
+      L'équipe ScintiNet est là pour vous à Québec. Demandez votre devis gratuit dès aujourd'hui !
+      
+      #Québec #Entretien | https://www.scintinet.com/services/nettoyage-residentiel?utm_source=facebook&utm_medium=social&utm_campaign=2026-11-nettoyage-residentiel-a856 | https://www.scintinet.com/media/social.jpg?src=%2Fuploads%2F01a1b61f4764738f83021f22f2c34edf%2Fvisuel-b899755b.webp
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1b620-e181-753b-80d1-67852e73cca3 sur Facebook : publiée
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : 3 publication(s) préparée(s).
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : 3 publication(s) à valider
+info: Hub.Web.Components.Pages.Account.LoginWith2fa[0]
+      Connexion en deux étapes réussie
+info: Hub.Web.Components.Pages.Account.LoginWith2fa[0]
+      Connexion en deux étapes réussie
