@@ -20,11 +20,22 @@ public sealed class PostDraft
     public string? ImageUrl { get; set; }
     public List<ChannelType> Channels { get; set; } = [ChannelType.Facebook];
     public string? AiModel { get; set; }
+    public string? Audience { get; set; }
+    public string? VisualKind { get; set; }
+    public string? Theme { get; set; }
 }
+
+/// <summary>Une publication partie, pour les résultats : réseaux où elle a été publiée.</summary>
+public sealed record PublishedPost(
+    Guid Id, string Title, DateTimeOffset PublishedAt, string Campaign, string? Audience, bool FromAutopilot,
+    string? VisualKind, string? Theme, IReadOnlyList<ChannelType> Channels, string? ImageUrl);
 
 public interface IPostService
 {
     Task<IReadOnlyList<PostView>> ListAsync(CancellationToken ct = default);
+
+    /// <summary>Publications parties depuis une date (au moins un réseau publié).</summary>
+    Task<IReadOnlyList<PublishedPost>> ListPublishedAsync(DateTimeOffset since, CancellationToken ct = default);
     Task<PostView?> GetAsync(Guid id, CancellationToken ct = default);
     Task<Result<Guid>> SaveDraftAsync(PostDraft draft, string author, CancellationToken ct = default);
     Task<Result> ScheduleAsync(Guid id, DateTimeOffset when, CancellationToken ct = default);
@@ -49,6 +60,20 @@ internal sealed class PostService(
         var ids = posts.Select(p => p.Id).ToList();
         var targets = await db.PostTargets.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct);
         return posts.Select(p => new PostView(p, targets.Where(t => t.PostId == p.Id).ToList())).ToList();
+    }
+
+    public async Task<IReadOnlyList<PublishedPost>> ListPublishedAsync(DateTimeOffset since, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var posts = await db.Posts.AsNoTracking()
+            .Where(p => p.PublishedAt != null && p.PublishedAt >= since
+                        && (p.Status == PostStatus.Published || p.Status == PostStatus.PartiallyPublished))
+            .OrderByDescending(p => p.PublishedAt).ToListAsync(ct);
+        var ids = posts.Select(p => p.Id).ToList();
+        var targets = await db.PostTargets.AsNoTracking()
+            .Where(t => ids.Contains(t.PostId) && t.Status == PostTargetStatus.Published).ToListAsync(ct);
+        return posts.Select(p => new PublishedPost(p.Id, p.Title, p.PublishedAt!.Value, p.Campaign, p.Audience, p.FromAutopilot,
+            p.VisualKind, p.Theme, targets.Where(t => t.PostId == p.Id).Select(t => t.Channel).Distinct().ToList(), p.ImageUrl)).ToList();
     }
 
     public async Task<PostView?> GetAsync(Guid id, CancellationToken ct = default)
@@ -91,6 +116,9 @@ internal sealed class PostService(
         post.LinkPath = string.IsNullOrWhiteSpace(d.LinkPath) ? null : d.LinkPath.Trim();
         post.ImageUrl = string.IsNullOrWhiteSpace(d.ImageUrl) ? null : d.ImageUrl.Trim();
         post.AiModel = d.AiModel ?? post.AiModel;
+        post.Audience = string.IsNullOrWhiteSpace(d.Audience) ? post.Audience : d.Audience.Trim();
+        post.Theme = string.IsNullOrWhiteSpace(d.Theme) ? post.Theme : d.Theme.Trim();
+        post.VisualKind = post.ImageUrl is null ? null : d.VisualKind ?? post.VisualKind ?? "Importée";
         if (post.Status == PostStatus.Failed) post.Status = PostStatus.Draft;
 
         // Les réseaux visés : on garde ceux déjà publiés, on ajuste les autres.

@@ -126,12 +126,17 @@ internal sealed class AutopilotRunner(
         var suggestion = text.Value![0];
 
         var imageUrl = item.ImageUrl;
+        var visualKind = "Importée";
         var visual = await designer.DesignAsync(new VisualIdea(context.CompanyName, context.Phone, context.PrimaryColor, context.AccentColor,
             item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl), ct);
         if (visual.IsSuccess && (visual.Value!.Png ?? (visual.Value.Svg is { } svg ? renderer.RenderPng(svg) : null)) is { } png)
         {
             var saved = await store.SavePngAsync(png, ct);
-            if (saved.IsSuccess) imageUrl = saved.Value;
+            if (saved.IsSuccess)
+            {
+                imageUrl = saved.Value;
+                visualKind = visual.Value.Svg is null ? "Photo" : "Illustration";
+            }
             else problems.Add(saved.Error!);
         }
         else if (visual.IsFailure)
@@ -146,6 +151,8 @@ internal sealed class AutopilotRunner(
             LinkPath = item.LinkPath,
             ImageUrl = imageUrl,
             Audience = item.Audience.Truncate(100),
+            VisualKind = imageUrl is null ? null : visualKind,
+            Theme = item.Style,
             FromAutopilot = true,
             CreatedBy = Author,
             AiModel = suggestion.Model,
@@ -160,15 +167,15 @@ internal sealed class AutopilotRunner(
     {
         var recent = await db.Posts.AsNoTracking()
             .Where(p => p.Status == PostStatus.Published || p.Status == PostStatus.PartiallyPublished)
-            .OrderByDescending(p => p.PublishedAt).Take(15)
-            .Select(p => new { p.Title, p.Audience, p.PublishedAt, p.Campaign })
+            .OrderByDescending(p => p.PublishedAt).Take(30)
+            .Select(p => new { p.Title, p.Audience, p.PublishedAt, p.Campaign, p.Theme })
             .ToListAsync(ct);
         if (recent.Count == 0) return [];
         var results = await source.GetResultsAsync(recent.Select(p => p.Campaign).ToList(), ct);
         return recent.Select(p =>
         {
             var r = results.GetValueOrDefault(p.Campaign);
-            return new AutopilotHistory(p.Title, p.Audience, p.PublishedAt, r.Visits, r.Leads);
+            return new AutopilotHistory(p.Title, p.Audience, p.PublishedAt, r.Visits, r.Leads, r.Won, p.Theme);
         }).ToList();
     }
 

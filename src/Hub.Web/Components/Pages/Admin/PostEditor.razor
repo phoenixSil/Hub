@@ -345,6 +345,7 @@ else
     private string VisualTopic => string.IsNullOrWhiteSpace(topic) ? draft.Title : topic;
 
     private byte[]? visualPng;
+    private string? generatedImage;
     private VisualKind visualKind = VisualKind.Photo;
     private bool WantsPhoto => Designer.MakesPhotos && visualKind == VisualKind.Photo;
     private string VisualDataUrl => visualPng is null ? "" : "data:image/png;base64," + Convert.ToBase64String(visualPng);
@@ -371,7 +372,9 @@ else
             {
                 Id = p.Id, Title = p.Title, Message = p.Message, LinkPath = p.LinkPath, ImageUrl = p.ImageUrl,
                 Channels = view.Targets.Select(t => t.Channel).ToList(), AiModel = p.AiModel,
+                Audience = p.Audience, VisualKind = p.VisualKind, Theme = p.Theme,
             };
+            generatedImage = p.VisualKind is "Photo" or "Illustration" ? p.ImageUrl : null;
             stats = (await Stats.GetCampaignStatsAsync([p.Campaign])).GetValueOrDefault(p.Campaign);
         }
         loaded = true;
@@ -449,6 +452,9 @@ else
         End();
         if (saved.IsFailure) { feedback = saved.Error; feedbackIsError = true; return; }
         draft.ImageUrl = saved.Value;
+        generatedImage = saved.Value;
+        draft.VisualKind = visual?.Svg is null ? "Photo" : "Illustration";
+        draft.Theme = visualStyle;
         visual = null;
         visualPng = null;
         feedback = "Visuel ajouté à la publication.";
@@ -470,6 +476,9 @@ else
 
     private async Task<Guid?> SaveDraftInternalAsync()
     {
+        // Une image changée à la main après la création d'un visuel est une image importée.
+        if (draft.ImageUrl is not null && draft.ImageUrl != generatedImage) draft.VisualKind = "Importée";
+        draft.Theme ??= visualStyle;
         var result = await Posts.SaveDraftAsync(draft, await AuthorAsync());
         errors = result.FieldErrors;
         if (result.IsFailure)

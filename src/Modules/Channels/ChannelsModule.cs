@@ -84,6 +84,8 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.AiModel).HasMaxLength(80);
             e.Property(x => x.Audience).HasMaxLength(100);
+            e.Property(x => x.VisualKind).HasMaxLength(20);
+            e.Property(x => x.Theme).HasMaxLength(30);
             e.HasIndex(x => new { x.Status, x.ScheduledAt });
             e.HasIndex(x => new { x.TenantId, x.Campaign });
         });

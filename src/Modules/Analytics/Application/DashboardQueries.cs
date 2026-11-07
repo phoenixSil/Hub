@@ -30,8 +30,14 @@ public sealed record DashboardStats(
 /// <summary>Résultats d'une campagne (ex. une publication) : pages vues et demandes arrivées par ses liens.</summary>
 public sealed record CampaignStats(int PageViews, int Leads);
 
+/// <summary>Pages vues arrivées par une campagne, pour un réseau (utm_source).</summary>
+public sealed record CampaignSourceViews(string Campaign, string Source, int PageViews, int Visitors);
+
 public interface IDashboardQueries
 {
+    /// <summary>Pages vues et visiteurs par campagne et par réseau (pour comparer Facebook, Instagram…).</summary>
+    Task<IReadOnlyList<CampaignSourceViews>> GetCampaignViewsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default);
+
     Task<DashboardStats> GetAsync(int days, CancellationToken ct = default);
 
     /// <summary>Pages vues et demandes par identifiant de campagne (utm_campaign).</summary>
@@ -40,6 +46,20 @@ public interface IDashboardQueries
 
 internal sealed class DashboardQueries(IDbContextFactory<AnalyticsDbContext> factory, TimeProvider clock) : IDashboardQueries
 {
+    public async Task<IReadOnlyList<CampaignSourceViews>> GetCampaignViewsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
+    {
+        if (campaigns.Count == 0) return [];
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.Campaign != null && campaigns.Contains(e.Campaign) && e.Type == AnalyticsEventType.PageView)
+            .Select(e => new { e.Campaign, e.Source, e.VisitorId })
+            .ToListAsync(ct);
+        return rows.GroupBy(r => (Campaign: r.Campaign!, Source: (r.Source ?? "direct").ToLowerInvariant()))
+            .Select(g => new CampaignSourceViews(g.Key.Campaign, g.Key.Source, g.Count(),
+                g.Where(r => r.VisitorId != null).Select(r => r.VisitorId).Distinct().Count()))
+            .ToList();
+    }
+
     public async Task<IReadOnlyDictionary<string, CampaignStats>> GetCampaignStatsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
     {
         if (campaigns.Count == 0) return new Dictionary<string, CampaignStats>();

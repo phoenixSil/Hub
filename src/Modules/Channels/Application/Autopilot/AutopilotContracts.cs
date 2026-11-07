@@ -13,7 +13,7 @@ public sealed record AutopilotPage(
     string? Facts);
 
 /// <summary>Résultat d'une publication passée : ce qui a marché sert à choisir les prochaines.</summary>
-public sealed record AutopilotHistory(string Title, string? Audience, DateTimeOffset? PublishedAt, int Visits, int Leads);
+public sealed record AutopilotHistory(string Title, string? Audience, DateTimeOffset? PublishedAt, int Visits, int Leads, int Won = 0, string? Theme = null);
 
 /// <summary>Ce que le pilote sait de l'entreprise. Assemblé par l'hôte à partir des autres modules.</summary>
 public sealed record AutopilotContext(
@@ -31,8 +31,8 @@ public interface IAutopilotContextSource
 {
     Task<AutopilotContext> GetAsync(CancellationToken ct = default);
 
-    /// <summary>Visites et demandes apportées par chaque campagne (utm_campaign).</summary>
-    Task<IReadOnlyDictionary<string, (int Visits, int Leads)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default);
+    /// <summary>Visites, demandes et clients gagnés apportés par chaque campagne (utm_campaign).</summary>
+    Task<IReadOnlyDictionary<string, (int Visits, int Leads, int Won)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default);
 }
 
 /// <summary>Convertit un visuel SVG en image PNG (côté serveur, avec les polices de la marque).</summary>

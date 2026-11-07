@@ -141,14 +141,26 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
             sb.AppendLine($"- {p.Url} | {(p.IsPromotion ? "OFFRE" : "Service")} | {p.Title}{(p.Facts is null ? "" : " | " + p.Facts)} | {Clip(p.Summary, 200)}");
         if (r.History.Count > 0)
         {
-            sb.AppendLine().AppendLine("Publications récentes (visites, demandes) :");
-            foreach (var h in r.History)
-                sb.AppendLine($"- {h.Title}{(h.Audience is null ? "" : $" [{h.Audience}]")} : {h.Visits} visites, {h.Leads} demandes");
+            sb.AppendLine().AppendLine("Publications récentes (visites, demandes, clients gagnés) :");
+            foreach (var h in r.History.Take(15))
+                sb.AppendLine($"- {h.Title}{(h.Audience is null ? "" : $" [{h.Audience}]")}{(h.Theme is null ? "" : $" ({h.Theme})")} : {h.Visits} visites, {h.Leads} demandes, {h.Won} gagnés");
+            AppendAverages(sb, "Résultats moyens par public", r.History, h => h.Audience);
+            AppendAverages(sb, "Résultats moyens par type de sujet", r.History, h => h.Theme);
+            sb.AppendLine("Fais davantage de ce qui apporte des demandes, en gardant un peu de variété pour continuer d'apprendre.");
         }
         if (!string.IsNullOrWhiteSpace(r.Guidelines))
             sb.AppendLine().AppendLine("Consignes de l'entreprise :").AppendLine(r.Guidelines);
         sb.AppendLine().AppendLine($"Réponds au format JSON demandé, avec exactement {r.Slots.Count} publications dans l'ordre des créneaux.");
         return sb.ToString();
+    }
+
+    private static void AppendAverages(StringBuilder sb, string title, IReadOnlyList<AutopilotHistory> history, Func<AutopilotHistory, string?> key)
+    {
+        var groups = history.Where(h => key(h) is not null).GroupBy(key).Where(g => g.Count() >= 1).ToList();
+        if (groups.Count < 2) return;
+        sb.AppendLine().AppendLine(title + " :");
+        foreach (var g in groups.OrderByDescending(g => g.Average(h => h.Leads)).ThenByDescending(g => g.Average(h => h.Visits)))
+            sb.AppendLine($"- {g.Key} : {g.Count()} publication(s), {g.Average(h => h.Visits):0.#} visites et {g.Average(h => h.Leads):0.##} demandes par publication");
     }
 
     private const string Schema = """

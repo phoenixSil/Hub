@@ -12,6 +12,10 @@ public interface ITenantStore
     Task<Tenant?> GetAsync(Guid id, CancellationToken ct = default);
     Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default);
     Task SaveAsync(Tenant tenant, CancellationToken ct = default);
+    Task<IReadOnlyList<Tenant>> ListActiveAsync(CancellationToken ct = default);
+
+    /// <summary>Note l'envoi du résumé de la semaine (sans toucher au reste de la fiche).</summary>
+    Task MarkWeeklyReportAsync(Guid id, DateOnly day, CancellationToken ct = default);
 }
 
 internal sealed class TenantStore(IDbContextFactory<PlatformDbContext> factory, IMemoryCache cache) : ITenantStore
@@ -40,6 +44,15 @@ internal sealed class TenantStore(IDbContextFactory<PlatformDbContext> factory, 
 
     public async Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default) =>
         (await AllAsync(ct)).FirstOrDefault(t => t.Slug == slug);
+
+    public async Task<IReadOnlyList<Tenant>> ListActiveAsync(CancellationToken ct = default) => await AllAsync(ct);
+
+    public async Task MarkWeeklyReportAsync(Guid id, DateOnly day, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.Tenants.Where(t => t.Id == id).ExecuteUpdateAsync(s => s.SetProperty(t => t.LastWeeklyReportOn, day), ct);
+        cache.Remove(AllKey);
+    }
 
     public async Task SaveAsync(Tenant tenant, CancellationToken ct = default)
     {

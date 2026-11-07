@@ -81,6 +81,7 @@
                 <div class="field"><label>Son courriel</label><InputText @bind-Value="tenant.PrivacyOfficerEmail" /></div>
             </div>
             <div class="field"><label>Domaines servis (séparés par des virgules)</label><InputText @bind-Value="tenant.Domains" /></div>
+            <label class="check"><InputCheckbox @bind-Value="tenant.WeeklyReport" /> Recevoir chaque lundi matin le résumé des résultats (publications, visites, demandes)</label>
         </div>
 
         <div class="admin-actions sticky-actions">

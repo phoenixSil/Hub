@@ -67,6 +67,8 @@ else if (builder.Configuration.GetValue<bool>($"{GeminiOptions.Section}:Simulate
 else
     builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiImageGenerator, NoAiImageGenerator>();
 builder.Services.AddSingleton<Hub.Modules.Channels.Application.IPhotoComposer, SkiaPhotoComposer>();
+builder.Services.AddScoped<IMarketingResults, MarketingResults>();
+builder.Services.AddHostedService<WeeklyReportWorker>();
 
 // Courriels : fournisseur choisi par Email:Provider, sinon détecté (Resend, Azure Communication, dossier local, journal).
 builder.Services.AddEmail(builder.Configuration, builder.Environment);

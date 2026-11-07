@@ -53,6 +53,12 @@ public sealed class Post : TenantEntity
 
     /// <summary>Préparée par le pilote automatique.</summary>
     public bool FromAutopilot { get; set; }
+
+    /// <summary>Type de visuel : « Photo », « Illustration », « Importée » (vide : sans image). Sert aux résultats.</summary>
+    public string? VisualKind { get; set; }
+
+    /// <summary>Type de sujet (Promotion, Service, Conseil, Saison, Aînés). Sert aux résultats.</summary>
+    public string? Theme { get; set; }
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

@@ -1,0 +1,190 @@
+@page "/admin/resultats"
+@rendermode InteractiveServer
+@using System.Globalization
+@using Hub.Web.Infrastructure
+@inject IMarketingResults Results
+@inject ICurrentTenant Tenant
+
+<PageTitle>Résultats du marketing</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Résultats du marketing</h1>
+        <p class="muted">Ce que rapportent vos publications des @days derniers jours : visites sur le site, demandes, rendez-vous et clients gagnés. Chaque lien publié est mesuré par réseau.</p>
+    </div>
+    <div class="segmented">
+        @foreach (var d in new[] { 7, 30, 90 })
+        {
+            <button class="@(days == d ? "active" : null)" @onclick="() => ChangeAsync(d)">@d jours</button>
+        }
+    </div>
+</div>
+
+@if (report is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    <div class="kpi-grid">
+        <div class="kpi"><span>Publications parties</span><strong>@report.PostCount</strong></div>
+        <div class="kpi"><span>Visites venues des réseaux</span><strong>@report.Visits.ToString("N0", Fr)</strong></div>
+        <div class="kpi kpi-accent"><span>Demandes reçues</span><strong>@report.Leads</strong></div>
+        <div class="kpi"><span>Dont rendez-vous</span><strong>@report.Appointments</strong></div>
+        <div class="kpi"><span>Clients gagnés</span><strong>@report.Won</strong></div>
+        <div class="kpi"><span>Photos IA ce mois</span><strong>@report.PhotosThisMonth</strong><small class="muted">≈ @report.PhotoCostThisMonth.ToString("0.00", Fr) $</small></div>
+    </div>
+
+    <div class="admin-card">
+        <h2>Le parcours</h2>
+        <div class="funnel">
+            @Step("Publications", report.PostCount, null)
+            @Step("Visites", report.Visits, report.PostCount == 0 ? null : $"{(double)report.Visits / report.PostCount:0.#} par publication")
+            @Step("Demandes", report.Leads, report.Visits == 0 ? null : $"{100.0 * report.Leads / report.Visits:0.#} % des visites")
+            @Step("Clients gagnés", report.Won, report.Leads == 0 ? null : $"{100.0 * report.Won / report.Leads:0.#} % des demandes")
+        </div>
+        <p class="muted small">Une demande passe en « client gagné » quand vous changez son statut à « Gagnée » dans Demandes.</p>
+    </div>
+
+    @if (report.Best is { } best)
+    {
+        <div class="admin-card best-post">
+            @if (!string.IsNullOrWhiteSpace(best.Post.ImageUrl)) { <img src="@best.Post.ImageUrl" alt="" /> }
+            <div>
+                <p class="eyebrow">Meilleure publication</p>
+                <h2><a href="/admin/publications/@best.Post.Id">@best.Post.Title</a></h2>
+                <p class="muted">
+                    @best.Visits visite(s), @best.Leads demande(s)@(best.Won > 0 ? $", {best.Won} client(s) gagné(s)" : "")
+                    · @string.Join(" et ", best.Post.Channels.Select(MarketingResults.ChannelLabel))
+                    @(best.Post.Audience is null ? "" : " · pour " + best.Post.Audience)
+                </p>
+            </div>
+        </div>
+    }
+
+    @if (report.PostCount == 0)
+    {
+        <div class="admin-card">
+            <p>Aucune publication partie sur cette période. Créez-en une dans <a href="/admin/publications/nouvelle">Publications</a>
+               ou activez le <a href="/admin/pilote-automatique">pilote automatique</a> : les résultats apparaîtront ici.</p>
+        </div>
+    }
+    else
+    {
+        <div class="admin-columns">
+            @Compare("Par réseau", report.ByChannel)
+            @Compare("Par public visé", report.ByAudience)
+            @Compare("Par type de sujet", report.ByTheme)
+            @Compare("Par type de visuel", report.ByVisual)
+            @Compare("Pilote automatique ou à la main", report.ByOrigin)
+        </div>
+
+        <div class="admin-card">
+            <h2>Chaque publication</h2>
+            <div class="table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Publiée</th><th>Publication</th><th>Réseaux</th><th class="num">Visites</th><th class="num">Demandes</th><th class="num">Rendez-vous</th><th class="num">Gagnés</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in report.Posts)
+                        {
+                            <tr>
+                                <td class="nowrap">@AdminFormat.Local(r.Post.PublishedAt, "d MMM")</td>
+                                <td>
+                                    <a href="/admin/publications/@r.Post.Id">@r.Post.Title</a>
+                                    <div class="muted small">@Details(r)</div>
+                                </td>
+                                <td>@string.Join(", ", r.Post.Channels.Select(MarketingResults.ChannelLabel))</td>
+                                <td class="num" title="@string.Join(" · ", r.VisitsBySource.Select(kv => $"{kv.Key} : {kv.Value}"))">@r.Visits</td>
+                                <td class="num">@r.Leads</td>
+                                <td class="num">@r.Appointments</td>
+                                <td class="num">@r.Won</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <div class="admin-card">
+        <h2>Lien de la bio Instagram</h2>
+        <p class="muted">Les liens ne sont pas cliquables dans les publications Instagram : vos clients passent par le lien de votre profil.
+           Mettez ce lien dans Instagram (Modifier le profil → Liens) pour mesurer ces visites aussi :</p>
+        <p><code class="copy-line">@BioLink</code></p>
+        <p class="muted small">Sur la période : @report.BioVisits visite(s) et @report.BioLeads demande(s) par ce lien.</p>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
+    private int days = 30;
+    private MarketingReport? report;
+    private string BioLink = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var company = await Tenant.GetAsync();
+        BioLink = $"{(company.SiteUrl ?? "https://votre-site").TrimEnd('/')}/devis?utm_source=instagram&utm_medium=social&utm_campaign={MarketingResults.BioCampaign}";
+        report = await Results.GetAsync(days);
+    }
+
+    private async Task ChangeAsync(int d)
+    {
+        days = d;
+        report = null;
+        report = await Results.GetAsync(days);
+    }
+
+    private static string Details(PostResult r) => string.Join(" · ", new[]
+    {
+        r.Post.FromAutopilot ? "Pilote automatique" : null,
+        r.Post.Audience is null ? null : "Pour : " + r.Post.Audience,
+        r.Post.Theme,
+        r.Post.VisualKind,
+    }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static RenderFragment Step(string label, int value, string? rate) => __builder =>
+    {
+        <div class="funnel-step">
+            <strong>@value.ToString("N0", Fr)</strong>
+            <span>@label</span>
+            @if (rate is not null) { <small>@rate</small> }
+        </div>
+    };
+
+    private static RenderFragment Compare(string title, IReadOnlyList<ResultGroup> groups) => __builder =>
+    {
+        var maxVisits = Math.Max(0.01, groups.Count == 0 ? 0 : groups.Max(g => g.VisitsPerPost));
+        <div class="admin-card">
+            <h2>@title</h2>
+            @if (groups.Count == 0)
+            {
+                <p class="muted">Pas encore de données.</p>
+            }
+            else
+            {
+                <table class="admin-table compare-table">
+                    <thead><tr><th></th><th class="num">Publ.</th><th>Visites par publication</th><th class="num">Demandes</th></tr></thead>
+                    <tbody>
+                        @foreach (var g in groups)
+                        {
+                            <tr>
+                                <td>@g.Label</td>
+                                <td class="num">@g.Posts</td>
+                                <td>
+                                    <div class="meter" title="@g.Visits visite(s) au total">
+                                        <div style="width:@((100 * g.VisitsPerPost / maxVisits).ToString("0.#", CultureInfo.InvariantCulture))%"></div>
+                                        <span>@g.VisitsPerPost.ToString("0.#", Fr)</span>
+                                    </div>
+                                </td>
+                                <td class="num">@g.Leads@(g.Won > 0 ? $" ({g.Won} gagné{(g.Won > 1 ? "s" : "")})" : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    };
+}

@@ -16,6 +16,7 @@ internal sealed class AutopilotContextSource(
     ICatalogQueries catalog,
     IContentQueries content,
     IDashboardQueries stats,
+    Hub.Modules.Leads.Application.ILeadAttribution leads,
     TimeProvider clock) : IAutopilotContextSource
 {
     public async Task<AutopilotContext> GetAsync(CancellationToken ct = default)
@@ -46,9 +47,13 @@ internal sealed class AutopilotContextSource(
             pages);
     }
 
-    public async Task<IReadOnlyDictionary<string, (int Visits, int Leads)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<string, (int Visits, int Leads, int Won)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
     {
-        var results = await stats.GetCampaignStatsAsync(campaigns.ToList(), ct);
-        return results.ToDictionary(r => r.Key, r => (r.Value.PageViews, r.Value.Leads));
+        var views = await stats.GetCampaignStatsAsync(campaigns.ToList(), ct);
+        var origins = await leads.ListForCampaignsAsync(campaigns, ct);
+        return campaigns.Distinct().ToDictionary(c => c, c => (
+            views.GetValueOrDefault(c)?.PageViews ?? 0,
+            origins.Count(l => l.Campaign == c),
+            origins.Count(l => l.Campaign == c && l.Status == Hub.Modules.Leads.Domain.LeadStatus.Won)));
     }
 }

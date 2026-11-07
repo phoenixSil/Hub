@@ -16,6 +16,7 @@ public static class LeadsModule
         services.AddRepository<LeadsDbContext, ClosedDay>();
         services.AddScoped<ILeadIntake, LeadIntakeService>();
         services.AddScoped<ILeadInbox, LeadInboxService>();
+        services.AddScoped<ILeadAttribution, LeadAttribution>();
         services.AddScoped<ILeadScheduling, LeadSchedulingService>();
         services.AddHostedService<LeadReminderService>();
         services.AddSingleton<IModuleInitializer, LeadsInitializer>();

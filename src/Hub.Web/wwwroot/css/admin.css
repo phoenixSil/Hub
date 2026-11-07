@@ -227,3 +227,30 @@ code.break { word-break: break-all; }
 .assistant-head { flex-wrap: wrap; gap: 6px 10px; }
 .assistant-head .tag { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 .admin-card .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Résultats du marketing */
+.funnel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 8px 0 10px; }
+.funnel-step { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 18px 14px 26px; background: #eef7fb;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%); }
+.funnel-step:first-child { clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%); padding-left: 18px; }
+.funnel-step:nth-child(2) { background: #dff0f8; }
+.funnel-step:nth-child(3) { background: #e4f6dc; }
+.funnel-step:nth-child(4) { background: #cdeec0; }
+.funnel-step strong { font-size: 1.6rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.funnel-step span { font-weight: 600; font-size: .9rem; }
+.funnel-step small { color: var(--muted); font-size: .78rem; }
+.best-post { display: flex; gap: 18px; align-items: center; border-left: 4px solid var(--green); }
+.best-post img { width: 110px; height: 110px; object-fit: cover; border-radius: 10px; flex: none; }
+.best-post h2 { margin: 2px 0 4px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; font-weight: 700; color: var(--green-dark, #2f8f1f); margin: 0; }
+.meter { position: relative; height: 22px; background: #f0f3f6; border-radius: 6px; min-width: 120px; overflow: hidden; }
+.meter > div { position: absolute; inset: 0 auto 0 0; background: #9fd3ea; border-radius: 6px; }
+.meter span { position: relative; padding-left: 8px; font-size: .82rem; line-height: 22px; font-variant-numeric: tabular-nums; }
+.compare-table td:first-child { font-weight: 600; }
+.copy-line { display: block; padding: 10px 12px; background: #f4f7f9; border-radius: 8px; overflow-wrap: anywhere; user-select: all; }
+.nowrap { white-space: nowrap; }
+@media (max-width: 900px) {
+    .funnel { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .funnel-step, .funnel-step:first-child { clip-path: none; border-radius: 10px; padding: 12px 14px; }
+    .best-post { flex-direction: column; align-items: flex-start; }
+}

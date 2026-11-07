@@ -90,6 +90,18 @@ def mobile_menu(browser, state):
     ctx.close()
 
 
+@step("Résultats : la publication partie y figure avec ses chiffres")
+def results(page):
+    page.goto(BASE + "/admin/resultats", wait_until="networkidle")
+    page.wait_for_selector("text=Le parcours", timeout=15000)
+    expect(page.locator(".kpi").first).to_contain_text("Publications parties")
+    expect(page.locator("text=Chaque publication")).to_be_visible()
+    expect(page.locator("table.admin-table").last).to_contain_text("Facebook")
+    page.click("text=7 jours")
+    page.wait_for_timeout(800)
+    expect(page.locator(".segmented .active")).to_have_text("7 jours")
+
+
 @step("Devis public : un envoi vide affiche les erreurs")
 def quote_validation(page):
     page.goto(BASE + "/devis", wait_until="networkidle")
@@ -106,6 +118,7 @@ with sync_playwright() as p:
     faq(page)
     lead_status(page)
     csv_export(page)
+    results(page)
     mobile_menu(browser, state)
     quote_validation(page)
     browser.close()
