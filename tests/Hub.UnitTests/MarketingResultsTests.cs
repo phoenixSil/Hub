@@ -116,7 +116,7 @@ public class MarketingResultsTests
         var (subject, html) = WeeklyReportEmail.Build(await Report(), "Scinti<Net>", "https://www.scintinet.com", "#0097CE");
 
         Assert.Contains("3 demande(s)", subject);
-        Assert.Contains("Grand ménage", html);
+        Assert.Contains("Grand ménage", System.Net.WebUtility.HtmlDecode(html));
         Assert.Contains("Scinti&lt;Net&gt;", html);
         Assert.Contains("https://www.scintinet.com/admin/resultats", html);
     }
