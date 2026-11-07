@@ -118,7 +118,7 @@ internal sealed class MarketingPlanService(
         var (phases, pillars, end) = PlanTemplates.Visibility(startsOn);
         db.MarketingPlans.Add(new MarketingPlan
         {
-            Name = $"Visibilité sur les réseaux — {startsOn:yyyy-MM-dd} au {end:yyyy-MM-dd}",
+            Name = string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-CA"), $"Visibilité sur les réseaux, du {startsOn:d MMMM yyyy} au {end:d MMMM yyyy}"),
             Objective = PlanObjective.Visibility,
             StartsOn = startsOn,
             EndsOn = end,

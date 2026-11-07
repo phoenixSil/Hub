@@ -269,6 +269,7 @@ code.break { word-break: break-all; }
 .plan-proposal { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line); }
 .plan-proposal p { margin: 2px 0 0; }
 .plan-proposal .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .plan-kpis .kpi small { line-height: 1.35; }
 .plan-late { color: #b42318; font-weight: 600; font-size: .78rem; }
 .plan-timeline { display: flex; gap: 6px; }
@@ -295,4 +296,9 @@ code.break { word-break: break-all; }
     .plan-edit-pillar { grid-template-columns: 1fr 90px; }
     .plan-edit-desc { grid-column: 1 / -1; }
     .plan-edit .field-row { flex-direction: column; gap: 0; }
+    .plan-kpis { grid-template-columns: 1fr; }
+    .plan-mix th:nth-child(1) { width: 40%; }
+    .plan-mix th:nth-child(2) { width: 22%; }
+    .plan-mix th:nth-child(4), .plan-mix td:nth-child(4) { display: none; }
+    .plan-mix td { overflow-wrap: normal; }
 }
