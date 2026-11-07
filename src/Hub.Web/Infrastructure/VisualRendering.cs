@@ -4,6 +4,7 @@ using Hub.SharedKernel;
 using SkiaSharp;
 using Svg.Skia;
 using Svg.Skia.TypefaceProviders;
+using Shim = ShimSkiaSharp;
 
 namespace Hub.Web.Infrastructure;
 
@@ -19,9 +20,13 @@ public sealed class SkiaVisualRenderer(ILogger<SkiaVisualRenderer> logger) : IVi
         if (clean is null) return null;
         try
         {
-            using var document = new SKSvg();
-            document.Settings.TypefaceProviders = [BrandFont.Instance];
-            var picture = document.FromSvg(clean);
+            // Svg.Skia cherche les polices du système, absentes sur un serveur Linux minimal :
+            // le chargeur ci-dessous impose la police de la marque, pour la mesure comme pour le dessin.
+            var settings = new SKSvgSettings { TypefaceProviders = [BrandFont.Instance] };
+            var model = new SkiaModel(settings);
+            var document = Svg.Model.Services.SvgService.FromSvg(clean);
+            if (document is null) return null;
+            using var picture = SKSvg.ToPicture(document, model, new BrandAssetLoader(model));
             if (picture is null) return null;
 
             using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
@@ -69,6 +74,30 @@ public sealed class BrandFont : ITypefaceProvider
         var data = SKData.CreateCopy(buffer.ToArray());
         return SKTypeface.FromData(data) ?? throw new InvalidOperationException($"Police illisible : {name}");
     }
+}
+
+/// <summary>
+/// Chargeur Svg.Skia qui garde, pour chaque texte, la police demandée par le SVG (servie ensuite par <see cref="BrandFont"/>)
+/// au lieu de chercher une police système caractère par caractère.
+/// </summary>
+internal sealed class BrandAssetLoader(SkiaModel model) : Svg.Model.ISvgAssetLoader
+{
+    private readonly SkiaSvgAssetLoader inner = new(model);
+
+    public Shim.SKImage LoadImage(Stream stream) => inner.LoadImage(stream);
+
+    public List<Svg.Model.TypefaceSpan> FindTypefaces(string? text, Shim.SKPaint paint)
+    {
+        if (string.IsNullOrEmpty(text)) return [];
+        var typeface = paint.Typeface ?? Shim.SKTypeface.FromFamilyName("Poppins",
+            Shim.SKFontStyleWeight.Normal, Shim.SKFontStyleWidth.Normal, Shim.SKFontStyleSlant.Upright);
+        var bounds = new Shim.SKRect();
+        return [new Svg.Model.TypefaceSpan(text, inner.MeasureText(text, paint, ref bounds), typeface)];
+    }
+
+    public Shim.SKFontMetrics GetFontMetrics(Shim.SKPaint paint) => inner.GetFontMetrics(paint);
+    public float MeasureText(string? text, Shim.SKPaint paint, ref Shim.SKRect bounds) => inner.MeasureText(text, paint, ref bounds);
+    public Shim.SKPath? GetTextPath(string? text, Shim.SKPaint paint, float x, float y) => inner.GetTextPath(text, paint, x, y);
 }
 
 /// <summary>Enregistre le PNG d'un visuel dans le stockage des médias (local ou Azure Blob).</summary>

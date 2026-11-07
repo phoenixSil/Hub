@@ -157,6 +157,26 @@ public class VisualRendererTests
     }
 
     [Fact]
+    public void Le_texte_du_svg_est_dessine_avec_la_police_de_la_marque()
+    {
+        const string svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080"><text x="40" y="300" font-family="Arial, sans-serif" font-size="100" font-weight="700" fill="#000000">Entretien</text></svg>""";
+        var png = new SkiaVisualRenderer(NullLogger<SkiaVisualRenderer>.Instance).RenderPng(svg)!;
+        using var bitmap = SKBitmap.Decode(png);
+        int left = int.MaxValue, right = -1;
+        for (var y = 150; y < 350; y++)
+        for (var x = 0; x < 1080; x++)
+        {
+            if (bitmap.GetPixel(x, y).Red >= 128) continue;
+            left = Math.Min(left, x);
+            right = Math.Max(right, x);
+        }
+
+        using var font = new SKFont(BrandFont.Instance.Bold, 100);
+        font.MeasureText("Entretien", out var expected);
+        Assert.InRange(right - left + 1, expected.Width - 4, expected.Width + 4);
+    }
+
+    [Fact]
     public void Un_svg_invalide_ne_donne_pas_d_image() =>
         Assert.Null(new SkiaVisualRenderer(NullLogger<SkiaVisualRenderer>.Instance).RenderPng("pas du svg"));
 }
