@@ -45,7 +45,7 @@ public sealed class SkiaVisualRenderer(ILogger<SkiaVisualRenderer> logger) : IVi
 }
 
 /// <summary>Toute famille demandée (Arial, Helvetica…) est servie par la police de la marque, normale ou grasse.</summary>
-internal sealed class BrandFont : ITypefaceProvider
+public sealed class BrandFont : ITypefaceProvider
 {
     public static readonly BrandFont Instance = new();
 
@@ -55,11 +55,19 @@ internal sealed class BrandFont : ITypefaceProvider
     public SKTypeface? FromFamilyName(string fontFamily, SKFontStyleWeight fontWeight, SKFontStyleWidth fontWidth, SKFontStyleSlant fontStyle) =>
         (int)fontWeight >= (int)SKFontStyleWeight.SemiBold ? bold : regular;
 
+    public SKTypeface Regular => regular;
+    public SKTypeface Bold => bold;
+
+    // Les octets sont copiés dans un SKData gardé en vie : Skia lit les glyphes à la demande,
+    // un flux .NET refermé donnerait une police vide (et le texte retomberait sur une police par défaut).
     private static SKTypeface Load(string name)
     {
         using var stream = typeof(BrandFont).Assembly.GetManifestResourceStream(name)
             ?? throw new InvalidOperationException($"Police intégrée introuvable : {name}");
-        return SKTypeface.FromStream(stream);
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        var data = SKData.CreateCopy(buffer.ToArray());
+        return SKTypeface.FromData(data) ?? throw new InvalidOperationException($"Police illisible : {name}");
     }
 }
 

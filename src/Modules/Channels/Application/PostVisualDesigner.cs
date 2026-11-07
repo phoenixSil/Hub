@@ -114,13 +114,14 @@ internal sealed class PostVisualDesigner(IAiTextGenerator ai) : IPostVisualDesig
     internal static PostVisual Template(VisualIdea i)
     {
         static string E(string s) => WebUtility.HtmlEncode(s);
-        var lines = Wrap(i.Topic, 14).Take(3).ToList();
-        var startY = 470 - (lines.Count - 1) * 60;
+        var big = Wrap(i.Topic, 14).ToList();
+        var (lines, fontSize, lineHeight) = big.Count <= 3 ? (big, 92, 120) : (Wrap(i.Topic, 19).Take(4).ToList(), 70, 92);
+        var startY = 470 - (lines.Count - 1) * lineHeight / 2;
         var title = new StringBuilder();
         for (var n = 0; n < lines.Count; n++)
-            title.Append($"""<text x="540" y="{startY + n * 120}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="92" font-weight="700" fill="#ffffff">{E(lines[n])}</text>""");
+            title.Append($"""<text x="540" y="{startY + n * lineHeight}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="{fontSize}" font-weight="700" fill="#ffffff">{E(lines[n])}</text>""");
         var facts = string.IsNullOrWhiteSpace(i.Facts) ? ""
-            : $"""<rect x="290" y="{startY + lines.Count * 120 - 40}" width="500" height="110" rx="55" fill="{E(i.AccentColor)}"/><text x="540" y="{startY + lines.Count * 120 + 35}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="56" font-weight="700" fill="#10233F">{E(Truncate(i.Facts!, 18))}</text>""";
+            : $"""<rect x="290" y="{startY + lines.Count * lineHeight - 40}" width="500" height="110" rx="55" fill="{E(i.AccentColor)}"/><text x="540" y="{startY + lines.Count * lineHeight + 35}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="56" font-weight="700" fill="#10233F">{E(Truncate(i.Facts!, 18))}</text>""";
 
         var svg = $"""
             <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">

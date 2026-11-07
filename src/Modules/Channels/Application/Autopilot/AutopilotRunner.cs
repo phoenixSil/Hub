@@ -117,7 +117,10 @@ internal sealed class AutopilotRunner(
         PlannedPost item, AutopilotContext context, AutopilotSettings settings, IReadOnlyList<ChannelType> channels, List<string> problems, CancellationToken ct)
     {
         var audience = AutopilotService.ReadAudiences(settings.AudiencesJson).FirstOrDefault(a => a.Name == item.Audience);
-        var details = $"{item.Angle}\nPublic visé : {item.Audience}{(audience is null ? "" : " — " + audience.Description)}.";
+        // Le public n'est transmis qu'à l'IA : les modèles de texte sans IA reprendraient la consigne mot pour mot.
+        var details = writer.UsesAi
+            ? $"{item.Angle}\nPublic visé : {item.Audience}{(audience is null ? "" : " — " + audience.Description)}. Adresse-toi à ce public."
+            : item.Angle;
         var text = await writer.SuggestAsync(new PostIdea(context.CompanyName, context.City, item.Topic, details, item.Tone, ChannelType.Facebook), ct);
         if (text.IsFailure) { problems.Add(text.Error!); return null; }
         var suggestion = text.Value![0];

@@ -143,6 +143,20 @@ public class VisualRendererTests
     }
 
     [Fact]
+    public void Toute_police_demandee_est_servie_par_la_police_de_la_marque()
+    {
+        var bold = BrandFont.Instance.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)!;
+        var regular = BrandFont.Instance.FromFamilyName("Helvetica", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)!;
+
+        Assert.Equal("Poppins", bold.FamilyName);
+        Assert.Equal(700, bold.FontWeight);
+        Assert.Equal(400, regular.FontWeight);
+        Assert.True(bold.GlyphCount > 100);
+        using var font = new SKFont(bold, 100);
+        Assert.True(font.MeasureText("Entretien") > 300, "les glyphes de la police doivent être lisibles");
+    }
+
+    [Fact]
     public void Un_svg_invalide_ne_donne_pas_d_image() =>
         Assert.Null(new SkiaVisualRenderer(NullLogger<SkiaVisualRenderer>.Instance).RenderPng("pas du svg"));
 }

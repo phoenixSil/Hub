@@ -167,7 +167,7 @@ code.break { word-break: break-all; }
 .fb-link { background: #f0f2f5; padding: 10px 14px; border-top: 1px solid #dddfe2; }
 .fb-link strong { display: block; color: #050505; }
 .field .check { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; }
-.field .check input[type=checkbox] { width: auto; flex: none; margin: 0; }
+.field .check input[type=checkbox], .field .check input[type=radio] { width: auto; flex: none; margin: 0; }
 
 /* Action en cours : indicateur qui tourne */
 .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: hub-spin .7s linear infinite; vertical-align: -0.15em; flex: none; }
@@ -193,3 +193,4 @@ code.break { word-break: break-all; }
 .audience-row .field-row { display: flex; gap: 10px; }
 .audience-row .field-row .field:first-child { flex: 1; }
 .audience-row .field.hour select { width: auto; }
+

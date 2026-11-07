@@ -100,7 +100,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
             var page = pages[i % pages.Count];
             var audience = audiences[i % audiences.Count];
             return new PlannedPost(AtHour(slot, audience.Hour), audience.Name, page.Title,
-                $"{page.Summary} Pour : {audience.Description}", page.Url, page.ImageUrl, page.Facts,
+                page.Summary, page.Url, page.ImageUrl, page.Facts,
                 page.IsPromotion ? "Promotion" : "Service", page.IsPromotion ? "Promotionnel" : "Chaleureux");
         }).ToList();
     }
