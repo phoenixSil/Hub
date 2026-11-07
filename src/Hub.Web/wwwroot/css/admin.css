@@ -32,7 +32,8 @@
 .admin-form .check, .admin-card .check { margin: 6px 16px 12px 0; }
 .hint { font-size: .8rem; color: var(--muted); }
 .admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
-.sticky-actions { position: sticky; bottom: 0; background: #f4f7f9; padding: 12px 0; }
+.sticky-actions { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(15,37,51,.06); padding: 12px 22px; margin: 0 -36px; backdrop-filter: blur(4px); }
+@media (max-width: 900px) { .sticky-actions { margin: 0 -16px; padding: 12px 16px; } }
 .filters { display: flex; gap: 12px; flex-wrap: wrap; }
 .filters > * { flex: 1; min-width: 180px; }
 .status-picker { display: flex; flex-direction: column; gap: 4px; min-width: 200px; font-size: .85rem; }
@@ -218,7 +219,8 @@ code.break { word-break: break-all; }
     .admin-sidebar nav, .admin-sidebar-foot { display: none; width: 100%; }
     .admin-menu-toggle:checked ~ nav, .admin-menu-toggle:checked ~ .admin-sidebar-foot { display: flex; }
     .admin-sidebar-foot { margin-top: 8px; }
-    .admin-head { flex-direction: column; align-items: stretch; }
+    .admin-head { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .admin-head > :first-child { flex: none; width: 100%; }
     .admin-head > .actions, .admin-head > div:not(:first-child) { justify-content: flex-start; }
 }
 @media (max-width: 640px) { .admin-actions .btn { white-space: normal; } }
