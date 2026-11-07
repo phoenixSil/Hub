@@ -132,3 +132,27 @@ Garder le VPS une à deux semaines après la bascule, le temps de vérifier les 
 - Journal en direct : `az webapp log tail -g rg-scintinet -n <nom-du-site>`
 - Le site ne démarre pas après un changement de base : vérifier la chaîne de connexion dans Azure (le site → Configuration → Chaînes de connexion → `Hub`).
 - Mot de passe administrateur perdu : l'administrateur n'est créé qu'au premier démarrage. Ajouter un nouvel administrateur en changeant `Hub__AdminEmail` et `Hub__AdminPassword` dans la configuration, puis redémarrer le site.
+
+## Déploiement automatique (gratuit)
+
+Chaque changement poussé sur `main` est mis en ligne tout seul, **seulement si tous les tests sont verts** :
+
+1. *Compilation et tests* (tests unitaires) ;
+2. *Test de fumée* : vraie base SQL Server, parcours de bout en bout dans un navigateur
+   (devis, back-office, publications, pilote automatique, double vérification, FAQ, export CSV…)
+   et **tests visuels** de toutes les pages en bureau, tablette et mobile ;
+3. *Déploiement* : publication, mise en ligne sur Azure, puis vérification que le site répond.
+
+La connexion à Azure se fait sans mot de passe stocké (OpenID Connect) : GitHub prouve son identité à chaque
+déploiement, et l'identité Azure n'a qu'un droit, déployer ce site. Coût : 0 $ (dépôt public).
+
+**Activation (une seule fois)**, depuis le dossier du projet, après `az login` :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\activer-deploiement-auto.ps1
+```
+
+Le script crée l'identité et affiche 5 variables à ajouter dans GitHub
+(*Settings > Secrets and variables > Actions > Variables*), ou les enregistre lui-même si l'outil `gh` est installé.
+Tant qu'elles sont absentes, le flux *Déploiement* se termine sans rien faire. Le script manuel
+`azure-deployer.ps1 -CodeSeulement` reste disponible.
