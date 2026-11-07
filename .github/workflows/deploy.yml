@@ -1,31 +1,101 @@
-name: Déployer sur Azure
+name: Déploiement
 
-# Lancement manuel tant que la bascule depuis OVH n'est pas faite.
-# Secrets requis : AZURE_WEBAPP_NAME, AZURE_WEBAPP_PUBLISH_PROFILE.
+# Met le site en ligne tout seul quand un changement arrive sur « main » ET que les tests sont verts :
+# compilation et tests unitaires, puis test de fumée (parcours de bout en bout et tests visuels).
+# Connexion à Azure sans mot de passe stocké (OpenID Connect) : voir scripts/activer-deploiement-auto.ps1.
+# Coût : nul (GitHub Actions est gratuit pour un dépôt public ; l'identité Azure est gratuite).
 on:
+  workflow_run:
+    workflows: ["Test de fumée"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploiement-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Mettre en ligne
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     environment:
       name: production
+      url: ${{ vars.SITE_URL }}
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
+      - name: Déploiement automatique activé ?
+        id: actif
+        run: |
+          if [ -z "${{ vars.AZURE_CLIENT_ID }}" ] || [ -z "${{ vars.AZURE_WEBAPP_NAME }}" ]; then
+            echo "::notice::Déploiement automatique non activé : lancez scripts/activer-deploiement-auto.ps1 (une seule fois)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Les tests unitaires de ce commit sont verts ?
+        if: steps.actif.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 40); do
+            etat=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=1" \
+              --jq '.workflow_runs[0] | "\(.status) \(.conclusion)"')
+            case "$etat" in
+              "completed success") echo "Compilation et tests : OK"; exit 0 ;;
+              completed*) echo "::error::Compilation et tests en échec pour $SHA : rien n'est mis en ligne."; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Compilation et tests introuvables ou trop longs pour $SHA"; exit 1
+
       - uses: actions/checkout@v4
+        if: steps.actif.outputs.ok == 'true'
+        with:
+          ref: ${{ env.SHA }}
 
       - uses: actions/setup-dotnet@v4
+        if: steps.actif.outputs.ok == 'true'
         with:
           dotnet-version: '10.0.x'
 
-      - name: Tester
-        run: dotnet test Hub.slnx -c Release
-
       - name: Publier
+        if: steps.actif.outputs.ok == 'true'
         run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release -o publish
 
-      - name: Déployer
+      - name: Connexion à Azure (OpenID Connect, sans secret)
+        if: steps.actif.outputs.ok == 'true'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Mettre en ligne
+        if: steps.actif.outputs.ok == 'true'
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           package: publish
+
+      - name: Le site répond ?
+        if: steps.actif.outputs.ok == 'true'
+        run: |
+          url="${{ vars.SITE_URL }}"
+          [ -n "$url" ] || url="https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+          for i in $(seq 1 36); do
+            code=$(curl -s -o page.html -w "%{http_code}" "$url/" || true)
+            if [ "$code" = "200" ] && grep -qi "<html" page.html; then
+              echo "::notice::En ligne : $url répond (version ${SHA::7})"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Le site ne répond pas après la mise en ligne ($url, dernier code : $code)"; exit 1

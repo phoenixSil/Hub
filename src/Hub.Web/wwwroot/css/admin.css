@@ -174,7 +174,7 @@ code.break { word-break: break-all; }
 @keyframes hub-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 .btn.is-busy { display: inline-flex; align-items: center; gap: 8px; cursor: progress; opacity: 1; }
-.btn { white-space: normal; text-align: center; }
+.btn { white-space: nowrap; text-align: center; }
 .alert-info { background: #eef6fb; border: 1px solid #b9dcef; color: #0b5375; border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
 .busy-banner { position: sticky; top: 8px; z-index: 20; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
 
@@ -194,3 +194,30 @@ code.break { word-break: break-all; }
 .audience-row .field-row .field:first-child { flex: 1; }
 .audience-row .field.hour select { width: auto; }
 
+
+/* ---- Mise en page générale (relecture visuelle) ---- */
+.admin-shell { background: linear-gradient(to right, var(--ink) 240px, #f4f7f9 240px); }
+.admin-head { flex-wrap: wrap; }
+.admin-head > :first-child { flex: 1 1 320px; min-width: 0; }
+.admin-head > .actions, .admin-head > div:not(:first-child) { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.card-head { gap: 12px; flex-wrap: wrap; }
+.admin-main h2 + .btn, .section-head .btn { flex: none; }
+.color-field { display: flex; align-items: center; gap: 10px; }
+.admin-card .field .color-field input[type=color], .admin-form .field .color-field input[type=color] {
+    width: 56px; height: 42px; padding: 3px; flex: none; cursor: pointer; }
+.color-field code { font-size: .85rem; color: var(--muted); }
+.admin-menu-toggle, .admin-menu-button { display: none; }
+
+@media (max-width: 900px) {
+    .admin-shell { background: #f4f7f9; }
+    .admin-sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; }
+    .admin-brand { flex-direction: row; align-items: center; gap: 10px; }
+    .admin-brand img { height: 36px; }
+    .admin-menu-button { display: inline-flex; align-items: center; gap: 6px; color: #fff; border: 1px solid rgba(255,255,255,.25);
+        border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 600; }
+    .admin-sidebar nav, .admin-sidebar-foot { display: none; width: 100%; }
+    .admin-menu-toggle:checked ~ nav, .admin-menu-toggle:checked ~ .admin-sidebar-foot { display: flex; }
+    .admin-sidebar-foot { margin-top: 8px; }
+    .admin-head { flex-direction: column; align-items: stretch; }
+    .admin-head > .actions, .admin-head > div:not(:first-child) { justify-content: flex-start; }
+}

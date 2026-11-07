@@ -150,6 +150,9 @@ with sync_playwright() as p:
     page.goto(BASE + "/admin/securite", wait_until="networkidle")
     page.wait_for_timeout(1500)
     secret = page.locator(".manual-key").inner_text().replace(" ", "")
+    # Gardé pour les tests visuels qui suivent (hors du dossier des captures publiées).
+    with open("/tmp/hub-totp-secret", "w") as f:
+        f.write(secret)
     page.fill(".setup-steps input", totp(secret))
     page.click("text=Activer")
     page.wait_for_selector(".recovery-codes", timeout=10000)

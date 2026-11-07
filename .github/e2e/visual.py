@@ -8,9 +8,15 @@ ressources en erreur. Une capture de chaque page est enregistrée pour la relect
 
 Usage : python3 visual.py http://localhost:5080 dossier-captures
 """
+import base64
+import hashlib
+import hmac
 import json
 import os
+import struct
 import sys
+import time
+import traceback
 
 from playwright.sync_api import sync_playwright
 
@@ -154,28 +160,51 @@ def watch(page):
     return state
 
 
-def login(page):
+def totp(secret):
+    key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))
+    digest = hmac.new(key, struct.pack(">Q", int(time.time() // 30)), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    return f"{(struct.unpack('>I', digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000:06d}"
+
+
+def login(browser):
+    """Une seule connexion (avec le code à 6 chiffres si la double vérification est active), réutilisée partout."""
+    ctx = browser.new_context(locale="fr-CA")
+    page = ctx.new_page()
     page.goto(BASE + "/compte/connexion", wait_until="networkidle")
     page.fill("#email", "admin@smoke.test")
     page.fill("#password", "SmokeTest-Password-2026")
     page.click("button[type=submit]")
-    page.wait_for_url("**/admin", timeout=20000)
+    page.wait_for_url(lambda u: "/admin" in u or "connexion-2fa" in u, timeout=20000)
+    if "connexion-2fa" in page.url:
+        with open("/tmp/hub-totp-secret") as f:
+            secret = f.read().strip()
+        time.sleep(31 - (time.time() % 30))  # un code neuf : le précédent a déjà servi
+        page.fill("#code", totp(secret))
+        page.click("button[type=submit]")
+        page.wait_for_url("**/admin", timeout=20000)
+    state = ctx.storage_state()
+    ctx.close()
+    return state
 
 
 problems = []
 with sync_playwright() as p:
     browser = p.chromium.launch()
+    session = login(browser)
     for label, viewport, mobile in VIEWPORTS:
-        ctx = browser.new_context(viewport=viewport, is_mobile=mobile, has_touch=mobile, device_scale_factor=1, locale="fr-CA")
+        ctx = browser.new_context(viewport=viewport, is_mobile=mobile, has_touch=mobile, device_scale_factor=1,
+                                  locale="fr-CA", storage_state=session)
         page = ctx.new_page()
         state = watch(page)
-        for name, path in PUBLIC:
-            audit(page, state, label, name, BASE + path, problems)
-        login(page)
-        for name, path in ADMIN:
-            url = resolve(page, path)
-            if url:
-                audit(page, state, label, name, url, problems)
+        for name, path in PUBLIC + ADMIN:
+            try:
+                url = resolve(page, path)
+                if url:
+                    audit(page, state, label, name, url, problems)
+            except Exception as ex:  # une page qui plante ne doit pas masquer les autres
+                traceback.print_exc()
+                problems.append((label, name, f"la page n'a pas pu être testée : {str(ex).splitlines()[0][:200]}"))
         ctx.close()
     browser.close()
 

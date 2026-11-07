@@ -6,6 +6,9 @@
             <img src="/images/site/logo.png" alt="" width="132" height="42" />
             <span>Back-office</span>
         </a>
+        @* Sur téléphone, le menu se replie derrière un bouton (sans JavaScript). *@
+        <input type="checkbox" id="admin-menu" class="admin-menu-toggle" aria-hidden="true" />
+        <label for="admin-menu" class="admin-menu-button">☰ Menu</label>
         <nav aria-label="Back-office">
             <p class="admin-nav-group">Suivi</p>
             <NavLink href="/admin" Match="NavLinkMatch.All">Tableau de bord</NavLink>

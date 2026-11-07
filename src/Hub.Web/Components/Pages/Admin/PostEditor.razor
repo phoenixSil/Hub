@@ -95,7 +95,7 @@ else
                         <div class="field" style="align-self:end">
                             <BusyButton Class="btn btn-outline btn-sm" OnClick="SuggestAsync" IsBusy="@(action == "suggest")" AnyBusy="busy"
                                         Disabled="@string.IsNullOrWhiteSpace(topic)" BusyText="@(Writer.UsesAi ? "Claude rédige…" : "Préparation…")">
-                                @(Writer.UsesAi ? "✨ Proposer 3 textes (Claude)" : "Proposer 3 textes (modèles)")
+                                @(Writer.UsesAi ? "✨ Proposer 3 textes" : "Proposer 3 textes")
                             </BusyButton>
                         </div>
                     </div>

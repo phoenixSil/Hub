@@ -30,9 +30,9 @@
             <div class="field"><label>Phrase de présentation (pied de page)</label><InputTextArea rows="2" @bind-Value="tenant.ServiceAreaSummary" /></div>
             <div class="field"><label>Logo</label><ImagePicker @bind-Value="tenant.LogoUrl" /></div>
             <div class="field-row">
-                <div class="field"><label>Couleur principale</label><InputText type="color" @bind-Value="tenant.PrimaryColor" /></div>
-                <div class="field"><label>Couleur secondaire</label><InputText type="color" @bind-Value="tenant.SecondaryColor" /></div>
-                <div class="field"><label>Couleur d'accent</label><InputText type="color" @bind-Value="tenant.AccentColor" /></div>
+                <div class="field"><label>Couleur principale</label><div class="color-field"><InputText type="color" @bind-Value="tenant.PrimaryColor" /><code>@tenant.PrimaryColor</code></div></div>
+                <div class="field"><label>Couleur secondaire</label><div class="color-field"><InputText type="color" @bind-Value="tenant.SecondaryColor" /><code>@tenant.SecondaryColor</code></div></div>
+                <div class="field"><label>Couleur d'accent</label><div class="color-field"><InputText type="color" @bind-Value="tenant.AccentColor" /><code>@tenant.AccentColor</code></div></div>
             </div>
         </div>
 
