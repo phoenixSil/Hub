@@ -19,7 +19,7 @@
 }
 
 <CrudEditor T="Channel" Title="Canaux de présence en ligne" Context="c" AllowDelete="false"
-            Help="Liste de vos présences en ligne (adresse, état). Les réseaux sont branchés un par un : Facebook d'abord, puis Instagram et Google Business."
+            Help="Liste de vos présences en ligne (adresse, état). Facebook et Instagram se publient depuis le back-office ; Google Business arrivera ensuite."
             Query="@(q => q.OrderBy(x => x.Phase).ThenBy(x => x.Type))">
     <Header><th>Canal</th><th>État</th><th>Phase</th><th>Adresse</th></Header>
     <Row>

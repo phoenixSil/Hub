@@ -224,3 +224,6 @@ code.break { word-break: break-all; }
     .admin-head > .actions, .admin-head > div:not(:first-child) { justify-content: flex-start; }
 }
 @media (max-width: 640px) { .admin-actions .btn { white-space: normal; } }
+.assistant-head { flex-wrap: wrap; gap: 6px 10px; }
+.assistant-head .tag { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.admin-card .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
