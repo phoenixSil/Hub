@@ -39,3 +39,17 @@ public interface ILinkedChannel
     /// <summary>Trouve le compte lié au compte source et renvoie ses identifiants.</summary>
     Task<Result<ChannelCredentials>> DeriveAsync(ChannelCredentials source, CancellationToken ct = default);
 }
+
+/// <summary>Chiffres d'une publication : personnes atteintes et interactions.</summary>
+public sealed record PostInsight(int Reach, int Interactions);
+
+/// <summary>
+/// Lecture des chiffres d'un réseau (personnes atteintes, interactions, abonnés).
+/// Implémentée par le connecteur du réseau quand celui-ci les fournit.
+/// </summary>
+public interface ISocialInsights
+{
+    ChannelType Channel { get; }
+    Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials credentials, CancellationToken ct = default);
+    Task<Result<int>> GetFollowersAsync(ChannelCredentials credentials, CancellationToken ct = default);
+}

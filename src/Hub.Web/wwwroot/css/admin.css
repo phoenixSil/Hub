@@ -260,3 +260,39 @@ code.break { word-break: break-all; }
     .funnel-step, .funnel-step:first-child { clip-path: none; border-radius: 10px; padding: 12px 14px; }
     .best-post { flex-direction: column; align-items: flex-start; }
 }
+
+/* Plan marketing */
+.plan-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; }
+.plan-status-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.plan-create .field-row { max-width: 520px; }
+.plan-proposals { border-color: #f5d48a; box-shadow: inset 4px 0 0 #f0b429; }
+.plan-proposal { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+.plan-proposal p { margin: 2px 0 0; }
+.plan-proposal .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-kpis .kpi small { line-height: 1.35; }
+.plan-late { color: #b42318; font-weight: 600; font-size: .78rem; }
+.plan-timeline { display: flex; gap: 6px; }
+.plan-phase { position: relative; flex-basis: 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: #f4f7fa; border: 1px solid var(--line); border-radius: 10px; font-size: .85rem; }
+.plan-phase strong { font-size: .95rem; color: var(--ink); }
+.plan-phase.is-current { background: #e6f5fb; border-color: #9fd3ea; box-shadow: inset 0 3px 0 var(--blue); }
+.plan-phase.is-done { opacity: .7; }
+.plan-phase-dates { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan-theme { color: var(--muted); font-style: italic; }
+.plan-now { position: absolute; top: -6px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--blue); border: 2px solid #fff; }
+.plan-mix th:nth-child(1) { width: 26%; }
+.plan-mix th:nth-child(2) { width: 15%; }
+.plan-mix th:nth-child(4) { width: 26%; }
+.plan-edit > summary { cursor: pointer; list-style: none; }
+.plan-edit > summary h2 { display: inline; }
+.plan-edit > summary::before { content: "▸ "; color: var(--muted); }
+.plan-edit[open] > summary::before { content: "▾ "; }
+.plan-edit h3 { margin: 18px 0 8px; font-size: 1rem; }
+.plan-edit-block { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.plan-edit-pillar { display: grid; grid-template-columns: 160px 90px 1fr; gap: 0 12px; align-items: end; }
+@media (max-width: 760px) {
+    .plan-timeline { flex-direction: column; }
+    .plan-status-actions { margin-left: 0; }
+    .plan-edit-pillar { grid-template-columns: 1fr 90px; }
+    .plan-edit-desc { grid-column: 1 / -1; }
+    .plan-edit .field-row { flex-direction: column; gap: 0; }
+}

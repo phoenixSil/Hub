@@ -13,7 +13,9 @@ public sealed record AutopilotPage(
     string? Facts);
 
 /// <summary>Résultat d'une publication passée : ce qui a marché sert à choisir les prochaines.</summary>
-public sealed record AutopilotHistory(string Title, string? Audience, DateTimeOffset? PublishedAt, int Visits, int Leads, int Won = 0, string? Theme = null);
+public sealed record AutopilotHistory(
+    string Title, string? Audience, DateTimeOffset? PublishedAt, int Visits, int Leads, int Won = 0, string? Theme = null,
+    int Reach = 0, int Interactions = 0, string? Pillar = null);
 
 /// <summary>Ce que le pilote sait de l'entreprise. Assemblé par l'hôte à partir des autres modules.</summary>
 public sealed record AutopilotContext(

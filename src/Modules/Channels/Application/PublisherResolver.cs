@@ -21,6 +21,9 @@ public interface IPublisherResolver
 
     /// <summary>Le connecteur réel du réseau s'il se connecte à partir d'un autre (ex. Instagram depuis Facebook).</summary>
     ILinkedChannel? LinkedFor(ChannelType channel);
+
+    /// <summary>Lecteur des chiffres du réseau (le simulé si Channels:Simulate), ou null si le réseau n'en fournit pas.</summary>
+    ISocialInsights? InsightsFor(ChannelType channel);
 }
 
 internal sealed class PublisherResolver(
@@ -34,6 +37,9 @@ internal sealed class PublisherResolver(
     public bool IsSimulated => options.Value.Simulate;
 
     public ILinkedChannel? LinkedFor(ChannelType channel) => _byChannel.GetValueOrDefault(channel) as ILinkedChannel;
+
+    public ISocialInsights? InsightsFor(ChannelType channel) =>
+        _byChannel.ContainsKey(channel) ? For(channel) as ISocialInsights : null;
 
     public ISocialPublisher For(ChannelType channel)
     {

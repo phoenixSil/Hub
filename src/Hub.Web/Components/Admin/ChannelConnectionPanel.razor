@@ -31,8 +31,9 @@
             <ol>
                 <li>Dans l'application Instagram : <strong>Paramètres → Type de compte et outils → Passer à un compte professionnel</strong> (catégorie « Entreprise »).</li>
                 <li>Reliez-le à la page Facebook : sur la page, <strong>Paramètres → Comptes liés → Instagram → Connecter</strong>.</li>
-                <li>Le jeton de la page Facebook doit inclure <code>instagram_basic</code> et <code>instagram_content_publish</code> :
-                    dans l'Explorateur de l'API Graph, ajoutez ces deux autorisations, régénérez le jeton de page, puis reconnectez Facebook ci-dessus.</li>
+                <li>Le jeton de la page Facebook doit inclure <code>instagram_basic</code>, <code>instagram_content_publish</code>
+                    et <code>instagram_manage_insights</code> (pour les chiffres du plan marketing) :
+                    dans l'Explorateur de l'API Graph, ajoutez ces autorisations, régénérez le jeton de page, puis reconnectez Facebook ci-dessus.</li>
                 <li>Cliquez ensuite sur le bouton ci-dessous : le compte relié est trouvé automatiquement, aucun jeton à copier.</li>
             </ol>
         </details>
@@ -55,7 +56,7 @@
             <summary>Comment obtenir l'identifiant et le jeton de la page</summary>
             <ol>
                 <li>Sur <strong>developers.facebook.com</strong>, créez une application (type « Entreprise ») et ajoutez le produit « Pages ».</li>
-                <li>Dans l'<strong>Explorateur de l'API Graph</strong>, choisissez votre application, demandez les autorisations <code>pages_show_list</code>, <code>pages_read_engagement</code> et <code>pages_manage_posts</code>, puis générez un jeton d'utilisateur.</li>
+                <li>Dans l'<strong>Explorateur de l'API Graph</strong>, choisissez votre application, demandez les autorisations <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>pages_manage_posts</code> et <code>read_insights</code> (chiffres du plan marketing), puis générez un jeton d'utilisateur.</li>
                 <li>Transformez-le en jeton longue durée (outil « Débogueur de jeton d'accès » → « Étendre le jeton d'accès »).</li>
                 <li>Appelez <code>me/accounts</code> avec ce jeton : copiez l'<strong>id</strong> et l'<strong>access_token</strong> de la page ScintiNet. Ce jeton de page n'expire pas.</li>
             </ol>
