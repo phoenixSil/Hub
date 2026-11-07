@@ -315,4 +315,6 @@ h1:focus, h1:focus-visible { outline: none; }
 @media (max-width: 640px) {
     .btn-block, .btn-lg, .consent-actions .btn { white-space: normal; text-align: center; }
     .consent-actions .btn { flex: 1 1 auto; }
+    .consent { left: 8px; right: 8px; bottom: 8px; }
+    .consent-inner { padding: 14px 16px; font-size: .84rem; }
 }

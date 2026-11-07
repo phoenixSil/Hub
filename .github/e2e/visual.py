@@ -110,6 +110,10 @@ CHECKS = r"""
       issues.push(`éléments superposés : « ${name(controls[i])} » et « ${name(controls[j])} »`);
   }
 
+  const raw = document.body.innerText.match(/\{\{[^}]{1,40}\}\}/);
+  if (raw) issues.push(`champ non remplacé affiché : ${raw[0]}`);
+  if (/\b(undefined|NaN)\b/.test(document.body.innerText)) issues.push('texte « undefined » ou « NaN » affiché');
+
   for (const img of document.images) if (shown(img) && img.complete && img.naturalWidth === 0) issues.push(`image cassée : ${img.getAttribute('src')}`);
 
   for (const card of document.querySelectorAll('.admin-card, .card, .admin-head, .field, .auth-card')) {
@@ -167,6 +171,9 @@ with sync_playwright() as p:
                                   locale="fr-CA", storage_state=state_file)
         page = ctx.new_page()
         state = watch(page)
+        # Le bandeau de consentement est vérifié une fois, puis refusé : les captures montrent les pages telles quelles.
+        audit(page, state, label, "consentement", BASE + "/", problems)
+        page.locator("[data-consent='no']").first.click()
         for name, path in PUBLIC + ADMIN:
             try:
                 url = resolve(page, path)

@@ -9,14 +9,14 @@
     return;
 }
 
-<Seo Title="@(current.SeoTitle ?? current.Title)" Description="@(current.SeoDescription ?? current.Lead ?? tenant.Tagline)" SiteName="@tenant.Name" />
+<Seo Title="@Fill(current.SeoTitle ?? current.Title)" Description="@Fill(current.SeoDescription ?? current.Lead ?? tenant.Tagline)" SiteName="@tenant.Name" />
 
 <section class="page-hero page-hero-plain">
     <div class="container narrow">
-        <h1>@current.Title</h1>
+        <h1>@Fill(current.Title)</h1>
         @if (!string.IsNullOrWhiteSpace(current.Lead))
         {
-            <p class="hero-lead">@current.Lead</p>
+            <p class="hero-lead">@Fill(current.Lead)</p>
         }
     </div>
 </section>
@@ -41,7 +41,7 @@
     }
 
     /// <summary>Remplace les champs {{Nom}}, {{Courriel}}, etc. par les coordonnées de l'entreprise.</summary>
-    private string Fill(string body) => body
+    private string Fill(string? body) => (body ?? "")
         .Replace("{{Nom}}", tenant!.Name)
         .Replace("{{Courriel}}", tenant.PublicEmail)
         .Replace("{{Telephone}}", tenant.Phone)
