@@ -3,6 +3,9 @@
 @rendermode InteractiveServer
 @inject IPostService Posts
 @inject IPostWriter Writer
+@inject IPostVisualDesigner Designer
+@inject Hub.Web.Infrastructure.IMediaStorage Media
+@inject IJSRuntime JS
 @inject IChannelConnections Connections
 @inject IPublisherResolver Publishers
 @inject ICatalogQueries Catalog
@@ -131,7 +134,33 @@ else
                             @foreach (var s in services) { <option value="@s.Url">@s.Title</option> }
                         </select>
                     </div>
-                    <div class="field"><label>Image (recommandée)</label><ImagePicker @bind-Value="draft.ImageUrl" /></div>
+                    <div class="field">
+                        <label>Visuel</label>
+                        <div class="visual-tools">
+                            <select @bind="visualStyle" aria-label="Style du visuel">
+                                @foreach (var st in Designer.Styles) { <option value="@st">@st</option> }
+                            </select>
+                            <input @bind="facts" @bind:event="oninput" placeholder="Chiffres à afficher (ex. -20 %), facultatif" aria-label="Chiffres autorisés sur le visuel" />
+                            <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy"
+                                        Disabled="@string.IsNullOrWhiteSpace(VisualTopic)" BusyText="@(Designer.UsesAi ? "Claude dessine…" : "Préparation…")">
+                                @(Designer.UsesAi ? "🎨 Créer un visuel (Claude)" : "Créer un visuel (modèle)")
+                            </BusyButton>
+                        </div>
+                        <p class="muted small">Seuls les chiffres saisis ici peuvent apparaître sur l'image : l'IA n'en invente aucun.</p>
+                        @if (visual is not null)
+                        {
+                            <div class="visual-proposal">
+                                <img src="@VisualDataUrl" alt="Proposition de visuel : @visual.Headline" />
+                                <div class="actions">
+                                    <BusyButton OnClick="UseVisualAsync" IsBusy="@(action == "use-visual")" AnyBusy="busy" BusyText="Préparation de l'image…">Utiliser ce visuel</BusyButton>
+                                    <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy" BusyText="Nouvelle proposition…">Autre proposition</BusyButton>
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => visual = null" disabled="@busy">Ignorer</button>
+                                </div>
+                            </div>
+                        }
+                        <p class="muted small">Ou importez votre propre image :</p>
+                        <ImagePicker @bind-Value="draft.ImageUrl" />
+                    </div>
                     <div class="field">
                         <label>Réseaux</label>
                         @foreach (var c in Publishers.Supported)
@@ -286,6 +315,13 @@ else
     private IReadOnlyList<PostSuggestion> suggestions = [];
     private DateTime? scheduleLocal;
     private string? previewLink;
+    private string visualStyle = "Service";
+    private string? facts;
+    private PostVisual? visual;
+    private string VisualTopic => string.IsNullOrWhiteSpace(topic) ? draft.Title : topic;
+
+    private string VisualDataUrl => visual is null ? "" :
+        "data:image/svg+xml;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(visual.Svg));
     private string? previewFor;
 
     private bool Editable => view is null || view.Post.Status is PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed;
@@ -336,6 +372,7 @@ else
             details = s.Summary;
             draft.LinkPath = s.Url;
             draft.ImageUrl ??= s.ImageUrl;
+            visualStyle = s.Url.StartsWith("/aines") ? "Aînés" : "Service";
         }
         else if (topicKey.StartsWith("o:"))
         {
@@ -344,6 +381,8 @@ else
             details = p.Text;
             draft.LinkPath = p.PrimaryUrl;
             draft.ImageUrl ??= p.ImageUrl;
+            facts = p.Highlight;
+            visualStyle = "Promotion";
         }
         if (string.IsNullOrWhiteSpace(draft.Title) && topic is not null) draft.Title = topic;
     }
@@ -355,6 +394,45 @@ else
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         suggestions = result.Value!;
+    }
+
+    private async Task DesignAsync()
+    {
+        await BeginAsync("design", Designer.UsesAi ? "Claude dessine le visuel… (20 à 40 secondes)" : "Préparation du visuel…");
+        var company = await Tenant.GetAsync();
+        var result = await Designer.DesignAsync(new VisualIdea(
+            company.Name, company.Phone, company.PrimaryColor, company.AccentColor,
+            VisualTopic, draft.Message, facts, visualStyle));
+        End();
+        if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
+        visual = result.Value;
+    }
+
+    private async Task UseVisualAsync()
+    {
+        if (visual is null) return;
+        await BeginAsync("use-visual", "Préparation de l'image…");
+        try
+        {
+            var png = await JS.InvokeAsync<IJSStreamReference>("hubAdmin.svgToPng", visual.Svg, 1080);
+            await using var incoming = await png.OpenReadStreamAsync(maxAllowedSize: 10 * 1024 * 1024);
+            using var stream = new MemoryStream();
+            await incoming.CopyToAsync(stream);
+            stream.Position = 0;
+            draft.ImageUrl = await Media.SaveImageAsync(stream, "visuel.png");
+            visual = null;
+            feedback = "Visuel ajouté à la publication.";
+            feedbackIsError = false;
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or IOException)
+        {
+            feedback = $"Le visuel n'a pas pu être converti en image : {ex.Message}";
+            feedbackIsError = true;
+        }
+        finally
+        {
+            End();
+        }
     }
 
     private void Use(PostSuggestion s)

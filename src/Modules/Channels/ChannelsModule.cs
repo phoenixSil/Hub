@@ -120,6 +120,7 @@ public static class ChannelsModule
         services.AddScoped<PostPublishing>();
         services.AddScoped<IPostService, PostService>();
         services.AddScoped<IPostWriter, PostWriter>();
+        services.AddScoped<IPostVisualDesigner, PostVisualDesigner>();
         services.AddHostedService<PostScheduler>();
         services.AddSingleton<IModuleInitializer, ChannelsInitializer>();
         return services;

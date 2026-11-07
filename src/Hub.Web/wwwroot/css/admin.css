@@ -177,3 +177,10 @@ code.break { word-break: break-all; }
 .btn { white-space: normal; text-align: center; }
 .alert-info { background: #eef6fb; border: 1px solid #b9dcef; color: #0b5375; border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
 .busy-banner { position: sticky; top: 8px; z-index: 20; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+
+/* Visuels des publications */
+.visual-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.visual-tools select { width: auto; min-width: 130px; }
+.visual-tools input { flex: 1 1 200px; }
+.visual-proposal { margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fafbfc; }
+.visual-proposal img { display: block; width: 100%; max-width: 420px; aspect-ratio: 1; margin: 0 auto 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
