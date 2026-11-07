@@ -125,6 +125,39 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.ToTable("AutopilotSettings", "channels");
                 });
 
+            modelBuilder.Entity("Hub.Modules.Channels.Domain.ImageUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Month")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Month")
+                        .IsUnique();
+
+                    b.ToTable("ImageUsages", "channels");
+                });
+
             modelBuilder.Entity("Hub.Modules.Channels.Domain.Post", b =>
                 {
                     b.Property<Guid>("Id")
