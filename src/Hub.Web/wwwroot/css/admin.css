@@ -168,3 +168,12 @@ code.break { word-break: break-all; }
 .fb-link strong { display: block; color: #050505; }
 .field .check { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; }
 .field .check input[type=checkbox] { width: auto; flex: none; margin: 0; }
+
+/* Action en cours : indicateur qui tourne */
+.spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: hub-spin .7s linear infinite; vertical-align: -0.15em; flex: none; }
+@keyframes hub-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+.btn.is-busy { display: inline-flex; align-items: center; gap: 8px; cursor: progress; opacity: 1; }
+.btn { white-space: normal; text-align: center; }
+.alert-info { background: #eef6fb; border: 1px solid #b9dcef; color: #0b5375; border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
+.busy-banner { position: sticky; top: 8px; z-index: 20; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }

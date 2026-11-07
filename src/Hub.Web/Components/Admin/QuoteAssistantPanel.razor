@@ -26,9 +26,9 @@
             <p class="muted">L'assistant prépare une proposition (quelques secondes)…</p>
             <button class="btn btn-outline btn-sm" @onclick="LoadAsync">Actualiser</button>
         }
-        <button class="btn btn-primary btn-sm" @onclick="GenerateAsync" disabled="@busy">
-            @(busy ? "Préparation en cours…" : proposals.Count == 0 ? "Préparer une proposition" : "Préparer une nouvelle proposition")
-        </button>
+        <BusyButton OnClick="GenerateAsync" IsBusy="@(action == "generate")" AnyBusy="busy" BusyText="@(Quotes.UsesRealModel ? "Claude prépare la proposition… (10 à 30 secondes)" : "Préparation…")">
+            @(proposals.Count == 0 ? "Préparer une proposition" : "Préparer une nouvelle proposition")
+        </BusyButton>
     }
     else
     {
@@ -101,10 +101,10 @@
         </div>
 
         <div class="actions">
-            <button class="btn btn-primary btn-sm" @onclick="SendAsync" disabled="@(busy || Total <= 0 || string.IsNullOrWhiteSpace(message))">
-                @(busy ? "Envoi…" : $"Valider et envoyer au client ({Money(Total)})")
-            </button>
-            <button class="btn btn-outline btn-sm" @onclick="GenerateAsync" disabled="@busy">Nouvelle proposition</button>
+            <BusyButton OnClick="SendAsync" IsBusy="@(action == "send")" AnyBusy="busy" Disabled="@(Total <= 0 || string.IsNullOrWhiteSpace(message))" BusyText="Envoi du courriel au client…">
+                @($"Valider et envoyer au client ({Money(Total)})")
+            </BusyButton>
+            <BusyButton Class="btn btn-outline btn-sm" OnClick="GenerateAsync" IsBusy="@(action == "generate")" AnyBusy="busy" BusyText="Préparation…">Nouvelle proposition</BusyButton>
             <button class="btn btn-ghost btn-sm" @onclick="DiscardAsync" disabled="@busy">Écarter</button>
         </div>
         <p class="muted small">Rien n'est envoyé au client sans ce clic.</p>
@@ -163,6 +163,22 @@
     private List<EditLine> edit = [];
     private string? message;
     private bool busy;
+    private string? action;
+
+    private async Task BeginAsync(string name)
+    {
+        busy = true;
+        action = name;
+        feedback = null;
+        StateHasChanged();
+        await Task.Yield();
+    }
+
+    private void End()
+    {
+        busy = false;
+        action = null;
+    }
     private string? feedback;
     private bool feedbackIsError;
     private Guid loadedFor;
@@ -192,13 +208,12 @@
 
     private async Task GenerateAsync()
     {
-        busy = true;
-        feedback = null;
+        await BeginAsync("generate");
         // Une nouvelle proposition remplace le brouillon en cours.
         if (current is not null) await Quotes.DiscardAsync(current.Proposal.Id, await AuthorAsync());
         current = null;
         var result = await Quotes.GenerateAsync(LeadId);
-        busy = false;
+        End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; }
         await LoadAsync();
     }
@@ -206,12 +221,12 @@
     private async Task SendAsync()
     {
         if (current is null) return;
-        busy = true;
+        await BeginAsync("send");
         var proposed = current.Proposal.ProposedTotal;
         var total = Total;
         var lines = edit.Select(l => new QuoteLine(l.Description.Trim(), l.Quantity, l.Unit, l.UnitPrice, l.Service)).ToList();
         var result = await Quotes.ApproveAndSendAsync(current.Proposal.Id, lines, message ?? "", await AuthorAsync());
-        busy = false;
+        End();
         feedback = result.IsSuccess ? $"Proposition envoyée au client ({Money(total)} avant taxes)." : result.Error;
         feedbackIsError = result.IsFailure;
         if (result.IsSuccess)

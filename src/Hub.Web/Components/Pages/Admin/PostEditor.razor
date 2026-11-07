@@ -26,7 +26,11 @@
     }
 </div>
 
-@if (feedback is not null)
+@if (working is not null)
+{
+    <div class="alert alert-info busy-banner" role="status"><span class="spinner" aria-hidden="true"></span> @working</div>
+}
+else if (feedback is not null)
 {
     <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
 }
@@ -85,9 +89,10 @@ else
                             <select @bind="tone">@foreach (var t in PostWriterTones) { <option value="@t">@t</option> }</select>
                         </div>
                         <div class="field" style="align-self:end">
-                            <button class="btn btn-outline btn-sm" @onclick="SuggestAsync" disabled="@(busy || string.IsNullOrWhiteSpace(topic))">
-                                @(busy ? "Rédaction…" : Writer.UsesAi ? "✨ Proposer 3 textes (Claude)" : "Proposer 3 textes (modèles)")
-                            </button>
+                            <BusyButton Class="btn btn-outline btn-sm" OnClick="SuggestAsync" IsBusy="@(action == "suggest")" AnyBusy="busy"
+                                        Disabled="@string.IsNullOrWhiteSpace(topic)" BusyText="@(Writer.UsesAi ? "Claude rédige…" : "Préparation…")">
+                                @(Writer.UsesAi ? "✨ Proposer 3 textes (Claude)" : "Proposer 3 textes (modèles)")
+                            </BusyButton>
                         </div>
                     </div>
                     @if (suggestions.Count > 0)
@@ -148,12 +153,12 @@ else
                 <div class="admin-card">
                     <h2>3. Envoi</h2>
                     <div class="actions">
-                        <button class="btn btn-primary btn-sm" @onclick="PublishNowAsync" disabled="@busy">Publier maintenant</button>
-                        <button class="btn btn-outline btn-sm" @onclick="SaveAsync" disabled="@busy">Enregistrer le brouillon</button>
+                        <BusyButton OnClick="PublishNowAsync" IsBusy="@(action == "publish")" AnyBusy="busy" BusyText="Publication en cours…">Publier maintenant</BusyButton>
+                        <BusyButton Class="btn btn-outline btn-sm" OnClick="SaveAsync" IsBusy="@(action == "save")" AnyBusy="busy" BusyText="Enregistrement…">Enregistrer le brouillon</BusyButton>
                     </div>
                     <div class="field-row schedule">
                         <div class="field"><label>Ou programmer le</label><input type="datetime-local" @bind="scheduleLocal" @bind:event="oninput" /></div>
-                        <div class="field" style="align-self:end"><button class="btn btn-outline btn-sm" @onclick="ScheduleAsync" disabled="@(busy || scheduleLocal is null)">Programmer</button></div>
+                        <div class="field" style="align-self:end"><BusyButton Class="btn btn-outline btn-sm" OnClick="ScheduleAsync" IsBusy="@(action == "schedule")" AnyBusy="busy" Disabled="@(scheduleLocal is null)" BusyText="Programmation…">Programmer</BusyButton></div>
                     </div>
                     @if (view?.Post.Status == PostStatus.Scheduled)
                     {
@@ -197,7 +202,7 @@ else
                     </ul>
                     @if (view.Post.Status is PostStatus.PartiallyPublished)
                     {
-                        <button class="btn btn-outline btn-sm" @onclick="PublishNowAsync" disabled="@busy">Réessayer les réseaux en échec</button>
+                        <BusyButton Class="btn btn-outline btn-sm" OnClick="PublishNowAsync" IsBusy="@(action == "publish")" AnyBusy="busy" BusyText="Publication en cours…">Réessayer les réseaux en échec</BusyButton>
                     }
                 </div>
             }
@@ -244,6 +249,26 @@ else
     private CampaignStats? stats;
     private bool loaded;
     private bool busy;
+    private string? action;
+    private string? working;
+
+    /// <summary>Affiche tout de suite l'action en cours (avant l'appel au réseau ou à l'IA).</summary>
+    private async Task BeginAsync(string name, string message)
+    {
+        busy = true;
+        action = name;
+        working = message;
+        feedback = null;
+        StateHasChanged();
+        await Task.Yield();
+    }
+
+    private void End()
+    {
+        busy = false;
+        action = null;
+        working = null;
+    }
     private string? feedback;
     private bool feedbackIsError;
     private IReadOnlyDictionary<string, string> errors = new Dictionary<string, string>();
@@ -325,10 +350,9 @@ else
 
     private async Task SuggestAsync()
     {
-        busy = true;
-        feedback = null;
+        await BeginAsync("suggest", Writer.UsesAi ? "Claude rédige 3 propositions… (10 à 20 secondes)" : "Préparation des propositions…");
         var result = await Writer.SuggestAsync(new PostIdea(companyName, city, topic ?? "", details, tone, ChannelType.Facebook));
-        busy = false;
+        End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         suggestions = result.Value!;
     }
@@ -362,9 +386,9 @@ else
 
     private async Task SaveAsync()
     {
-        busy = true;
+        await BeginAsync("save", "Enregistrement du brouillon…");
         var id = await SaveDraftInternalAsync();
-        busy = false;
+        End();
         if (id is null) return;
         if (Id is null) { Nav.NavigateTo($"/admin/publications/{id}"); return; }
         feedback = "Brouillon enregistré.";
@@ -374,12 +398,12 @@ else
 
     private async Task PublishNowAsync()
     {
-        busy = true;
-        feedback = null;
+        var networks = string.Join(" et ", draft.Channels.Select(PostLabels.Of));
+        await BeginAsync("publish", $"Publication sur {networks} en cours… ne fermez pas la page.");
         Guid? id = view?.Post.Status == PostStatus.PartiallyPublished ? view.Post.Id : await SaveDraftInternalAsync();
-        if (id is null) { busy = false; return; }
+        if (id is null) { End(); return; }
         var result = await Posts.PublishNowAsync(id.Value);
-        busy = false;
+        End();
         feedback = result.IsSuccess ? "Publication envoyée." : $"Publication incomplète : {result.Error}";
         feedbackIsError = result.IsFailure;
         await ReloadAsync(id.Value);
@@ -388,11 +412,11 @@ else
     private async Task ScheduleAsync()
     {
         if (scheduleLocal is null) return;
-        busy = true;
+        await BeginAsync("schedule", "Programmation de la publication…");
         var id = await SaveDraftInternalAsync();
-        if (id is null) { busy = false; return; }
+        if (id is null) { End(); return; }
         var result = await Posts.ScheduleAsync(id.Value, Hub.SharedKernel.Time.BusinessTime.FromLocal(scheduleLocal.Value));
-        busy = false;
+        End();
         feedback = result.IsSuccess ? $"Publication programmée le {scheduleLocal.Value.ToString("d MMMM 'à' HH:mm", AdminFormat.Fr)}." : result.Error;
         feedbackIsError = result.IsFailure;
         await ReloadAsync(id.Value);

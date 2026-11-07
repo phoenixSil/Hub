@@ -1,0 +1,24 @@
+@* Bouton qui montre qu'une action est en cours : indicateur qui tourne et libellé explicite. *@
+<button type="button" class="@Class @(IsBusy ? "is-busy" : null)" disabled="@(Disabled || IsBusy || AnyBusy)" @onclick="OnClick" aria-busy="@(IsBusy ? "true" : "false")">
+    @if (IsBusy)
+    {
+        <span class="spinner" aria-hidden="true"></span>
+        <span>@BusyText</span>
+    }
+    else
+    {
+        @ChildContent
+    }
+</button>
+
+@code {
+    [Parameter] public string? Class { get; set; } = "btn btn-primary btn-sm";
+    [Parameter] public bool IsBusy { get; set; }
+
+    /// <summary>Une autre action est en cours : ce bouton est désactivé aussi.</summary>
+    [Parameter] public bool AnyBusy { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string BusyText { get; set; } = "En cours…";
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

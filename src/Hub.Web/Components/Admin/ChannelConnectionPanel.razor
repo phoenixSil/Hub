@@ -48,9 +48,7 @@
             <div class="field"><label>Jeton de la page</label><input type="password" autocomplete="off" @bind="token" @bind:event="oninput" placeholder="EAAG…" /></div>
         </div>
         <div class="actions">
-            <button class="btn btn-primary btn-sm" @onclick="ConnectAsync" disabled="@(busy || string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(token))">
-                @(busy ? "Vérification…" : "Vérifier et connecter")
-            </button>
+            <BusyButton OnClick="ConnectAsync" IsBusy="busy" Disabled="@(string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(token))" BusyText="Vérification auprès de Facebook…">Vérifier et connecter</BusyButton>
             @if (editing) { <button class="btn btn-ghost btn-sm" @onclick="() => editing = false">Annuler</button> }
         </div>
     }
@@ -73,6 +71,8 @@
     {
         busy = true;
         feedback = null;
+        StateHasChanged();
+        await Task.Yield();
         var result = await Connections.ConnectAsync(Channel, accountId ?? "", token ?? "");
         busy = false;
         token = null; // le jeton ne reste pas en mémoire de l'écran
