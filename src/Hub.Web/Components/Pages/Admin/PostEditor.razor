@@ -414,7 +414,7 @@ else
 
     private async Task DesignAsync()
     {
-        await BeginAsync("design", Designer.UsesAi ? "Claude dessine le visuel… (20 à 40 secondes)" : "Préparation du visuel…");
+        await BeginAsync("design", Designer.UsesAi ? "Claude dessine le visuel… (1 à 2 minutes)" : "Préparation du visuel…");
         var company = await Tenant.GetAsync();
         var result = await Designer.DesignAsync(new VisualIdea(
             company.Name, company.Phone, company.PrimaryColor, company.AccentColor,

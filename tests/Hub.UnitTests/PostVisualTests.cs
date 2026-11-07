@@ -85,6 +85,19 @@ public class PostVisualDesignerTests
         Assert.DoesNotContain("<script", result.Value.Svg);
         Assert.Contains("-20 %", ai.Last!.User);
         Assert.Contains("#E2E735", ai.Last.System);
+        Assert.Contains("Mise en page :", ai.Last.User);
+        Assert.Contains("Illustration :", ai.Last.User);
+    }
+
+    [Fact]
+    public void Les_directions_artistiques_varient_d_une_proposition_a_l_autre()
+    {
+        var random = new Random(42);
+        var picks = Enumerable.Range(0, 20).Select(_ => ArtDirection.Pick("Aînés", random)).ToList();
+
+        Assert.True(picks.Select(p => p.Layout).Distinct().Count() >= 4);
+        Assert.True(picks.Select(p => p.Scene).Distinct().Count() >= 2);
+        Assert.NotNull(ArtDirection.Pick("Inconnu", random).Scene);
     }
 
     [Fact]

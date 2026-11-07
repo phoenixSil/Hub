@@ -54,7 +54,7 @@ builder.Services.AddScoped<Hub.Modules.Channels.Application.Autopilot.IVisualSto
 
 // IA générique (rédaction des publications…) : Claude si une clé est fournie, sinon aucun (replis sans IA).
 if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AnthropicOptions.Section}:ApiKey"]))
-    builder.Services.AddHttpClient<Hub.SharedKernel.Ai.IAiTextGenerator, ClaudeTextGenerator>(c => c.Timeout = TimeSpan.FromSeconds(90));
+    builder.Services.AddHttpClient<Hub.SharedKernel.Ai.IAiTextGenerator, ClaudeTextGenerator>(c => c.Timeout = TimeSpan.FromSeconds(240));
 else
     builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiTextGenerator, NoAiTextGenerator>();
 
