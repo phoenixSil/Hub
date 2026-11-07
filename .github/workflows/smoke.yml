@@ -29,6 +29,7 @@ jobs:
       ASPNETCORE_ENVIRONMENT: "Production"
       Leads__RemindersAnyHour: "true"
       Channels__Simulate: "true"
+      Gemini__Simulate: "true"
     steps:
       - uses: actions/checkout@v4
 

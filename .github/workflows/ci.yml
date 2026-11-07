@@ -29,6 +29,16 @@ jobs:
 
       - name: Tester
         run: dotnet test Hub.slnx -c Release --no-build --verbosity normal
+        env:
+          HUB_TEST_OUTPUT: ${{ github.workspace }}/apercus-tests
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apercus-tests
+          path: apercus-tests
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Publier
         run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release --no-build -o publish

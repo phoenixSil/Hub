@@ -127,8 +127,8 @@ internal sealed class AutopilotRunner(
 
         var imageUrl = item.ImageUrl;
         var visual = await designer.DesignAsync(new VisualIdea(context.CompanyName, context.Phone, context.PrimaryColor, context.AccentColor,
-            item.Topic, suggestion.Text, item.Facts, item.Style), ct);
-        if (visual.IsSuccess && renderer.RenderPng(visual.Value!.Svg) is { } png)
+            item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl), ct);
+        if (visual.IsSuccess && (visual.Value!.Png ?? (visual.Value.Svg is { } svg ? renderer.RenderPng(svg) : null)) is { } png)
         {
             var saved = await store.SavePngAsync(png, ct);
             if (saved.IsSuccess) imageUrl = saved.Value;

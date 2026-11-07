@@ -30,3 +30,11 @@ public sealed class AutopilotSettings : TenantEntity
     public DateTimeOffset? LastRunAt { get; set; }
     public string? LastRunSummary { get; set; }
 }
+
+/// <summary>Nombre de photos créées par mois (plafond de coût du service d'images).</summary>
+public sealed class ImageUsage : TenantEntity
+{
+    /// <summary>Mois, au format « 2026-11 ».</summary>
+    public string Month { get; set; } = string.Empty;
+    public int Count { get; set; }
+}

@@ -58,6 +58,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<PostTarget> PostTargets => Set<PostTarget>();
     public DbSet<AutopilotSettings> AutopilotSettings => Set<AutopilotSettings>();
+    public DbSet<ImageUsage> ImageUsages => Set<ImageUsage>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -107,6 +108,13 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.LastRunSummary).HasMaxLength(1000);
             e.HasIndex(x => x.TenantId).IsUnique();
         });
+
+        b.Entity<ImageUsage>(e =>
+        {
+            e.ToTable("ImageUsages");
+            e.Property(x => x.Month).HasMaxLength(7);
+            e.HasIndex(x => new { x.TenantId, x.Month }).IsUnique();
+        });
     }
 }
 
@@ -134,6 +142,7 @@ public static class ChannelsModule
         services.AddScoped<IPostService, PostService>();
         services.AddScoped<IPostWriter, PostWriter>();
         services.AddScoped<IPostVisualDesigner, PostVisualDesigner>();
+        services.AddScoped<IImageQuota, ImageQuota>();
         services.AddHostedService<PostScheduler>();
 
         // Pilote automatique : planifie, rédige, illustre et programme les publications de la semaine.

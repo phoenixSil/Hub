@@ -58,6 +58,16 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AnthropicOptions.Section
 else
     builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiTextGenerator, NoAiTextGenerator>();
 
+// Photos réalistes des publications : Google Gemini si une clé est fournie, sinon illustrations dessinées par Claude.
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection(GeminiOptions.Section));
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{GeminiOptions.Section}:ApiKey"]))
+    builder.Services.AddHttpClient<Hub.SharedKernel.Ai.IAiImageGenerator, GeminiImageGenerator>(c => c.Timeout = TimeSpan.FromSeconds(180));
+else if (builder.Configuration.GetValue<bool>($"{GeminiOptions.Section}:Simulate"))
+    builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiImageGenerator, SimulatedImageGenerator>();
+else
+    builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiImageGenerator, NoAiImageGenerator>();
+builder.Services.AddSingleton<Hub.Modules.Channels.Application.IPhotoComposer, SkiaPhotoComposer>();
+
 // Courriels : fournisseur choisi par Email:Provider, sinon détecté (Resend, Azure Communication, dossier local, journal).
 builder.Services.AddEmail(builder.Configuration, builder.Environment);
 

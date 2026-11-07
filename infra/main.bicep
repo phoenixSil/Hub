@@ -34,6 +34,10 @@ param resendApiKey string = ''
 @description('Clé de l\'API Claude pour l\'assistant de devis (vide = modèle simulé, sans IA).')
 param anthropicApiKey string = ''
 
+@secure()
+@description('Clé de l\'API Google Gemini pour les photos des publications (vide = illustrations dessinées seulement).')
+param geminiApiKey string = ''
+
 @description('Adresse d\'expédition des courriels (domaine vérifié dans Resend).')
 param fromEmail string = 'noreply@scintinet.com'
 
@@ -151,6 +155,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'Resend__ApiKey', value: resendApiKey }
         { name: 'Resend__FromEmail', value: fromEmail }
         { name: 'Anthropic__ApiKey', value: anthropicApiKey }
+        { name: 'Gemini__ApiKey', value: geminiApiKey }
         { name: 'Media__BlobConnectionString', value: storageConnection }
         { name: 'Media__Container', value: mediaContainer.name }
       ]

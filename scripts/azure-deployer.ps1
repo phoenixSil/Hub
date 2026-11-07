@@ -98,6 +98,7 @@ if (-not $CodeSeulement) {
     } while (-not $valide)
     $resend = EnClair (Read-Host '    Clé API Resend (Entrée pour plus tard)' -AsSecureString)
     $claude = EnClair (Read-Host '    Clé API Claude pour l''assistant de devis (Entrée pour plus tard)' -AsSecureString)
+    $gemini = EnClair (Read-Host '    Clé API Google Gemini pour les photos des publications (Entrée pour plus tard)' -AsSecureString)
     $mdpSql = MotDePasseAleatoire
 
     Etape 'Création de l''infrastructure (5 à 10 minutes)'
@@ -106,7 +107,8 @@ if (-not $CodeSeulement) {
         "adminEmail=$courriel",
         "adminPassword=$mdp",
         "resendApiKey=$resend",
-        "anthropicApiKey=$claude"
+        "anthropicApiKey=$claude",
+        "geminiApiKey=$gemini"
     )
     $sortie = & az deployment group create --resource-group $GroupeRessources `
         --template-file (Join-Path $racine 'infra\main.bicep') `

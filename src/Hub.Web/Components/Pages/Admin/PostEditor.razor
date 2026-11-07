@@ -138,13 +138,20 @@ else
                     <div class="field">
                         <label>Visuel</label>
                         <div class="visual-tools">
+                            @if (Designer.MakesPhotos)
+                            {
+                                <select @bind="visualKind" aria-label="Type de visuel">
+                                    <option value="@VisualKind.Photo">Photo réaliste</option>
+                                    <option value="@VisualKind.Illustration">Illustration</option>
+                                </select>
+                            }
                             <select @bind="visualStyle" aria-label="Style du visuel">
                                 @foreach (var st in Designer.Styles) { <option value="@st">@st</option> }
                             </select>
                             <input @bind="facts" @bind:event="oninput" placeholder="Chiffres à afficher (ex. -20 %), facultatif" aria-label="Chiffres autorisés sur le visuel" />
                             <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy"
-                                        Disabled="@string.IsNullOrWhiteSpace(VisualTopic)" BusyText="@(Designer.UsesAi ? "Claude dessine…" : "Préparation…")">
-                                @(Designer.UsesAi ? "🎨 Créer un visuel (Claude)" : "Créer un visuel (modèle)")
+                                        Disabled="@string.IsNullOrWhiteSpace(VisualTopic)" BusyText="@(WantsPhoto ? "Création de la photo…" : Designer.UsesAi ? "Claude dessine…" : "Préparation…")">
+                                @(WantsPhoto ? "📷 Créer un visuel" : Designer.UsesAi ? "🎨 Créer un visuel (Claude)" : "Créer un visuel (modèle)")
                             </BusyButton>
                         </div>
                         <p class="muted small">Seuls les chiffres saisis ici peuvent apparaître sur l'image : l'IA n'en invente aucun.</p>
@@ -337,6 +344,8 @@ else
     private string VisualTopic => string.IsNullOrWhiteSpace(topic) ? draft.Title : topic;
 
     private byte[]? visualPng;
+    private VisualKind visualKind = VisualKind.Photo;
+    private bool WantsPhoto => Designer.MakesPhotos && visualKind == VisualKind.Photo;
     private string VisualDataUrl => visualPng is null ? "" : "data:image/png;base64," + Convert.ToBase64String(visualPng);
     private string? previewFor;
 
@@ -414,15 +423,19 @@ else
 
     private async Task DesignAsync()
     {
-        await BeginAsync("design", Designer.UsesAi ? "Claude dessine le visuel… (1 à 2 minutes)" : "Préparation du visuel…");
+        await BeginAsync("design", WantsPhoto
+            ? "Claude imagine la scène, puis la photo est créée et mise en page… (environ 30 à 60 secondes)"
+            : Designer.UsesAi ? "Claude dessine le visuel… (1 à 2 minutes)" : "Préparation du visuel…");
         var company = await Tenant.GetAsync();
         var result = await Designer.DesignAsync(new VisualIdea(
             company.Name, company.Phone, company.PrimaryColor, company.AccentColor,
-            VisualTopic, draft.Message, facts, visualStyle));
+            VisualTopic, draft.Message, facts, visualStyle,
+            Site: company.SiteUrl,
+            Kind: WantsPhoto ? VisualKind.Photo : VisualKind.Illustration));
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         // Aperçu = image finale : dessinée côté serveur, avec la police de la marque.
-        visualPng = Renderer.RenderPng(result.Value!.Svg);
+        visualPng = result.Value!.Png ?? (result.Value.Svg is { } svg ? Renderer.RenderPng(svg) : null);
         if (visualPng is null) { feedback = "Ce visuel n'a pas pu être dessiné. Demandez une autre proposition."; feedbackIsError = true; return; }
         visual = result.Value;
     }
