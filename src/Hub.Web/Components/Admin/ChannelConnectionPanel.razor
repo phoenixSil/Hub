@@ -24,11 +24,28 @@
         <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
     }
 
-    @if (status?.IsConnected == true && !editing)
+    @if (Linked is not null && !(status?.IsConnected == true && !editing))
     {
-        <p class="muted small">Page n° @status.AccountId, connectée le @AdminFormat.Local(status.ConnectedAt!.Value, "d MMMM yyyy"). Le jeton est chiffré et n'est jamais réaffiché.</p>
+        <details class="assistant-notes" open="@(status?.IsConnected != true)">
+            <summary>Avant de connecter @PostLabels.Of(Channel)</summary>
+            <ol>
+                <li>Dans l'application Instagram : <strong>Paramètres → Type de compte et outils → Passer à un compte professionnel</strong> (catégorie « Entreprise »).</li>
+                <li>Reliez-le à la page Facebook : sur la page, <strong>Paramètres → Comptes liés → Instagram → Connecter</strong>.</li>
+                <li>Le jeton de la page Facebook doit inclure <code>instagram_basic</code> et <code>instagram_content_publish</code> :
+                    dans l'Explorateur de l'API Graph, ajoutez ces deux autorisations, régénérez le jeton de page, puis reconnectez Facebook ci-dessus.</li>
+                <li>Cliquez ensuite sur le bouton ci-dessous : le compte relié est trouvé automatiquement, aucun jeton à copier.</li>
+            </ol>
+        </details>
         <div class="actions">
-            <button class="btn btn-outline btn-sm" @onclick="() => editing = true">Changer de page ou de jeton</button>
+            <BusyButton OnClick="ConnectLinkedAsync" IsBusy="busy" BusyText="Recherche du compte relié…">Connecter avec la page @PostLabels.Of(Linked.Source)</BusyButton>
+            @if (editing) { <button class="btn btn-ghost btn-sm" @onclick="() => editing = false">Annuler</button> }
+        </div>
+    }
+    else if (status?.IsConnected == true && !editing)
+    {
+        <p class="muted small">@(Linked is null ? "Page" : "Compte") n° @status.AccountId, connectée le @AdminFormat.Local(status.ConnectedAt!.Value, "d MMMM yyyy"). Le jeton est chiffré et n'est jamais réaffiché.</p>
+        <div class="actions">
+            <button class="btn btn-outline btn-sm" @onclick="() => editing = true">@(Linked is null ? "Changer de page ou de jeton" : "Reconnecter")</button>
             <button class="btn btn-ghost btn-sm" @onclick="DisconnectAsync">Déconnecter</button>
         </div>
     }
@@ -65,7 +82,23 @@
     private string? feedback;
     private bool feedbackIsError;
 
+    private Hub.Modules.Channels.Publishers.ILinkedChannel? Linked => Publishers.LinkedFor(Channel);
+
     protected override async Task OnInitializedAsync() => status = await Connections.GetStatusAsync(Channel);
+
+    private async Task ConnectLinkedAsync()
+    {
+        busy = true;
+        feedback = null;
+        StateHasChanged();
+        await Task.Yield();
+        var result = await Connections.ConnectLinkedAsync(Channel);
+        busy = false;
+        feedback = result.IsSuccess ? $"Compte {result.Value} connecté." : result.Error;
+        feedbackIsError = result.IsFailure;
+        if (result.IsSuccess) editing = false;
+        status = await Connections.GetStatusAsync(Channel);
+    }
 
     private async Task ConnectAsync()
     {

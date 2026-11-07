@@ -27,3 +27,15 @@ public interface ISocialPublisher
 
     Task<PublishResult> PublishAsync(PublishRequest request, ChannelCredentials credentials, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Réseau dont la connexion se déduit d'un autre déjà connecté (ex. Instagram depuis la page Facebook) :
+/// l'administrateur n'a aucun jeton à copier.
+/// </summary>
+public interface ILinkedChannel
+{
+    ChannelType Source { get; }
+
+    /// <summary>Trouve le compte lié au compte source et renvoie ses identifiants.</summary>
+    Task<Result<ChannelCredentials>> DeriveAsync(ChannelCredentials source, CancellationToken ct = default);
+}

@@ -84,6 +84,9 @@ with sync_playwright() as p:
     # Publications : rédiger (modèles, sans IA), publier (réseau simulé), retrouver dans la liste.
     page.goto(BASE + "/admin/canaux", wait_until="networkidle")
     page.wait_for_timeout(1500)
+    page.click("text=Connecter avec la page Facebook")
+    page.wait_for_selector("text=Compte @compte (simulé) connecté", timeout=15000)
+    print("::notice::Instagram connecté à partir de la page Facebook (simulé)")
     page.screenshot(path=f"{OUT}/admin-canaux.png", full_page=True)
     page.goto(BASE + "/admin/publications/nouvelle", wait_until="networkidle")
     page.wait_for_selector("text=1. Le sujet", timeout=15000)

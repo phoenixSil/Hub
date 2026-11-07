@@ -168,6 +168,7 @@ else
                         }
                         <p class="muted small">Ou importez votre propre image :</p>
                         <ImagePicker @bind-Value="draft.ImageUrl" />
+                        <FieldError Errors="errors" For="ImageUrl" />
                     </div>
                     <div class="field">
                         <label>Réseaux</label>
@@ -182,7 +183,7 @@ else
                                 }
                             </label>
                         }
-                        <span class="muted small">Instagram et Google Business arriveront ensuite.</span>
+                        <span class="muted small">Instagram exige une image. Google Business arrivera ensuite.</span>
                         <FieldError Errors="errors" For="Channels" />
                     </div>
                 </div>

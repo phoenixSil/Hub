@@ -17,6 +17,9 @@ public interface IChannelConnections
 {
     Task<ConnectionStatus> GetStatusAsync(ChannelType channel, CancellationToken ct = default);
     Task<Result<string>> ConnectAsync(ChannelType channel, string accountId, string accessToken, CancellationToken ct = default);
+
+    /// <summary>Connecte un réseau lié (ex. Instagram) avec le compte source déjà connecté (la page Facebook).</summary>
+    Task<Result<string>> ConnectLinkedAsync(ChannelType channel, CancellationToken ct = default);
     Task DisconnectAsync(ChannelType channel, CancellationToken ct = default);
     Task<ChannelCredentials?> GetCredentialsAsync(ChannelType channel, CancellationToken ct = default);
 }
@@ -46,7 +49,36 @@ internal sealed class ChannelConnections(
         // On vérifie auprès du réseau avant d'enregistrer : un jeton invalide n'est jamais conservé.
         var test = await publishers.For(channel).TestAsync(new ChannelCredentials(accountId, accessToken), ct);
         if (test.IsFailure) return test;
+        await SaveAsync(channel, accountId, accessToken, test.Value!, ct);
+        return test;
+    }
 
+    public async Task<Result<string>> ConnectLinkedAsync(ChannelType channel, CancellationToken ct = default)
+    {
+        var linked = publishers.LinkedFor(channel);
+        if (linked is null) return Result<string>.Failure($"{channel} se connecte avec son propre jeton.");
+        var source = await GetCredentialsAsync(linked.Source, ct);
+        if (source is null && !publishers.IsSimulated)
+            return Result<string>.Failure($"Connectez d'abord {linked.Source} : {channel} utilise la même connexion.");
+
+        ChannelCredentials derived;
+        if (publishers.IsSimulated || source is null)
+        {
+            derived = new ChannelCredentials("simule-lie", source?.AccessToken ?? "simulé", "@compte (simulé)");
+        }
+        else
+        {
+            var found = await linked.DeriveAsync(source, ct);
+            if (found.IsFailure) return Result<string>.Failure(found.Error!);
+            derived = found.Value!;
+        }
+        var name = derived.AccountName ?? derived.AccountId;
+        await SaveAsync(channel, derived.AccountId, derived.AccessToken, name, ct);
+        return Result<string>.Success(name);
+    }
+
+    private async Task SaveAsync(ChannelType channel, string accountId, string accessToken, string accountName, CancellationToken ct)
+    {
         await using var db = await factory.CreateDbContextAsync(ct);
         var row = await db.Channels.FirstOrDefaultAsync(c => c.Type == channel, ct);
         if (row is null)
@@ -54,10 +86,9 @@ internal sealed class ChannelConnections(
             row = new Channel { Type = channel };
             db.Channels.Add(row);
         }
-        row.SettingsJson = JsonSerializer.Serialize(new Stored(accountId, _protector.Protect(accessToken), test.Value, DateTimeOffset.UtcNow));
+        row.SettingsJson = JsonSerializer.Serialize(new Stored(accountId, _protector.Protect(accessToken), accountName, DateTimeOffset.UtcNow));
         row.Status = ChannelStatus.Active;
         await db.SaveChangesAsync(ct);
-        return test;
     }
 
     public async Task DisconnectAsync(ChannelType channel, CancellationToken ct = default)

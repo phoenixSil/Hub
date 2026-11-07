@@ -135,6 +135,7 @@ public static class ChannelsModule
 
         // Un connecteur par réseau : ajouter Instagram ou Google Business = une ligne ici.
         services.AddHttpClient<ISocialPublisher, FacebookPagePublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
+        services.AddHttpClient<ISocialPublisher, InstagramPublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
 
         services.AddScoped<IPublisherResolver, PublisherResolver>();
         services.AddScoped<IChannelConnections, ChannelConnections>();

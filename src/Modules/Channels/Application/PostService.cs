@@ -67,6 +67,8 @@ internal sealed class PostService(
         if (string.IsNullOrWhiteSpace(d.Message)) errors["Message"] = "Le texte est vide.";
         else if (d.Message.Length > 5000) errors["Message"] = "Texte trop long (5 000 caractères au plus).";
         if (d.Channels.Count == 0) errors["Channels"] = "Choisissez au moins un réseau.";
+        if (d.Channels.Contains(ChannelType.Instagram) && string.IsNullOrWhiteSpace(d.ImageUrl))
+            errors["ImageUrl"] = "Instagram exige une image : créez un visuel ou importez une image.";
         if (errors.Count > 0) return Result<Guid>.Invalid(errors);
 
         await using var db = await factory.CreateDbContextAsync(ct);
