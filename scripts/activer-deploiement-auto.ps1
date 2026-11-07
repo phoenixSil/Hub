@@ -20,7 +20,8 @@ param(
     [string]$GroupeRessources = 'rg-scintinet',
     [string]$NomSite = '',
     [string]$Depot = 'phoenixSil/Hub',
-    [string]$AdresseSite = 'https://www.scintinet.com'
+    [string]$AdresseSite = 'https://www.scintinet.com',
+    [string]$Tenant = 'talsilleryyahoo.onmicrosoft.com'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +30,16 @@ function Ok([string]$texte) { Write-Host "    OK  $texte" -ForegroundColor Green
 function Az { $ErrorActionPreference = 'Continue'; $sortie = & az @args 2>$null; if ($LASTEXITCODE -ne 0) { throw "Commande az en échec : az $($args -join ' ')" }; return $sortie }
 
 Etape 'Connexion à Azure'
-$compte = Az account show -o json | ConvertFrom-Json
+$ErrorActionPreference = 'Continue'
+$json = & az account show -o json 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $json) {
+    Write-Host '    Pas encore connecté : une fenêtre de connexion Microsoft va s''ouvrir.' -ForegroundColor Yellow
+    if ($Tenant) { & az login --tenant $Tenant | Out-Null } else { & az login | Out-Null }
+    $json = & az account show -o json 2>$null
+}
+$ErrorActionPreference = 'Stop'
+if (-not $json) { throw 'Connexion à Azure impossible. Lancez « az login --tenant talsilleryyahoo.onmicrosoft.com » puis relancez ce script.' }
+$compte = $json | ConvertFrom-Json
 Ok "Abonnement : $($compte.name)"
 
 Etape 'Application web'
