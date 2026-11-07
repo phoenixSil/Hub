@@ -156,7 +156,7 @@ internal sealed class AutopilotService(
 /// <summary>File des demandes « Préparer maintenant », lue par <see cref="AutopilotWorker"/>.</summary>
 internal sealed class AutopilotTrigger
 {
-    private readonly Channel<Guid> requests = Channel.CreateUnbounded<Guid>();
+    private readonly System.Threading.Channels.Channel<Guid> requests = System.Threading.Channels.Channel.CreateUnbounded<Guid>();
     public void Request(Guid tenantId) => requests.Writer.TryWrite(tenantId);
     public ChannelReader<Guid> Reader => requests.Reader;
 }
