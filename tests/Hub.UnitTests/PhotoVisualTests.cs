@@ -155,7 +155,7 @@ public class PhotoVisualTests
     public void La_reponse_de_Google_est_lue()
     {
         var data = Convert.ToBase64String(Photo(10, 10));
-        var ok = GeminiImageGenerator.Parse($$"""{"candidates":[{"content":{"parts":[{"text":"voici"},{"inlineData":{"mimeType":"image/png","data":"{{data}}"}}]}}]}""", "m");
+        var ok = GeminiImageGenerator.Parse($$$"""{"candidates":[{"content":{"parts":[{"text":"voici"},{"inlineData":{"mimeType":"image/png","data":"{{{data}}}"}}]}}]}""", "m");
         Assert.True(ok.IsSuccess);
         Assert.Equal("image/png", ok.Value!.MimeType);
 
