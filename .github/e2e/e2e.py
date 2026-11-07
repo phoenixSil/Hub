@@ -6,6 +6,8 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 3. L'export des demandes (CSV) se télécharge.
 4. Le menu du back-office se replie et s'ouvre sur téléphone.
 5. Le formulaire de devis public refuse un envoi vide et affiche les erreurs.
+6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
+7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
 
 Usage : python3 e2e.py http://localhost:5080
 """
@@ -110,6 +112,27 @@ def quote_validation(page):
     expect(page.locator(".field-error, .validation-message, .alert-error").first).to_be_visible()
 
 
+@step("Anciennes adresses : redirection permanente vers la bonne page")
+def legacy_redirects(page):
+    for old, new in [("/contactez-nous/", "/contact"), ("/Devis.html", "/devis"), ("/fr/faq", "/faq")]:
+        r = page.request.get(BASE + old, max_redirects=0)
+        assert r.status == 301, f"{old} : statut {r.status}"
+        assert r.headers["location"].endswith(new), f"{old} → {r.headers['location']}"
+    r = page.request.get(BASE + "/page-qui-nexiste-pas", max_redirects=0)
+    assert r.status == 404, f"page inconnue : statut {r.status}"
+
+
+@step("Menu du site : la section visée n'est pas cachée sous l'en-tête")
+def anchor_offset(page):
+    page.goto(BASE + "/", wait_until="networkidle")
+    href = page.locator(".site-header a[href^='/#']").first.get_attribute("href")
+    page.goto(BASE + href, wait_until="networkidle")
+    page.wait_for_timeout(1200)
+    header = page.locator(".site-header").bounding_box()
+    title = page.locator(f"[id='{href[2:]}'] h2").first.bounding_box()
+    assert title["y"] >= header["y"] + header["height"] - 1, f"titre à {title['y']:.0f}px, en-tête jusqu'à {header['y'] + header['height']:.0f}px"
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -121,10 +144,12 @@ with sync_playwright() as p:
     results(page)
     mobile_menu(browser, state)
     quote_validation(page)
+    legacy_redirects(page)
+    anchor_offset(page)
     browser.close()
 
 if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu")
