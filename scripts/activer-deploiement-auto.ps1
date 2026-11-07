@@ -71,15 +71,32 @@ if (-not $appId) {
 $sp = Invoke-AzCli ad sp list --filter "appId eq '$appId'" --query '[0].id' -o tsv
 if (-not $sp) { [void](Invoke-AzCli ad sp create --id $appId); Ok 'Principal de service créé' }
 
-$sujet = "repo:${Depot}:environment:production"
-$existants = Invoke-AzCli ad app federated-credential list --id $appId --query '[].subject' -o tsv
-if ($existants -notcontains $sujet) {
+# GitHub présente l'un ou l'autre format selon le dépôt : nom (repo:proprio/depot:...) ou identifiants
+# immuables (repo:proprio@id/depot@id:...). Les deux sont enregistrés.
+$sujets = @("repo:${Depot}:environment:production")
+try {
+    $infos = Invoke-RestMethod -Uri "https://api.github.com/repos/$Depot" -Headers @{ 'User-Agent' = 'hub-deploiement' }
+    $sujets += "repo:$($infos.owner.login)@$($infos.owner.id)/$($infos.name)@$($infos.id):environment:production"
+} catch { Write-Host '    (identifiants GitHub introuvables : format par nom seulement)' -ForegroundColor Yellow }
+
+$existants = @(Invoke-AzCli ad app federated-credential list --id $appId --query '[].subject' -o tsv)
+$n = 0
+foreach ($sujet in $sujets) {
+    $n++
+    if ($existants -contains $sujet) { continue }
     $fichier = Join-Path $env:TEMP 'hub-federation.json'
-    @{ name = 'github-production'; issuer = 'https://token.actions.githubusercontent.com'; subject = $sujet; audiences = @('api://AzureADTokenExchange') } |
+    @{ name = "github-production-$n"; issuer = 'https://token.actions.githubusercontent.com'; subject = $sujet; audiences = @('api://AzureADTokenExchange') } |
         ConvertTo-Json | Set-Content -Path $fichier -Encoding ASCII
-    [void](Invoke-AzCli ad app federated-credential create --id $appId --parameters "@$fichier")
+    try { [void](Invoke-AzCli ad app federated-credential create --id $appId --parameters "@$fichier") }
+    catch {
+        # Nom déjà pris par un enregistrement précédent : on en choisit un autre.
+        @{ name = "github-production-$n-$(Get-Random)"; issuer = 'https://token.actions.githubusercontent.com'; subject = $sujet; audiences = @('api://AzureADTokenExchange') } |
+            ConvertTo-Json | Set-Content -Path $fichier -Encoding ASCII
+        [void](Invoke-AzCli ad app federated-credential create --id $appId --parameters "@$fichier")
+    }
     Remove-Item $fichier -ErrorAction SilentlyContinue
 }
+$sujet = $sujets -join ' ; '
 Ok "GitHub ($sujet) peut se connecter sans secret"
 
 Etape 'Droit de déploiement (sur ce site seulement)'
