@@ -152,6 +152,9 @@ namespace Hub.Modules.Platform.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<DateOnly?>("LastWeeklyReportOn")
+                        .HasColumnType("date");
+
                     b.Property<string>("LogoUrl")
                         .HasColumnType("nvarchar(max)");
 
@@ -218,6 +221,9 @@ namespace Hub.Modules.Platform.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("WeeklyReport")
+                        .HasColumnType("bit");
 
                     b.Property<string>("WhatsAppNumber")
                         .HasColumnType("nvarchar(max)");
