@@ -8,15 +8,12 @@ ressources en erreur. Une capture de chaque page est enregistrée pour la relect
 
 Usage : python3 visual.py http://localhost:5080 dossier-captures
 """
-import base64
-import hashlib
-import hmac
 import json
 import os
-import struct
 import sys
-import time
 import traceback
+
+from common import session
 
 from playwright.sync_api import sync_playwright
 
@@ -49,7 +46,7 @@ PUBLIC = [
 ADMIN = [
     ("admin-tableau", "/admin"),
     ("admin-demandes", "/admin/demandes"),
-    ("admin-demande", "first:/admin/demandes|a[href^='/admin/demandes/']"),
+    ("admin-demande", "first:/admin/demandes|td a[href^='/admin/demandes/']"),
     ("admin-horaires", "/admin/horaires"),
     ("admin-publications", "/admin/publications"),
     ("admin-publication", "first:/admin/publications|td a[href^='/admin/publications/']"),
@@ -144,7 +141,8 @@ def audit(page, state, label, name, url, problems):
     page.goto(url, wait_until="networkidle")
     page.wait_for_timeout(1200 if "/admin" in url else 500)
     found = page.evaluate(CHECKS)
-    found += [f"erreur JavaScript : {e[:160]}" for e in state["errors"]]
+    # La page 404 annonce volontairement son code 404 : ce n'est pas une erreur.
+    found += [f"erreur JavaScript : {e[:160]}" for e in state["errors"] if not (name == "404" and "404" in e)]
     found += [f"ressource en erreur : {b}" for b in state["bad"]]
     page.screenshot(path=f"{OUT}/{label}-{name}.png", full_page=True)
     for f in found:
@@ -160,41 +158,13 @@ def watch(page):
     return state
 
 
-def totp(secret):
-    key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))
-    digest = hmac.new(key, struct.pack(">Q", int(time.time() // 30)), hashlib.sha1).digest()
-    offset = digest[-1] & 0x0F
-    return f"{(struct.unpack('>I', digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000:06d}"
-
-
-def login(browser):
-    """Une seule connexion (avec le code à 6 chiffres si la double vérification est active), réutilisée partout."""
-    ctx = browser.new_context(locale="fr-CA")
-    page = ctx.new_page()
-    page.goto(BASE + "/compte/connexion", wait_until="networkidle")
-    page.fill("#email", "admin@smoke.test")
-    page.fill("#password", "SmokeTest-Password-2026")
-    page.click("button[type=submit]")
-    page.wait_for_url(lambda u: "/admin" in u or "connexion-2fa" in u, timeout=20000)
-    if "connexion-2fa" in page.url:
-        with open("/tmp/hub-totp-secret") as f:
-            secret = f.read().strip()
-        time.sleep(31 - (time.time() % 30))  # un code neuf : le précédent a déjà servi
-        page.fill("#code", totp(secret))
-        page.click("button[type=submit]")
-        page.wait_for_url("**/admin", timeout=20000)
-    state = ctx.storage_state()
-    ctx.close()
-    return state
-
-
 problems = []
 with sync_playwright() as p:
     browser = p.chromium.launch()
-    session = login(browser)
+    state_file = session(browser, BASE)
     for label, viewport, mobile in VIEWPORTS:
         ctx = browser.new_context(viewport=viewport, is_mobile=mobile, has_touch=mobile, device_scale_factor=1,
-                                  locale="fr-CA", storage_state=session)
+                                  locale="fr-CA", storage_state=state_file)
         page = ctx.new_page()
         state = watch(page)
         for name, path in PUBLIC + ADMIN:

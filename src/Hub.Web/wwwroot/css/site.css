@@ -263,7 +263,8 @@ h1:focus, h1:focus-visible { outline: none; }
 .consent[hidden] { display: none; }
 .consent-inner { max-width: 640px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 16px 48px rgba(15,37,51,.18); padding: 20px 22px; font-size: .92rem; }
 .consent-inner p { margin-bottom: .6em; }
-.consent-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.consent-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.consent-inner { width: 100%; min-width: 0; }
 
 @media (max-width: 1240px) {
     .main-nav { display: none; }
@@ -309,3 +310,9 @@ h1:focus, h1:focus-visible { outline: none; }
 .credit-result dt { font-size: .8rem; color: var(--muted); }
 .credit-result dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 .credit-result .credit-net { border: 2px solid var(--green); }
+
+/* Téléphones : un long bouton passe à la ligne plutôt que de sortir de l'écran. */
+@media (max-width: 640px) {
+    .btn-block, .btn-lg, .consent-actions .btn { white-space: normal; text-align: center; }
+    .consent-actions .btn { flex: 1 1 auto; }
+}
