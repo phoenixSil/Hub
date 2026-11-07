@@ -98,6 +98,10 @@ jobs:
           python3 -m playwright install --with-deps chromium > /dev/null
           python3 .github/smoke/screens.py http://localhost:5080 apercus
 
+      - name: Tests visuels (bureau, tablette, mobile)
+        if: always()
+        run: python3 .github/e2e/visual.py http://localhost:5080 apercus
+
       - name: Courriel de proposition envoyé
         if: success()
         run: |
