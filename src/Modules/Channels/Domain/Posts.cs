@@ -59,6 +59,9 @@ public sealed class Post : TenantEntity
 
     /// <summary>Type de sujet (Promotion, Service, Conseil, Saison, Aînés). Sert aux résultats.</summary>
     public string? Theme { get; set; }
+
+    /// <summary>Pilier de contenu du plan marketing (Conseiller, Montrer, Rassurer, Proposer…).</summary>
+    public string? Pillar { get; set; }
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

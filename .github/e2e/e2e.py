@@ -8,6 +8,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 5. Le formulaire de devis public refuse un envoi vide et affiche les erreurs.
 6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
+8. Le plan marketing se crée, se lance (le pilote passe au rythme du plan) et relève les chiffres.
 
 Usage : python3 e2e.py http://localhost:5080
 """
@@ -133,6 +134,25 @@ def anchor_offset(page):
     assert title["y"] >= header["y"] + header["height"] - 1, f"titre à {title['y']:.0f}px, en-tête jusqu'à {header['y'] + header['height']:.0f}px"
 
 
+@step("Plan marketing : créé, lancé, chiffres relevés")
+def marketing_plan(page):
+    page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
+    page.wait_for_timeout(800)
+    if page.locator("text=Créer le plan").count() > 0:
+        page.locator("button", has_text="Créer le plan").click()
+        expect(page.locator("text=Plan créé en brouillon")).to_be_visible(timeout=15000)
+    if page.locator("button", has_text="Lancer le plan").count() > 0:
+        page.locator("button", has_text="Lancer le plan").click()
+        expect(page.locator("text=Plan lancé")).to_be_visible(timeout=15000)
+    expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
+    expect(page.locator(".plan-phase")).to_have_count(3)
+    expect(page.locator(".plan-mix tbody tr")).to_have_count(4)
+    page.locator("button", has_text="Relever les chiffres").click()
+    expect(page.locator(".alert-success, .alert-error").first).to_be_visible(timeout=30000)
+    page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
+    expect(page.locator("select").first).to_have_value("7")
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -146,10 +166,11 @@ with sync_playwright() as p:
     quote_validation(page)
     legacy_redirects(page)
     anchor_offset(page)
+    marketing_plan(page)
     browser.close()
 
 if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing")

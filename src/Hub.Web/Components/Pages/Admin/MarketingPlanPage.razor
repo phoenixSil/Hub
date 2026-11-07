@@ -1,0 +1,383 @@
+@page "/admin/plan-marketing"
+@rendermode InteractiveServer
+@inject IMarketingPlanService Plans
+@inject TimeProvider Clock
+
+<PageTitle>Plan marketing</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Plan marketing</h1>
+        <p class="muted">
+            L'objectif, les étapes, les thèmes et la répartition des contenus pour les prochains mois.
+            Le pilote automatique suit ce plan chaque semaine. Les chiffres des réseaux sont relevés chaque jour,
+            et les ajustements proposés ne s'appliquent qu'avec votre accord.
+        </p>
+    </div>
+    @if (view is { Status: PlanStatus.Active })
+    {
+        <BusyButton OnClick="RefreshAsync" IsBusy="@(action == "refresh")" BusyText="Relevé en cours…" Class="btn btn-outline">Relever les chiffres</BusyButton>
+    }
+</div>
+
+@if (working is not null)
+{
+    <div class="alert alert-info busy-banner" role="status"><span class="spinner" aria-hidden="true"></span> @working</div>
+}
+else if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+}
+
+@if (!loaded)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (view is null || view.Status == PlanStatus.Completed && creating)
+{
+    <div class="admin-card plan-create">
+        <h2>Créer le plan « Visibilité sur les réseaux »</h2>
+        <p>Trois étapes sur 13 semaines : <strong>se faire connaître</strong>, <strong>accélérer</strong>, <strong>amplifier</strong>.
+           Les thèmes suivent la saison et quatre piliers de contenu se partagent les publications :
+           conseiller 35 %, montrer 25 %, rassurer 20 % et proposer 20 %. Tout reste modifiable.</p>
+        <div class="field-row">
+            <div class="field">
+                <label for="plan-start">Début</label>
+                <input id="plan-start" type="date" @bind="startsOn" />
+            </div>
+            <div class="field">
+                <label for="plan-rythm">Publications par semaine</label>
+                <select id="plan-rythm" @bind="postsPerWeek">
+                    @for (var n = 3; n <= 7; n++) { var v = n; <option value="@v">@v</option> }
+                </select>
+            </div>
+        </div>
+        <BusyButton OnClick="CreateAsync" IsBusy="@(action == "create")" BusyText="Création…">Créer le plan</BusyButton>
+    </div>
+}
+else
+{
+    var v = view;
+    <div class="plan-status">
+        <span class="status status-@(v.Status == PlanStatus.Active ? "active" : v.Status == PlanStatus.Draft ? "approval" : "lost")">@StatusLabel(v.Status)</span>
+        <strong>@v.Name</strong>
+        <span class="muted">
+            @AdminFormat.Day(v.StartsOn) → @AdminFormat.Day(v.EndsOn) · @v.PostsPerWeek publications par semaine
+            @if (v.Status == PlanStatus.Active && v.Week > 0) { <text> · semaine @v.Week sur @v.TotalWeeks</text> }
+        </span>
+        @if (v.Status == PlanStatus.Draft)
+        {
+            <span class="plan-status-actions">
+                <BusyButton OnClick="ActivateAsync" IsBusy="@(action == "activate")" BusyText="Lancement…">Lancer le plan</BusyButton>
+                <button class="btn btn-ghost btn-sm" @onclick="DeleteDraftAsync" disabled="@busy">Supprimer le brouillon</button>
+            </span>
+        }
+        else if (v.Status == PlanStatus.Completed)
+        {
+            <span class="plan-status-actions"><button class="btn btn-outline btn-sm" @onclick="() => creating = true">Préparer un nouveau plan</button></span>
+        }
+    </div>
+
+    @if (v.Status == PlanStatus.Draft)
+    {
+        <div class="alert alert-info">
+            En lançant le plan, le pilote automatique est activé au rythme du plan. Facebook et Instagram sont utilisés s'ils sont connectés.
+            Pendant le premier mois, chaque publication attend votre accord.
+        </div>
+    }
+
+    @if (v.ProposedTargets is not null || v.ProposedPillars is not null || v.SuggestAutoPublish)
+    {
+        <div class="admin-card plan-proposals">
+            <h2>À approuver</h2>
+            @if (v.ProposalNote is not null) { <p>@v.ProposalNote</p> }
+            @if (v.ProposedTargets is { } t)
+            {
+                <div class="plan-proposal">
+                    <div>
+                        <strong>Cibles de fin de plan</strong>
+                        <p class="muted">@t.WeeklyReach.ToString("N0", Fr) personnes atteintes par semaine · @t.Followers.ToString("N0", Fr) abonnés · @Pct(t.EngagementRate) d'interaction</p>
+                    </div>
+                    <BusyButton OnClick="ApproveTargetsAsync" IsBusy="@(action == "targets")" BusyText="…">Approuver les cibles</BusyButton>
+                </div>
+            }
+            @if (v.ProposedPillars is { } pp)
+            {
+                <div class="plan-proposal">
+                    <div>
+                        <strong>Nouvelle répartition des contenus</strong>
+                        <p class="muted">@string.Join(" · ", pp.Select(p => $"{p.Name} {p.Share} %"))</p>
+                    </div>
+                    <span class="actions">
+                        <BusyButton OnClick="ApprovePillarsAsync" IsBusy="@(action == "pillars")" BusyText="…">Appliquer</BusyButton>
+                        <button class="btn btn-ghost btn-sm" @onclick="DismissAsync" disabled="@busy">Garder l'actuelle</button>
+                    </span>
+                </div>
+            }
+            @if (v.SuggestAutoPublish)
+            {
+                <div class="plan-proposal">
+                    <div>
+                        <strong>Passer en publication automatique ?</strong>
+                        <p class="muted">Le premier mois est écoulé. Si la qualité des publications vous convient, elles peuvent partir seules à l'heure prévue. Le résumé du lundi continue de vous informer.</p>
+                    </div>
+                    <BusyButton OnClick="AutoPublishAsync" IsBusy="@(action == "auto")" BusyText="…">Publier sans me demander</BusyButton>
+                </div>
+            }
+        </div>
+    }
+
+    @if (v.InsightsNote is not null)
+    {
+        <div class="alert alert-warning">Chiffres incomplets : @v.InsightsNote</div>
+    }
+
+    <div class="kpi-grid plan-kpis">
+        @Kpi("Personnes atteintes (7 jours)", v.Current.WeeklyReach.ToString("N0", Fr), v.Baseline?.WeeklyReach.ToString("N0", Fr), v.Targets?.WeeklyReach.ToString("N0", Fr), v.Expected is null ? null : v.Current.WeeklyReach >= v.Expected.WeeklyReach * 0.9)
+        @Kpi("Abonnés (Facebook + Instagram)", v.Current.Followers.ToString("N0", Fr), v.Baseline?.Followers.ToString("N0", Fr), v.Targets?.Followers.ToString("N0", Fr), v.Expected is null ? null : v.Current.Followers >= v.Expected.Followers * 0.97)
+        @Kpi("Taux d'interaction (28 jours)", Pct(v.Current.EngagementRate), v.Baseline is null ? null : Pct(v.Baseline.EngagementRate), v.Targets is null ? null : Pct(v.Targets.EngagementRate), v.Expected is null ? null : v.Current.EngagementRate >= v.Expected.EngagementRate * 0.9)
+    </div>
+    @if (v.Baseline is null && v.Status == PlanStatus.Active)
+    {
+        <p class="muted small">Le point de départ est mesuré après la première semaine du plan. Des cibles réalistes vous sont ensuite proposées.</p>
+    }
+    else if (v.Expected is { } e)
+    {
+        <p class="muted small">Trajectoire visée aujourd'hui : @e.WeeklyReach.ToString("N0", Fr) personnes atteintes par semaine et @e.Followers.ToString("N0", Fr) abonnés.
+            @(v.OnTrack == true ? "Le plan est dans les temps." : "Le plan prend du retard : le pilote mise davantage sur ce qui atteint le plus de monde.")</p>
+    }
+
+    <div class="admin-card">
+        <h2>Étapes</h2>
+        <div class="plan-timeline" role="list">
+            @foreach (var p in v.Phases)
+            {
+                var days = Math.Max(1, p.To.DayNumber - p.From.DayNumber + 1);
+                var isCurrent = v.CurrentPhase == p;
+                <div role="listitem" class="plan-phase @(isCurrent ? "is-current" : today > p.To ? "is-done" : null)" style="flex-grow:@days">
+                    <span class="plan-phase-dates">@AdminFormat.Day(p.From) → @AdminFormat.Day(p.To)</span>
+                    <strong>@p.Name</strong>
+                    <span>@p.Focus</span>
+                    <span class="plan-theme">Thème : @p.Theme</span>
+                    @if (isCurrent) { <span class="plan-now" style="left:@NowPosition(p)%"></span> }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="admin-columns">
+        <div class="admin-card">
+            <h2>Semaine par semaine</h2>
+            @if (v.Weeks.Count == 0)
+            {
+                <p class="muted">Les chiffres apparaîtront dès la première semaine du plan.</p>
+            }
+            else
+            {
+                var max = Math.Max(1, v.Weeks.Max(w => w.Reach));
+                <div class="bar-chart" aria-label="Personnes atteintes par semaine">
+                    @foreach (var w in v.Weeks)
+                    {
+                        <div class="bar-col" title="Semaine du @AdminFormat.Day(w.WeekOf) : @w.Posts publication(s), @w.Reach.ToString("N0", Fr) personnes atteintes, @w.Interactions interactions">
+                            <div class="bar" style="height:@((100.0 * w.Reach / max).ToString("0.#", CultureInfo.InvariantCulture))%"></div>
+                        </div>
+                    }
+                </div>
+                <div class="bar-axis"><span>@AdminFormat.Day(v.Weeks[0].WeekOf)</span><span>personnes atteintes par semaine</span><span>@AdminFormat.Day(v.Weeks[^1].WeekOf)</span></div>
+            }
+        </div>
+
+        <div class="admin-card">
+            <h2>Répartition des contenus</h2>
+            <table class="admin-table compare-table plan-mix">
+                <thead><tr><th>Pilier</th><th class="num">Visée</th><th>Réelle</th><th class="num">Atteintes / publ.</th></tr></thead>
+                <tbody>
+                    @foreach (var m in v.Mix)
+                    {
+                        <tr>
+                            <td title="@v.Pillars.FirstOrDefault(p => p.Name == m.Name)?.Description">@m.Name</td>
+                            <td class="num">@m.TargetShare %</td>
+                            <td>
+                                <div class="meter" title="@m.Posts publication(s)">
+                                    <div style="width:@(Math.Min(100, m.ActualShare).ToString("0.#", CultureInfo.InvariantCulture))%"></div>
+                                    <span>@m.ActualShare.ToString("0", Fr) %</span>
+                                </div>
+                            </td>
+                            <td class="num">@(m.AvgReach > 0 ? m.AvgReach.ToString("N0", Fr) : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="muted small">La part réelle compte les publications du plan déjà parues ou prévues.</p>
+        </div>
+    </div>
+
+    @if (form is not null && v.Status != PlanStatus.Completed)
+    {
+        <details class="admin-card plan-edit" open="@(v.Status == PlanStatus.Draft)">
+            <summary><h2>Modifier le plan</h2></summary>
+            <div class="field-row">
+                <div class="field">
+                    <label for="plan-name">Nom</label>
+                    <input id="plan-name" @bind="form.Name" />
+                    <FieldError Errors="errors" For="Name" />
+                </div>
+                <div class="field">
+                    <label for="plan-posts">Publications par semaine</label>
+                    <select id="plan-posts" @bind="form.PostsPerWeek">
+                        @for (var n = 1; n <= 7; n++) { var x = n; <option value="@x">@x</option> }
+                    </select>
+                    <FieldError Errors="errors" For="PostsPerWeek" />
+                </div>
+            </div>
+
+            <h3>Étapes</h3>
+            <FieldError Errors="errors" For="Phases" />
+            @foreach (var p in form.Phases)
+            {
+                <div class="plan-edit-block">
+                    <div class="field-row">
+                        <div class="field"><label>Nom</label><input @bind="p.Name" /></div>
+                        <div class="field"><label>Du</label><input type="date" @bind="p.From" /></div>
+                        <div class="field"><label>Au</label><input type="date" @bind="p.To" /></div>
+                    </div>
+                    <div class="field"><label>Ce qu'on cherche à faire</label><textarea rows="2" @bind="p.Focus"></textarea></div>
+                    <div class="field"><label>Thème de la période</label><input @bind="p.Theme" /></div>
+                </div>
+            }
+
+            <h3>Piliers de contenu <span class="muted small">(total : @form.Pillars.Sum(p => p.Share) %)</span></h3>
+            <FieldError Errors="errors" For="Pillars" />
+            @foreach (var p in form.Pillars)
+            {
+                <div class="plan-edit-pillar">
+                    <div class="field"><label>Nom</label><input @bind="p.Name" /></div>
+                    <div class="field"><label>Part (%)</label><input type="number" min="0" max="100" @bind="p.Share" /></div>
+                    <div class="field plan-edit-desc"><label>Description</label><input @bind="p.Description" /></div>
+                </div>
+            }
+            <div class="actions">
+                <BusyButton OnClick="SaveAsync" IsBusy="@(action == "save")" BusyText="Enregistrement…">Enregistrer le plan</BusyButton>
+            </div>
+        </details>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
+    private MarketingPlanView? view;
+    private MarketingPlanForm? form;
+    private IReadOnlyDictionary<string, string>? errors;
+    private bool loaded;
+    private bool creating;
+    private DateOnly today;
+    private DateOnly startsOn;
+    private int postsPerWeek = 7;
+    private string? working;
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = Hub.SharedKernel.Time.BusinessTime.Today(Clock);
+        // Par défaut : le lundi qui vient.
+        startsOn = today.AddDays(((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7 is 0 ? 7 : ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        view = await Plans.GetAsync();
+        form = await Plans.GetFormAsync();
+        loaded = true;
+    }
+
+    private Task CreateAsync() => RunAsync("create", "Création du plan…", async () =>
+    {
+        var r = await Plans.CreateAsync(startsOn, postsPerWeek);
+        if (r.IsSuccess) creating = false;
+        return (r, "Plan créé en brouillon : relisez-le, ajustez-le au besoin, puis lancez-le.");
+    });
+
+    private Task ActivateAsync() => RunAsync("activate", "Lancement du plan…", async () =>
+        (await Plans.ActivateAsync(), "Plan lancé : le pilote automatique le suit dès sa prochaine préparation. Les publications vous attendent dans « Publications »."));
+
+    private Task DeleteDraftAsync() => RunAsync("delete", "Suppression du brouillon…", async () =>
+        (await Plans.DeleteDraftAsync(), "Brouillon supprimé."));
+
+    private Task SaveAsync() => RunAsync("save", "Enregistrement du plan…", async () =>
+    {
+        var r = await Plans.SaveAsync(form!);
+        errors = r.FieldErrors;
+        return (r, "Plan enregistré.");
+    }, reloadForm: false);
+
+    private Task ApproveTargetsAsync() => RunAsync("targets", "Enregistrement des cibles…", async () =>
+        (await Plans.ApproveTargetsAsync(), "Cibles approuvées : la trajectoire est suivie chaque semaine."));
+
+    private Task ApprovePillarsAsync() => RunAsync("pillars", "Application de la nouvelle répartition…", async () =>
+        (await Plans.ApprovePillarsAsync(), "Nouvelle répartition appliquée aux prochaines publications."));
+
+    private Task DismissAsync() => RunAsync("dismiss", "…", async () =>
+        (await Plans.DismissProposalAsync(), "Répartition actuelle conservée."));
+
+    private Task AutoPublishAsync() => RunAsync("auto", "…", async () =>
+        (await Plans.EnableAutoPublishAsync(), "Les publications du pilote partiront désormais seules à l'heure prévue."));
+
+    private Task RefreshAsync() => RunAsync("refresh", "Relevé des chiffres auprès de Facebook et d'Instagram…", async () =>
+        (await Plans.RefreshAsync(), "Chiffres à jour."));
+
+    private async Task RunAsync(string name, string message, Func<Task<(Result Result, string Success)>> work, bool reloadForm = true)
+    {
+        if (busy) return;
+        busy = true;
+        action = name;
+        working = message;
+        feedback = null;
+        await Task.Yield();
+        try
+        {
+            var (result, success) = await work();
+            feedbackIsError = result.IsFailure;
+            feedback = result.IsSuccess ? success : result.Error ?? "Vérifiez les champs signalés.";
+            if (result.IsSuccess)
+            {
+                view = await Plans.GetAsync();
+                if (reloadForm) form = await Plans.GetFormAsync();
+            }
+        }
+        finally
+        {
+            busy = false;
+            action = null;
+            working = null;
+        }
+    }
+
+    private double NowPosition(PlanPhase p) =>
+        Math.Clamp(100.0 * (today.DayNumber - p.From.DayNumber) / Math.Max(1, p.To.DayNumber - p.From.DayNumber), 0, 100);
+
+    private static string Pct(double v) => v.ToString("0.#", Fr) + " %";
+
+    private static string StatusLabel(PlanStatus s) => s switch
+    {
+        PlanStatus.Active => "En cours",
+        PlanStatus.Draft => "Brouillon",
+        _ => "Terminé",
+    };
+
+    private static RenderFragment Kpi(string label, string value, string? baseline, string? target, bool? onTrack) => __builder =>
+    {
+        <div class="kpi @(onTrack == true ? "kpi-accent" : null)">
+            <span>@label</span>
+            <strong>@value</strong>
+            <small class="muted">
+                @(baseline is null ? "Départ : à mesurer" : $"Départ : {baseline}")
+                @(target is null ? "" : $" · Cible : {target}")
+            </small>
+            @if (onTrack == false) { <small class="plan-late">En retard sur la trajectoire</small> }
+        </div>
+    };
+}

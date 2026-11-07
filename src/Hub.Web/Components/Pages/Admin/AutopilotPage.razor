@@ -43,7 +43,7 @@ else
                     <select @bind="form.PostsPerWeek">
                         @for (var n = 1; n <= 7; n++) { var v = n; <option value="@v">@v</option> }
                     </select>
-                    <span class="muted small">3 à 5 par semaine est idéal : davantage fatigue les abonnés et Facebook montre moins vos publications.</span>
+                    <span class="muted small">3 à 5 par semaine pour entretenir la présence ; jusqu'à une par jour pour un objectif de visibilité (voir le Plan marketing, qui règle ce rythme).</span>
                     <FieldError Errors="errors" For="PostsPerWeek" />
                 </div>
                 <div class="field">

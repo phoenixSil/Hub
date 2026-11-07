@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
 using Hub.SharedKernel;
 using Hub.SharedKernel.Email;
@@ -82,7 +83,8 @@ internal sealed class AutopilotRunner(
             var context = await source.GetAsync(ct);
             var history = await HistoryAsync(db, ct);
             var audiences = AutopilotService.ReadAudiences(settings.AudiencesJson);
-            var plan = await planner.PlanAsync(new AutopilotPlanRequest(context, audiences, slots, history, settings.Guidelines, now), ct);
+            var brief = await BriefAsync(db, slots, ct);
+            var plan = await planner.PlanAsync(new AutopilotPlanRequest(context, audiences, slots, history, settings.Guidelines, now, brief), ct);
             if (plan.IsFailure)
             {
                 problems.Add(plan.Error!);
@@ -120,6 +122,7 @@ internal sealed class AutopilotRunner(
         // Le public n'est transmis qu'à l'IA : les modèles de texte sans IA reprendraient la consigne mot pour mot.
         var details = writer.UsesAi
             ? $"{item.Angle}\nPublic visé : {item.Audience}{(audience is null ? "" : " — " + audience.Description)}. Adresse-toi à ce public."
+              + (item.Pillar is null ? "" : $"\nPilier de contenu : {item.Pillar}.")
             : item.Angle;
         var text = await writer.SuggestAsync(new PostIdea(context.CompanyName, context.City, item.Topic, details, item.Tone, ChannelType.Facebook), ct);
         if (text.IsFailure) { problems.Add(text.Error!); return null; }
@@ -153,6 +156,7 @@ internal sealed class AutopilotRunner(
             Audience = item.Audience.Truncate(100),
             VisualKind = imageUrl is null ? null : visualKind,
             Theme = item.Style,
+            Pillar = item.Pillar?.Truncate(40),
             FromAutopilot = true,
             CreatedBy = Author,
             AiModel = suggestion.Model,
@@ -163,19 +167,49 @@ internal sealed class AutopilotRunner(
         return (post, channels.Select(c => new PostTarget { PostId = post.Id, Channel = c }).ToList());
     }
 
+    /// <summary>
+    /// Plan marketing actif à cette date : l'étape en cours et le pilier de chaque créneau,
+    /// choisi pour se rapprocher de la répartition visée sur l'étape.
+    /// </summary>
+    private async Task<PlanBrief?> BriefAsync(ChannelsDbContext db, IReadOnlyList<DateTimeOffset> slots, CancellationToken ct)
+    {
+        var plan = await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Status == PlanStatus.Active, ct);
+        if (plan is null || slots.Count == 0) return null;
+        var day = AutopilotSchedule.LocalDay(slots[0]);
+        var phase = PlanLogic.PhaseAt(PlanLogic.Phases(plan.PhasesJson), day);
+        if (phase is null) return null;
+        var pillars = PlanLogic.Pillars(plan.PillarsJson);
+        var from = BusinessTime.FromLocal(phase.From.ToDateTime(TimeOnly.MinValue));
+        var to = BusinessTime.FromLocal(phase.To.AddDays(1).ToDateTime(TimeOnly.MinValue));
+        var used = await db.Posts.AsNoTracking()
+            .Where(p => p.Pillar != null && p.Status != PostStatus.Cancelled && p.Status != PostStatus.Failed
+                        && (p.ScheduledAt ?? p.PublishedAt) >= from && (p.ScheduledAt ?? p.PublishedAt) < to)
+            .GroupBy(p => p.Pillar!)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Key, g => g.Count, ct);
+        return new PlanBrief(plan.Objective, phase, pillars, PlanLogic.AssignPillars(pillars, used, slots.Count));
+    }
+
     private async Task<IReadOnlyList<AutopilotHistory>> HistoryAsync(ChannelsDbContext db, CancellationToken ct)
     {
         var recent = await db.Posts.AsNoTracking()
             .Where(p => p.Status == PostStatus.Published || p.Status == PostStatus.PartiallyPublished)
             .OrderByDescending(p => p.PublishedAt).Take(30)
-            .Select(p => new { p.Title, p.Audience, p.PublishedAt, p.Campaign, p.Theme })
+            .Select(p => new { p.Id, p.Title, p.Audience, p.PublishedAt, p.Campaign, p.Theme, p.Pillar })
             .ToListAsync(ct);
         if (recent.Count == 0) return [];
         var results = await source.GetResultsAsync(recent.Select(p => p.Campaign).ToList(), ct);
+        var ids = recent.Select(p => p.Id).ToList();
+        var stats = await db.PostStats.AsNoTracking().Where(s => ids.Contains(s.PostId))
+            .GroupBy(s => s.PostId)
+            .Select(g => new { PostId = g.Key, Reach = g.Sum(s => s.Reach), Interactions = g.Sum(s => s.Interactions) })
+            .ToDictionaryAsync(s => s.PostId, ct);
         return recent.Select(p =>
         {
             var r = results.GetValueOrDefault(p.Campaign);
-            return new AutopilotHistory(p.Title, p.Audience, p.PublishedAt, r.Visits, r.Leads, r.Won, p.Theme);
+            var s = stats.GetValueOrDefault(p.Id);
+            return new AutopilotHistory(p.Title, p.Audience, p.PublishedAt, r.Visits, r.Leads, r.Won, p.Theme,
+                s?.Reach ?? 0, s?.Interactions ?? 0, p.Pillar);
         }).ToList();
     }
 

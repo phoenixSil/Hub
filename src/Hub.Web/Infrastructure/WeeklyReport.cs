@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using Hub.Modules.Channels.Application.Planning;
+using Hub.Modules.Channels.Domain;
 using Hub.Modules.Platform.Application;
 using Hub.SharedKernel.Email;
 using Hub.SharedKernel.Tenancy;
@@ -12,7 +14,7 @@ public static class WeeklyReportEmail
 {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
 
-    public static (string Subject, string Html) Build(MarketingReport r, string companyName, string? siteUrl, string color)
+    public static (string Subject, string Html) Build(MarketingReport r, string companyName, string? siteUrl, string color, MarketingPlanView? plan = null)
     {
         string E(string? s) => WebUtility.HtmlEncode(s ?? "");
         var link = $"{(siteUrl ?? "").TrimEnd('/')}/admin/resultats";
@@ -35,6 +37,7 @@ public static class WeeklyReportEmail
               <table role="presentation" cellspacing="6" style="width:100%;border-collapse:separate"><tr>
                 {Tile("publications", r.PostCount)}{Tile("visites", r.Visits)}{Tile("demandes", r.Leads)}{Tile("rendez-vous", r.Appointments)}{Tile("clients gagnés", r.Won)}
               </tr></table>
+              {PlanSection(plan, siteUrl, color)}
               {best}
               {tip}
               <p style="margin:22px 0"><a href="{E(link)}" style="background:{E(color)};color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;font-weight:700">Voir tous les résultats</a></p>
@@ -45,6 +48,38 @@ public static class WeeklyReportEmail
             ? $"Votre semaine : {r.Leads} demande(s), {r.Visits} visite(s) venues des réseaux"
             : $"Votre semaine : {r.PostCount} publication(s), {r.Visits} visite(s) venues des réseaux";
         return (subject, html);
+    }
+
+    /// <summary>Où en est le plan marketing : chiffres de la semaine, cibles, trajectoire, et ce qui attend un accord.</summary>
+    public static string PlanSection(MarketingPlanView? plan, string? siteUrl, string color)
+    {
+        if (plan is null || plan.Status != PlanStatus.Active) return "";
+        string E(string? s) => WebUtility.HtmlEncode(s ?? "");
+        string N(int v) => v.ToString("N0", Fr);
+        var c = plan.Current;
+        var lines = new List<string>
+        {
+            $"Personnes atteintes cette semaine : <strong>{N(c.WeeklyReach)}</strong>{(plan.Targets is { } t1 ? $" (cible {N(t1.WeeklyReach)})" : "")}",
+            $"Abonnés : <strong>{N(c.Followers)}</strong>{(plan.Targets is { } t2 ? $" (cible {N(t2.Followers)})" : "")}",
+            $"Taux d'interaction : <strong>{c.EngagementRate.ToString("0.#", Fr)} %</strong>",
+        };
+        var status = plan.OnTrack switch
+        {
+            true => "<span style=\"color:#145a10\">Le plan est dans les temps.</span>",
+            false => "<span style=\"color:#b42318\">Le plan prend du retard sur la trajectoire visée.</span>",
+            _ => plan.Baseline is null ? "Le point de départ sera mesuré après la première semaine." : "",
+        };
+        var pending = plan.ProposedTargets is not null || plan.ProposedPillars is not null || plan.SuggestAutoPublish
+            ? $"""<p style="margin:8px 0 0"><a href="{E((siteUrl ?? "").TrimEnd('/') + "/admin/plan-marketing")}" style="color:{E(color)};font-weight:700">Une proposition attend votre accord dans le plan marketing.</a></p>"""
+            : "";
+        return $"""
+            <div style="margin:18px 0 0;padding:14px 16px;background:#f4f7fa;border-radius:8px">
+              <p style="margin:0 0 6px;font-weight:700">Plan marketing — {E(plan.CurrentPhase?.Name ?? "en cours")} (semaine {plan.Week} sur {plan.TotalWeeks})</p>
+              <p style="margin:0;line-height:1.6">{string.Join("<br>", lines)}</p>
+              <p style="margin:8px 0 0">{status}</p>
+              {pending}
+            </div>
+            """;
     }
 }
 
@@ -88,12 +123,13 @@ public sealed class WeeklyReportWorker(IServiceScopeFactory scopes, TimeProvider
             await using var scope = scopes.CreateAsyncScope();
             scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenant.Id);
             var report = await scope.ServiceProvider.GetRequiredService<IMarketingResults>().GetAsync(7, ct);
+            var plan = await scope.ServiceProvider.GetRequiredService<IMarketingPlanService>().GetAsync(ct);
             var to = string.IsNullOrWhiteSpace(tenant.AdminNotificationEmail) ? tenant.PublicEmail : tenant.AdminNotificationEmail;
 
             // Rien à dire (ni publication ni demande) : pas de courriel, mais la semaine est marquée comme traitée.
-            if (report.PostCount > 0 || report.Leads > 0)
+            if (report.PostCount > 0 || report.Leads > 0 || plan?.Status == PlanStatus.Active)
             {
-                var (subject, html) = WeeklyReportEmail.Build(report, tenant.Name, tenant.SiteUrl, tenant.PrimaryColor);
+                var (subject, html) = WeeklyReportEmail.Build(report, tenant.Name, tenant.SiteUrl, tenant.PrimaryColor, plan);
                 var sent = await scope.ServiceProvider.GetRequiredService<IEmailSender>()
                     .SendAsync(new EmailMessage(to, subject, html, FromName: tenant.Name), ct);
                 if (sent.IsFailure)

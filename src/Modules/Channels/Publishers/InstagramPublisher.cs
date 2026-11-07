@@ -12,7 +12,7 @@ namespace Hub.Modules.Channels.Publishers;
 /// Les liens ne sont pas cliquables dans une légende Instagram : l'adresse du site est écrite en clair.
 /// </summary>
 internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptions> options, ILogger<InstagramPublisher> logger)
-    : ISocialPublisher, ILinkedChannel
+    : ISocialPublisher, ILinkedChannel, ISocialInsights
 {
     public const int MaxCaption = 2200;
 
@@ -125,6 +125,40 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
         }
     }
 
+    public async Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials c, CancellationToken ct = default)
+    {
+        try
+        {
+            // « reach » = comptes uniques atteints ; « total_interactions » = j'aime, commentaires, partages, enregistrements.
+            var json = await GetAsync($"{externalId}/insights?metric=reach,total_interactions", c.AccessToken, ct);
+            if (json.IsFailure) return Result<PostInsight>.Failure(json.Error!);
+            return Result<PostInsight>.Success(new PostInsight(
+                FacebookPagePublisher.MetricValue(json.Value, "reach"),
+                FacebookPagePublisher.MetricValue(json.Value, "total_interactions")));
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Chiffres Instagram indisponibles");
+            return Result<PostInsight>.Failure("Instagram est injoignable pour le moment.");
+        }
+    }
+
+    public async Task<Result<int>> GetFollowersAsync(ChannelCredentials c, CancellationToken ct = default)
+    {
+        try
+        {
+            var json = await GetAsync($"{c.AccountId}?fields=followers_count", c.AccessToken, ct);
+            return json.IsFailure
+                ? Result<int>.Failure(json.Error!)
+                : Result<int>.Success(FacebookPagePublisher.Int(json.Value!["followers_count"]) ?? 0);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Abonnés Instagram indisponibles");
+            return Result<int>.Failure("Instagram est injoignable pour le moment.");
+        }
+    }
+
     private async Task<Result<JsonNode>> GetAsync(string path, string token, CancellationToken ct)
     {
         var separator = path.Contains('?') ? '&' : '?';
@@ -154,8 +188,8 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
         return code switch
         {
             "190" => "Le jeton de la page Facebook est expiré ou invalide : reconnectez la page, puis Instagram.",
-            "10" or "200" => "Autorisations Instagram manquantes : régénérez le jeton de la page avec instagram_basic et " +
-                             "instagram_content_publish (Canaux → Instagram → la marche à suivre), puis reconnectez.",
+            "10" or "200" => "Autorisations Instagram manquantes : régénérez le jeton de la page avec instagram_basic, " +
+                             "instagram_content_publish et instagram_manage_insights (Canaux → Instagram → la marche à suivre), puis reconnectez.",
             "9004" or "36003" => "Instagram n'a pas pu récupérer l'image : elle doit être publique, en JPEG, au format carré ou proche.",
             _ => $"Instagram : {message} (code {code}).",
         };

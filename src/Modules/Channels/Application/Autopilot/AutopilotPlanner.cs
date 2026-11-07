@@ -18,7 +18,15 @@ public sealed record PlannedPost(
     string? ImageUrl,
     string? Facts,
     string Style,
-    string Tone);
+    string Tone,
+    string? Pillar = null);
+
+/// <summary>Ce que le plan marketing impose à la semaine : l'objectif, l'étape en cours, et le pilier de chaque créneau.</summary>
+public sealed record PlanBrief(
+    PlanObjective Objective,
+    PlanPhase Phase,
+    IReadOnlyList<PlanPillar> Pillars,
+    IReadOnlyList<string> SlotPillars);
 
 public sealed record AutopilotPlanRequest(
     AutopilotContext Context,
@@ -26,7 +34,8 @@ public sealed record AutopilotPlanRequest(
     IReadOnlyList<DateTimeOffset> Slots,
     IReadOnlyList<AutopilotHistory> History,
     string? Guidelines,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    PlanBrief? Plan = null);
 
 public interface IAutopilotPlanner
 {
@@ -78,7 +87,8 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
                     // Jamais de chiffre inventé : seuls ceux de l'offre choisie passent.
                     Facts: page?.Facts,
                     Style: style,
-                    Tone: page?.IsPromotion == true ? "Promotionnel" : "Chaleureux"));
+                    Tone: page?.IsPromotion == true ? "Promotionnel" : "Chaleureux",
+                    Pillar: SlotPillar(r, i)));
             }
             return plan.Count == 0
                 ? Result<IReadOnlyList<PlannedPost>>.Failure("L'IA n'a proposé aucun sujet.")
@@ -99,11 +109,17 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         {
             var page = pages[i % pages.Count];
             var audience = audiences[i % audiences.Count];
+            var pillar = SlotPillar(r, i);
+            var angle = pillar is null ? page.Summary
+                : $"{page.Summary}\nApproche : {r.Plan!.Pillars.FirstOrDefault(p => p.Name == pillar)?.Description ?? pillar}";
             return new PlannedPost(AtHour(slot, audience.Hour), audience.Name, page.Title,
-                page.Summary, page.Url, page.ImageUrl, page.Facts,
-                page.IsPromotion ? "Promotion" : "Service", page.IsPromotion ? "Promotionnel" : "Chaleureux");
+                angle, page.Url, page.ImageUrl, page.Facts,
+                page.IsPromotion ? "Promotion" : "Service", page.IsPromotion ? "Promotionnel" : "Chaleureux", pillar);
         }).ToList();
     }
+
+    private static string? SlotPillar(AutopilotPlanRequest r, int i) =>
+        r.Plan is { SlotPillars.Count: > 0 } plan ? plan.SlotPillars[i % plan.SlotPillars.Count] : null;
 
     /// <summary>Le créneau (un jour) à l'heure locale préférée du public.</summary>
     internal static DateTimeOffset AtHour(DateTimeOffset day, int hour)
@@ -114,7 +130,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
 
     internal static string SystemPrompt(AutopilotPlanRequest r) => $"""
         Tu es responsable des réseaux sociaux de {r.Context.CompanyName}, à {r.Context.City}.
-        Tu prépares le calendrier de publications Facebook de la semaine. Pour chaque créneau, choisis :
+        Tu prépares le calendrier de publications (Facebook et Instagram) de la semaine. Pour chaque créneau, choisis :
         - le public visé (un nom EXACT de la liste des publics) ;
         - le sujet (court, concret, qui parle à ce public) et l'angle (2 ou 3 phrases : l'idée, le bénéfice, l'appel à l'action) ;
         - le lien : une adresse EXACTE de la liste des pages, celle qui correspond au sujet ;
@@ -132,8 +148,23 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Aujourd'hui : {TimeZoneInfo.ConvertTime(r.Now, BusinessTime.Zone).ToString("dddd d MMMM yyyy", Fr)}");
+        if (r.Plan is { } plan)
+        {
+            sb.AppendLine().AppendLine(plan.Objective == PlanObjective.Visibility
+                ? "Objectif du plan marketing : la VISIBILITÉ. Privilégie ce qui atteint le plus de monde et donne envie de réagir, d'enregistrer et de partager."
+                : "Objectif du plan marketing : obtenir des demandes de devis.");
+            sb.AppendLine($"Étape en cours : {plan.Phase.Name} — {plan.Phase.Focus}");
+            if (!string.IsNullOrWhiteSpace(plan.Phase.Theme)) sb.AppendLine($"Thème de la période : {plan.Phase.Theme}");
+            sb.AppendLine("Piliers de contenu :");
+            foreach (var p in plan.Pillars) sb.AppendLine($"- {p.Name} : {p.Description}");
+        }
         sb.AppendLine().AppendLine($"Créneaux à remplir ({r.Slots.Count}), dans l'ordre :");
-        foreach (var s in r.Slots) sb.AppendLine("- " + TimeZoneInfo.ConvertTime(s, BusinessTime.Zone).ToString("dddd d MMMM", Fr));
+        for (var i = 0; i < r.Slots.Count; i++)
+        {
+            var pillar = SlotPillar(r, i);
+            sb.AppendLine("- " + TimeZoneInfo.ConvertTime(r.Slots[i], BusinessTime.Zone).ToString("dddd d MMMM", Fr)
+                          + (pillar is null ? "" : $" · pilier « {pillar} » (le sujet et l'angle doivent suivre ce pilier)"));
+        }
         sb.AppendLine().AppendLine("Publics :");
         foreach (var a in audiences) sb.AppendLine($"- {a.Name} : {a.Description}");
         sb.AppendLine().AppendLine("Pages du site :");
@@ -141,12 +172,16 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
             sb.AppendLine($"- {p.Url} | {(p.IsPromotion ? "OFFRE" : "Service")} | {p.Title}{(p.Facts is null ? "" : " | " + p.Facts)} | {Clip(p.Summary, 200)}");
         if (r.History.Count > 0)
         {
-            sb.AppendLine().AppendLine("Publications récentes (visites, demandes, clients gagnés) :");
+            sb.AppendLine().AppendLine("Publications récentes (personnes atteintes, interactions, visites, demandes, clients gagnés) :");
             foreach (var h in r.History.Take(15))
-                sb.AppendLine($"- {h.Title}{(h.Audience is null ? "" : $" [{h.Audience}]")}{(h.Theme is null ? "" : $" ({h.Theme})")} : {h.Visits} visites, {h.Leads} demandes, {h.Won} gagnés");
+                sb.AppendLine($"- {h.Title}{(h.Audience is null ? "" : $" [{h.Audience}]")}{(h.Theme is null ? "" : $" ({h.Theme})")}{(h.Pillar is null ? "" : $" {{{h.Pillar}}}")} : " +
+                              $"{h.Reach} atteintes, {h.Interactions} interactions, {h.Visits} visites, {h.Leads} demandes, {h.Won} gagnés");
             AppendAverages(sb, "Résultats moyens par public", r.History, h => h.Audience);
             AppendAverages(sb, "Résultats moyens par type de sujet", r.History, h => h.Theme);
-            sb.AppendLine("Fais davantage de ce qui apporte des demandes, en gardant un peu de variété pour continuer d'apprendre.");
+            AppendAverages(sb, "Résultats moyens par pilier", r.History, h => h.Pillar);
+            sb.AppendLine(r.Plan?.Objective == PlanObjective.Visibility
+                ? "Fais davantage de ce qui atteint le plus de monde et suscite des interactions, en gardant un peu de variété pour continuer d'apprendre."
+                : "Fais davantage de ce qui apporte des demandes, en gardant un peu de variété pour continuer d'apprendre.");
         }
         if (!string.IsNullOrWhiteSpace(r.Guidelines))
             sb.AppendLine().AppendLine("Consignes de l'entreprise :").AppendLine(r.Guidelines);
@@ -159,8 +194,9 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         var groups = history.Where(h => key(h) is not null).GroupBy(key).Where(g => g.Count() >= 1).ToList();
         if (groups.Count < 2) return;
         sb.AppendLine().AppendLine(title + " :");
-        foreach (var g in groups.OrderByDescending(g => g.Average(h => h.Leads)).ThenByDescending(g => g.Average(h => h.Visits)))
-            sb.AppendLine($"- {g.Key} : {g.Count()} publication(s), {g.Average(h => h.Visits):0.#} visites et {g.Average(h => h.Leads):0.##} demandes par publication");
+        foreach (var g in groups.OrderByDescending(g => g.Average(h => h.Leads)).ThenByDescending(g => g.Average(h => h.Reach)).ThenByDescending(g => g.Average(h => h.Visits)))
+            sb.AppendLine($"- {g.Key} : {g.Count()} publication(s), par publication : {g.Average(h => h.Reach):0} atteintes, " +
+                          $"{g.Average(h => h.Interactions):0.#} interactions, {g.Average(h => h.Visits):0.#} visites, {g.Average(h => h.Leads):0.##} demandes");
     }
 
     private const string Schema = """

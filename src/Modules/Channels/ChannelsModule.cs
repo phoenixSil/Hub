@@ -1,5 +1,6 @@
 using Hub.Modules.Channels.Application;
 using Hub.Modules.Channels.Application.Autopilot;
+using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
 using Hub.Modules.Channels.Publishers;
 using Hub.SharedKernel.Data;
@@ -59,6 +60,9 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<PostTarget> PostTargets => Set<PostTarget>();
     public DbSet<AutopilotSettings> AutopilotSettings => Set<AutopilotSettings>();
     public DbSet<ImageUsage> ImageUsages => Set<ImageUsage>();
+    public DbSet<MarketingPlan> MarketingPlans => Set<MarketingPlan>();
+    public DbSet<PostStats> PostStats => Set<PostStats>();
+    public DbSet<AudienceSnapshot> AudienceSnapshots => Set<AudienceSnapshot>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -86,6 +90,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Audience).HasMaxLength(100);
             e.Property(x => x.VisualKind).HasMaxLength(20);
             e.Property(x => x.Theme).HasMaxLength(30);
+            e.Property(x => x.Pillar).HasMaxLength(40);
             e.HasIndex(x => new { x.Status, x.ScheduledAt });
             e.HasIndex(x => new { x.TenantId, x.Campaign });
         });
@@ -116,6 +121,38 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.ToTable("ImageUsages");
             e.Property(x => x.Month).HasMaxLength(7);
             e.HasIndex(x => new { x.TenantId, x.Month }).IsUnique();
+        });
+
+        b.Entity<MarketingPlan>(e =>
+        {
+            e.ToTable("MarketingPlans");
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.Objective).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.PhasesJson).HasMaxLength(8000);
+            e.Property(x => x.PillarsJson).HasMaxLength(4000);
+            e.Property(x => x.BaselineJson).HasMaxLength(500);
+            e.Property(x => x.TargetsJson).HasMaxLength(500);
+            e.Property(x => x.ProposedTargetsJson).HasMaxLength(500);
+            e.Property(x => x.ProposedPillarsJson).HasMaxLength(4000);
+            e.Property(x => x.ProposalNote).HasMaxLength(2000);
+            e.Property(x => x.LastReviewedPhase).HasMaxLength(100);
+            e.Property(x => x.InsightsNote).HasMaxLength(1000);
+            e.HasIndex(x => new { x.TenantId, x.Status });
+        });
+
+        b.Entity<PostStats>(e =>
+        {
+            e.ToTable("PostStats");
+            e.Property(x => x.Channel).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.TenantId, x.PostId, x.Channel }).IsUnique();
+        });
+
+        b.Entity<AudienceSnapshot>(e =>
+        {
+            e.ToTable("AudienceSnapshots");
+            e.Property(x => x.Channel).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.TenantId, x.Channel, x.Day }).IsUnique();
         });
     }
 }
@@ -154,6 +191,11 @@ public static class ChannelsModule
         services.AddScoped<IAutopilotService, AutopilotService>();
         services.AddSingleton<AutopilotTrigger>();
         services.AddHostedService<AutopilotWorker>();
+
+        // Plan marketing : le pilote le suit ; les chiffres des réseaux sont relevés chaque jour.
+        services.AddScoped<PlanInsightsCollector>();
+        services.AddScoped<IMarketingPlanService, MarketingPlanService>();
+        services.AddHostedService<PlanInsightsWorker>();
         services.AddSingleton<IModuleInitializer, ChannelsInitializer>();
         return services;
     }
