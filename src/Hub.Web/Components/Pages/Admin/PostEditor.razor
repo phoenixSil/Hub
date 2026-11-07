@@ -4,8 +4,9 @@
 @inject IPostService Posts
 @inject IPostWriter Writer
 @inject IPostVisualDesigner Designer
-@inject Hub.Web.Infrastructure.IMediaStorage Media
-@inject IJSRuntime JS
+@inject IVisualRenderer Renderer
+@inject IVisualStore Visuals
+@inject IAutopilotService Autopilot
 @inject IChannelConnections Connections
 @inject IPublisherResolver Publishers
 @inject ICatalogQueries Catalog
@@ -154,7 +155,7 @@ else
                                 <div class="actions">
                                     <BusyButton OnClick="UseVisualAsync" IsBusy="@(action == "use-visual")" AnyBusy="busy" BusyText="Préparation de l'image…">Utiliser ce visuel</BusyButton>
                                     <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy" BusyText="Nouvelle proposition…">Autre proposition</BusyButton>
-                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => visual = null" disabled="@busy">Ignorer</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => { visual = null; visualPng = null; }" disabled="@busy">Ignorer</button>
                                 </div>
                             </div>
                         }
@@ -179,6 +180,21 @@ else
                     </div>
                 </div>
 
+                @if (view?.Post.Status == PostStatus.AwaitingApproval)
+                {
+                    <div class="admin-card approval-card">
+                        <h2>Proposée par le pilote automatique</h2>
+                        <p>
+                            Pour <strong>@(view.Post.Audience ?? "tous")</strong>,
+                            prévue le <strong>@AdminFormat.Local(view.Post.ScheduledAt!.Value, "dddd d MMMM 'à' HH:mm")</strong>.
+                            Relisez et modifiez au besoin : rien ne part sans votre accord.
+                        </p>
+                        <div class="actions">
+                            <BusyButton OnClick="ApproveAsync" IsBusy="@(action == "approve")" AnyBusy="busy" BusyText="Validation…">✓ Approuver</BusyButton>
+                            <BusyButton Class="btn btn-outline btn-sm" OnClick="RejectAsync" IsBusy="@(action == "reject")" AnyBusy="busy" BusyText="Refus…">Refuser</BusyButton>
+                        </div>
+                    </div>
+                }
                 <div class="admin-card">
                     <h2>3. Envoi</h2>
                     <div class="actions">
@@ -320,11 +336,11 @@ else
     private PostVisual? visual;
     private string VisualTopic => string.IsNullOrWhiteSpace(topic) ? draft.Title : topic;
 
-    private string VisualDataUrl => visual is null ? "" :
-        "data:image/svg+xml;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(visual.Svg));
+    private byte[]? visualPng;
+    private string VisualDataUrl => visualPng is null ? "" : "data:image/png;base64," + Convert.ToBase64String(visualPng);
     private string? previewFor;
 
-    private bool Editable => view is null || view.Post.Status is PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed;
+    private bool Editable => view is null || view.Post.Status is PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed or PostStatus.AwaitingApproval;
 
     protected override async Task OnInitializedAsync()
     {
@@ -405,34 +421,24 @@ else
             VisualTopic, draft.Message, facts, visualStyle));
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
+        // Aperçu = image finale : dessinée côté serveur, avec la police de la marque.
+        visualPng = Renderer.RenderPng(result.Value!.Svg);
+        if (visualPng is null) { feedback = "Ce visuel n'a pas pu être dessiné. Demandez une autre proposition."; feedbackIsError = true; return; }
         visual = result.Value;
     }
 
     private async Task UseVisualAsync()
     {
-        if (visual is null) return;
-        await BeginAsync("use-visual", "Préparation de l'image…");
-        try
-        {
-            var png = await JS.InvokeAsync<IJSStreamReference>("hubAdmin.svgToPng", visual.Svg, 1080);
-            await using var incoming = await png.OpenReadStreamAsync(maxAllowedSize: 10 * 1024 * 1024);
-            using var stream = new MemoryStream();
-            await incoming.CopyToAsync(stream);
-            stream.Position = 0;
-            draft.ImageUrl = await Media.SaveImageAsync(stream, "visuel.png");
-            visual = null;
-            feedback = "Visuel ajouté à la publication.";
-            feedbackIsError = false;
-        }
-        catch (Exception ex) when (ex is JSException or InvalidOperationException or IOException)
-        {
-            feedback = $"Le visuel n'a pas pu être converti en image : {ex.Message}";
-            feedbackIsError = true;
-        }
-        finally
-        {
-            End();
-        }
+        if (visualPng is null) return;
+        await BeginAsync("use-visual", "Enregistrement de l'image…");
+        var saved = await Visuals.SavePngAsync(visualPng);
+        End();
+        if (saved.IsFailure) { feedback = saved.Error; feedbackIsError = true; return; }
+        draft.ImageUrl = saved.Value;
+        visual = null;
+        visualPng = null;
+        feedback = "Visuel ajouté à la publication.";
+        feedbackIsError = false;
     }
 
     private void Use(PostSuggestion s)
@@ -498,6 +504,29 @@ else
         feedback = result.IsSuccess ? $"Publication programmée le {scheduleLocal.Value.ToString("d MMMM 'à' HH:mm", AdminFormat.Fr)}." : result.Error;
         feedbackIsError = result.IsFailure;
         await ReloadAsync(id.Value);
+    }
+
+    private async Task ApproveAsync()
+    {
+        await BeginAsync("approve", "Validation de la publication…");
+        var id = await SaveDraftInternalAsync();
+        if (id is null) { End(); return; }
+        var result = await Autopilot.ApproveAsync(id.Value);
+        End();
+        feedback = result.IsSuccess ? "Publication approuvée : elle partira à l'heure prévue." : result.Error;
+        feedbackIsError = result.IsFailure;
+        await ReloadAsync(id.Value);
+    }
+
+    private async Task RejectAsync()
+    {
+        if (view is null) return;
+        await BeginAsync("reject", "Refus de la publication…");
+        var result = await Autopilot.RejectAsync(view.Post.Id);
+        End();
+        if (result.IsSuccess) { Nav.NavigateTo("/admin/publications"); return; }
+        feedback = result.Error;
+        feedbackIsError = true;
     }
 
     private async Task CancelAsync()

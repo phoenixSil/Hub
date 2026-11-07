@@ -112,6 +112,32 @@ with sync_playwright() as p:
     page.screenshot(path=f"{OUT}/admin-publications.png", full_page=True)
     print("::notice::Publication rédigée puis publiée (réseau simulé)")
 
+    # Pilote automatique : activation, préparation de la semaine, puis validation d'une proposition.
+    page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
+    page.wait_for_selector("text=Publics visés", timeout=15000)
+    page.wait_for_timeout(1000)
+    page.check("text=Activer le pilote automatique")
+    page.click("text=Préparer la semaine maintenant")
+    page.wait_for_selector("text=C'est parti", timeout=20000)
+    page.screenshot(path=f"{OUT}/admin-pilote.png", full_page=True)
+    found = False
+    for _ in range(30):
+        page.goto(BASE + "/admin/publications", wait_until="networkidle")
+        if page.locator("text=attendent votre accord").count() > 0:
+            found = True
+            break
+        page.wait_for_timeout(4000)
+    if not found:
+        raise SystemExit("Le pilote automatique n'a préparé aucune publication")
+    page.wait_for_timeout(1000)
+    page.screenshot(path=f"{OUT}/admin-publications-a-valider.png", full_page=True)
+    page.locator(".approval-actions button", has_text="Approuver").first.click()
+    page.wait_for_selector("text=Publication approuvée", timeout=15000)
+    page.locator("td a").first.click()
+    page.wait_for_timeout(2000)
+    page.screenshot(path=f"{OUT}/admin-publication-pilote.png", full_page=True)
+    print("::notice::Pilote automatique : semaine préparée (texte, visuel, public, heure) puis proposition approuvée")
+
     # Vérification en deux étapes, de bout en bout : activation puis reconnexion avec un code.
     def totp(secret, at=None):
         key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))

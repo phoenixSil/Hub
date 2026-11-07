@@ -13,6 +13,7 @@ public static class PostLabels
         PostStatus.Published => "Publiée",
         PostStatus.PartiallyPublished => "Publiée en partie",
         PostStatus.Failed => "Échec",
+        PostStatus.AwaitingApproval => "À valider",
         _ => "Annulée",
     };
 
@@ -22,6 +23,8 @@ public static class PostLabels
         PostStatus.PartiallyPublished or PostStatus.Scheduled => "scheduled",
         PostStatus.Failed => "lost",
         PostStatus.Publishing => "contacted",
+        PostStatus.AwaitingApproval => "approval",
+        PostStatus.Cancelled => "lost",
         _ => "new",
     };
 

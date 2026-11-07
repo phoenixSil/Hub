@@ -48,6 +48,9 @@ builder.Services
     .AddChannelsModule(builder.Configuration, connectionString)
     .AddQuotesModule(builder.Configuration, connectionString);
 builder.Services.AddScoped<IQuoteContextSource, QuoteContextSource>();
+builder.Services.AddScoped<Hub.Modules.Channels.Application.Autopilot.IAutopilotContextSource, AutopilotContextSource>();
+builder.Services.AddSingleton<Hub.Modules.Channels.Application.Autopilot.IVisualRenderer, SkiaVisualRenderer>();
+builder.Services.AddScoped<Hub.Modules.Channels.Application.Autopilot.IVisualStore, MediaVisualStore>();
 
 // IA générique (rédaction des publications…) : Claude si une clé est fournie, sinon aucun (replis sans IA).
 if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AnthropicOptions.Section}:ApiKey"]))

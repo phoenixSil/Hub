@@ -12,6 +12,8 @@ public enum PostStatus
     PartiallyPublished = 4,
     Failed = 5,
     Cancelled = 6,
+    /// <summary>Proposée par le pilote automatique : attend l'accord de l'administrateur.</summary>
+    AwaitingApproval = 7,
 }
 
 public enum PostTargetStatus
@@ -45,6 +47,12 @@ public sealed class Post : TenantEntity
 
     /// <summary>Modèle d'IA ayant proposé le texte, s'il y a lieu.</summary>
     public string? AiModel { get; set; }
+
+    /// <summary>Public visé (ex. « Familles occupées »), choisi par le pilote automatique ou l'administrateur.</summary>
+    public string? Audience { get; set; }
+
+    /// <summary>Préparée par le pilote automatique.</summary>
+    public bool FromAutopilot { get; set; }
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

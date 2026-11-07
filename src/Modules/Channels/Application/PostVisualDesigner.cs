@@ -76,7 +76,7 @@ internal sealed class PostVisualDesigner(IAiTextGenerator ai) : IPostVisualDesig
 
         Charte de la marque :
         - Couleur principale {i.PrimaryColor}, couleur d'accent {i.AccentColor}, blanc, et un bleu nuit #10233F pour le texte foncé.
-        - Police : font-family="Arial, Helvetica, sans-serif" uniquement, en gras pour les titres.
+        - Police : font-family="Poppins, Arial, sans-serif" uniquement (Poppins est assez large : compte environ 0,6 × la taille de police par caractère), en gras (font-weight="700") pour les titres.
         - Style graphique moderne : aplats de couleur, formes géométriques, dégradés doux, petites illustrations simples
           dessinées avec des formes (maison, flacon pulvérisateur, étincelles, gouttes, cœur, main, calendrier).
 
@@ -114,13 +114,13 @@ internal sealed class PostVisualDesigner(IAiTextGenerator ai) : IPostVisualDesig
     internal static PostVisual Template(VisualIdea i)
     {
         static string E(string s) => WebUtility.HtmlEncode(s);
-        var lines = Wrap(i.Topic, 16).Take(3).ToList();
+        var lines = Wrap(i.Topic, 14).Take(3).ToList();
         var startY = 470 - (lines.Count - 1) * 60;
         var title = new StringBuilder();
         for (var n = 0; n < lines.Count; n++)
-            title.Append($"""<text x="540" y="{startY + n * 120}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="100" font-weight="700" fill="#ffffff">{E(lines[n])}</text>""");
+            title.Append($"""<text x="540" y="{startY + n * 120}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="92" font-weight="700" fill="#ffffff">{E(lines[n])}</text>""");
         var facts = string.IsNullOrWhiteSpace(i.Facts) ? ""
-            : $"""<rect x="290" y="{startY + lines.Count * 120 - 40}" width="500" height="110" rx="55" fill="{E(i.AccentColor)}"/><text x="540" y="{startY + lines.Count * 120 + 35}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700" fill="#10233F">{E(Truncate(i.Facts!, 18))}</text>""";
+            : $"""<rect x="290" y="{startY + lines.Count * 120 - 40}" width="500" height="110" rx="55" fill="{E(i.AccentColor)}"/><text x="540" y="{startY + lines.Count * 120 + 35}" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="56" font-weight="700" fill="#10233F">{E(Truncate(i.Facts!, 18))}</text>""";
 
         var svg = $"""
             <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
@@ -132,8 +132,8 @@ internal sealed class PostVisualDesigner(IAiTextGenerator ai) : IPostVisualDesig
               <path d="M880 760 l12 26 26 12 -26 12 -12 26 -12 -26 -26 -12 26 -12z" fill="#ffffff" opacity="0.7"/>
               {title}{facts}
               <rect x="0" y="930" width="1080" height="150" fill="#ffffff"/>
-              <text x="540" y="1000" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700" fill="#10233F">{E(i.CompanyName)}</text>
-              <text x="540" y="1052" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" fill="{E(i.PrimaryColor)}">{E(i.Phone)}</text>
+              <text x="540" y="1000" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="48" font-weight="700" fill="#10233F">{E(i.CompanyName)}</text>
+              <text x="540" y="1052" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="36" fill="{E(i.PrimaryColor)}">{E(i.Phone)}</text>
             </svg>
             """;
         return new PostVisual(SvgSanitizer.Clean(svg)!, i.Topic, "modèle");

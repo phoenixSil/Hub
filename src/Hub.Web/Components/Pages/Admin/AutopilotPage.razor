@@ -1,0 +1,186 @@
+@page "/admin/pilote-automatique"
+@rendermode InteractiveServer
+@inject IAutopilotService Autopilot
+@inject IPublisherResolver Publishers
+@inject IPostWriter Writer
+
+<PageTitle>Pilote automatique</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <p class="muted small"><a href="/admin/publications">← Publications</a></p>
+        <h1>Pilote automatique</h1>
+        <p class="muted">
+            Chaque jour, le pilote complète la semaine à venir : il choisit les sujets (services, offres, saison),
+            le public visé et l'heure, rédige le texte, crée le visuel et prépare la publication avec son lien mesuré.
+            @(Writer.UsesAi ? "Claude fait ces choix en tenant compte de ce qui a déjà apporté des demandes." : "Sans clé Claude, il fait tourner simplement vos services et vos publics.")
+        </p>
+    </div>
+</div>
+
+@if (working is not null)
+{
+    <div class="alert alert-info busy-banner" role="status"><span class="spinner" aria-hidden="true"></span> @working</div>
+}
+else if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+}
+
+@if (form is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    <div class="admin-columns">
+        <div>
+            <div class="admin-card">
+                <h2>Fonctionnement</h2>
+                <label class="check"><input type="checkbox" @bind="form.Enabled" /> <strong>Activer le pilote automatique</strong></label>
+                <div class="field">
+                    <label>Publications par semaine</label>
+                    <select @bind="form.PostsPerWeek">
+                        @for (var n = 1; n <= 7; n++) { var v = n; <option value="@v">@v</option> }
+                    </select>
+                    <span class="muted small">3 à 5 par semaine est idéal : davantage fatigue les abonnés et Facebook montre moins vos publications.</span>
+                    <FieldError Errors="errors" For="PostsPerWeek" />
+                </div>
+                <div class="field">
+                    <label>Validation</label>
+                    <label class="check"><input type="radio" name="mode" checked="@(!form.PublishWithoutApproval)" @onchange="() => form.PublishWithoutApproval = false" /> Je valide chaque publication avant son départ (recommandé)</label>
+                    <label class="check"><input type="radio" name="mode" checked="@form.PublishWithoutApproval" @onchange="() => form.PublishWithoutApproval = true" /> Publier sans me demander, à l'heure prévue</label>
+                    <span class="muted small">En mode validation, vous recevez un courriel quand de nouvelles publications vous attendent.</span>
+                </div>
+                <div class="field">
+                    <label>Réseaux</label>
+                    @foreach (var c in Publishers.Supported)
+                    {
+                        <label class="check"><input type="checkbox" checked="@form.Channels.Contains(c)" @onchange="e => Toggle(c, (bool)e.Value!)" /> @PostLabels.Of(c)</label>
+                    }
+                    <FieldError Errors="errors" For="Channels" />
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <h2>Publics visés</h2>
+                <p class="muted small">Chaque publication s'adresse à l'un de ces publics : le texte, le visuel et l'heure sont choisis pour lui.</p>
+                @foreach (var a in form.Audiences)
+                {
+                    var audience = a;
+                    <div class="audience-row">
+                        <div class="field-row">
+                            <div class="field"><label>Nom</label><input @bind="audience.Name" placeholder="ex. Familles occupées" /></div>
+                            <div class="field hour"><label>Heure</label>
+                                <select @bind="audience.Hour">
+                                    @for (var h = 6; h <= 21; h++) { var v = h; <option value="@v">@(v) h</option> }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field"><label>Qui sont-ils, que cherchent-ils ?</label><textarea rows="2" @bind="audience.Description"></textarea></div>
+                        <button type="button" class="btn btn-ghost btn-xs" @onclick="() => form.Audiences.Remove(audience)">Retirer ce public</button>
+                    </div>
+                }
+                <FieldError Errors="errors" For="Audiences" />
+                @if (form.Audiences.Count < 6)
+                {
+                    <button type="button" class="btn btn-outline btn-xs" @onclick="() => form.Audiences.Add(new AudienceForm())">+ Ajouter un public</button>
+                }
+            </div>
+
+            <div class="admin-card">
+                <h2>Consignes</h2>
+                <div class="field">
+                    <textarea rows="4" @bind="form.Guidelines" placeholder="ex. Ne jamais parler de prix. Mettre en avant les produits écologiques. Pas de publication le dimanche."></textarea>
+                    <span class="muted small">Le pilote les suit pour choisir et rédiger. Il n'invente jamais de prix ni de rabais : seuls ceux de vos offres en cours peuvent apparaître.</span>
+                    <FieldError Errors="errors" For="Guidelines" />
+                </div>
+                <div class="actions">
+                    <BusyButton OnClick="SaveAsync" IsBusy="@(action == "save")" AnyBusy="busy" BusyText="Enregistrement…">Enregistrer</BusyButton>
+                    <BusyButton Class="btn btn-outline btn-sm" OnClick="RunNowAsync" IsBusy="@(action == "run")" AnyBusy="busy" BusyText="Demande envoyée…">Préparer la semaine maintenant</BusyButton>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="admin-card">
+                <h2>État</h2>
+                <dl class="details">
+                    <dt>Pilote</dt><dd>@(form.Enabled ? "Activé" : "Désactivé")</dd>
+                    <dt>Dernier passage</dt><dd>@(form.LastRunAt is { } d ? AdminFormat.Local(d, "d MMMM 'à' HH:mm") : "jamais")</dd>
+                    <dt>Résultat</dt><dd>@(form.LastRunSummary ?? "—")</dd>
+                    <dt>À valider</dt><dd><a href="/admin/publications">@pending publication(s)</a></dd>
+                </dl>
+                <p class="muted small">
+                    Le pilote ne remplit que les jours libres des 7 prochains jours : vos propres publications sont respectées.
+                    Une proposition non validée la veille de son heure est abandonnée.
+                </p>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private AutopilotForm? form;
+    private IReadOnlyDictionary<string, string>? errors;
+    private int pending;
+    private string? working;
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        form = await Autopilot.GetAsync();
+        pending = await Autopilot.PendingCountAsync();
+    }
+
+    private void Toggle(ChannelType c, bool on)
+    {
+        if (on && !form!.Channels.Contains(c)) form.Channels.Add(c);
+        if (!on) form!.Channels.Remove(c);
+    }
+
+    private async Task SaveAsync()
+    {
+        Begin("save", "Enregistrement des réglages…");
+        await Task.Yield();
+        var result = await Autopilot.SaveAsync(form!);
+        End();
+        errors = result.FieldErrors;
+        feedback = result.IsSuccess ? (form!.Enabled ? "Réglages enregistrés : le pilote est activé." : "Réglages enregistrés (pilote désactivé).") : result.Error ?? "Vérifiez les champs signalés.";
+        feedbackIsError = result.IsFailure;
+    }
+
+    private async Task RunNowAsync()
+    {
+        Begin("run", "Enregistrement puis demande de préparation…");
+        await Task.Yield();
+        var saved = await Autopilot.SaveAsync(form!);
+        errors = saved.FieldErrors;
+        var result = saved.IsSuccess ? await Autopilot.RunNowAsync() : saved;
+        End();
+        feedback = result.IsSuccess
+            ? "C'est parti : les publications de la semaine arrivent dans « Publications » d'ici quelques minutes."
+            : result.Error ?? "Vérifiez les champs signalés.";
+        feedbackIsError = result.IsFailure;
+    }
+
+    private void Begin(string name, string message)
+    {
+        busy = true;
+        action = name;
+        working = message;
+        feedback = null;
+    }
+
+    private void End()
+    {
+        busy = false;
+        action = null;
+        working = null;
+    }
+}

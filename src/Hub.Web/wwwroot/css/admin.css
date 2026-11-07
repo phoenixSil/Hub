@@ -184,3 +184,12 @@ code.break { word-break: break-all; }
 .visual-tools input { flex: 1 1 200px; }
 .visual-proposal { margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fafbfc; }
 .visual-proposal img { display: block; width: 100%; max-width: 420px; aspect-ratio: 1; margin: 0 auto 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+
+/* Pilote automatique */
+.status-approval { background: #fff0e0; color: #8a4b00; }
+.approval-actions { display: flex; gap: 4px; margin-top: 6px; }
+.approval-card { border-left: 4px solid #f0a020; }
+.audience-row { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #fafbfc; }
+.audience-row .field-row { display: flex; gap: 10px; }
+.audience-row .field-row .field:first-child { flex: 1; }
+.audience-row .field.hour select { width: auto; }

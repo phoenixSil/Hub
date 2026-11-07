@@ -1,4 +1,5 @@
 using Hub.Modules.Channels.Application;
+using Hub.Modules.Channels.Application.Autopilot;
 using Hub.Modules.Channels.Domain;
 using Hub.Modules.Channels.Publishers;
 using Hub.SharedKernel.Data;
@@ -56,6 +57,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<PostTarget> PostTargets => Set<PostTarget>();
+    public DbSet<AutopilotSettings> AutopilotSettings => Set<AutopilotSettings>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -80,6 +82,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.AiModel).HasMaxLength(80);
+            e.Property(x => x.Audience).HasMaxLength(100);
             e.HasIndex(x => new { x.Status, x.ScheduledAt });
             e.HasIndex(x => new { x.TenantId, x.Campaign });
         });
@@ -93,6 +96,16 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.ExternalUrl).HasMaxLength(500);
             e.Property(x => x.Error).HasMaxLength(1000);
             e.HasIndex(x => new { x.TenantId, x.PostId });
+        });
+
+        b.Entity<AutopilotSettings>(e =>
+        {
+            e.ToTable("AutopilotSettings");
+            e.Property(x => x.AudiencesJson).HasMaxLength(4000);
+            e.Property(x => x.Channels).HasMaxLength(200);
+            e.Property(x => x.Guidelines).HasMaxLength(2000);
+            e.Property(x => x.LastRunSummary).HasMaxLength(1000);
+            e.HasIndex(x => x.TenantId).IsUnique();
         });
     }
 }
@@ -122,6 +135,13 @@ public static class ChannelsModule
         services.AddScoped<IPostWriter, PostWriter>();
         services.AddScoped<IPostVisualDesigner, PostVisualDesigner>();
         services.AddHostedService<PostScheduler>();
+
+        // Pilote automatique : planifie, rédige, illustre et programme les publications de la semaine.
+        services.AddScoped<IAutopilotPlanner, AutopilotPlanner>();
+        services.AddScoped<AutopilotRunner>();
+        services.AddScoped<IAutopilotService, AutopilotService>();
+        services.AddSingleton<AutopilotTrigger>();
+        services.AddHostedService<AutopilotWorker>();
         services.AddSingleton<IModuleInitializer, ChannelsInitializer>();
         return services;
     }

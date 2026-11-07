@@ -15,6 +15,11 @@
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="QRCoder" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+    <PackageReference Include="Svg.Skia" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Police de la marque (licence OFL) pour dessiner le texte des visuels côté serveur, quel que soit l'hébergement. -->
+    <EmbeddedResource Include="Resources\Fonts\*.ttf" LogicalName="Fonts.%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hub.SharedKernel\Hub.SharedKernel.csproj" />

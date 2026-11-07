@@ -3,6 +3,7 @@
 @inject IPostService Posts
 @inject IDashboardQueries Stats
 @inject IPublisherResolver Publishers
+@inject IAutopilotService Autopilot
 
 <PageTitle>Publications</PageTitle>
 
@@ -11,12 +12,28 @@
         <h1>Publications</h1>
         <p class="muted">Vos publications sur les réseaux sociaux. Chaque lien est mesuré : vous voyez les visites et les demandes qu'il apporte.</p>
     </div>
-    <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">+ Nouvelle publication</a>
+    <div class="actions">
+        <a class="btn btn-outline btn-sm" href="/admin/pilote-automatique">Pilote automatique</a>
+        <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">+ Nouvelle publication</a>
+    </div>
 </div>
 
 @if (Publishers.IsSimulated)
 {
     <div class="alert alert-warning">Mode simulé : les publications ne partent pas vraiment sur les réseaux (développement et tests).</div>
+}
+
+@if (message is not null)
+{
+    <div class="alert @(messageIsError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (items is not null && items.Any(i => i.Post.Status == PostStatus.AwaitingApproval))
+{
+    <div class="alert alert-info">
+        <strong>@items.Count(i => i.Post.Status == PostStatus.AwaitingApproval) publication(s) du pilote automatique attendent votre accord.</strong>
+        Ouvrez-les pour les relire et les modifier, ou approuvez-les directement ci-dessous.
+    </div>
 }
 
 @if (items is null)
@@ -44,14 +61,30 @@ else
                     var s = stats.GetValueOrDefault(p.Campaign);
                     <tr>
                         <td class="nowrap">@DateOf(p)</td>
-                        <td><a href="/admin/publications/@p.Id">@p.Title</a><div class="muted small truncate">@p.Message</div></td>
+                        <td>
+                            <a href="/admin/publications/@p.Id">@p.Title</a>
+                            @if (p.FromAutopilot || p.Audience is not null)
+                            {
+                                <div class="muted small">@(p.FromAutopilot ? "Pilote automatique" : "")@(p.FromAutopilot && p.Audience is not null ? " · " : "")@(p.Audience is null ? "" : "Pour : " + p.Audience)</div>
+                            }
+                            <div class="muted small truncate">@p.Message</div>
+                        </td>
                         <td class="nowrap">
                             @foreach (var t in v.Targets)
                             {
                                 <span class="tag @(t.Status == PostTargetStatus.Published ? "tag-ok" : t.Status == PostTargetStatus.Failed ? "tag-ko" : "")" title="@(t.Error ?? "")">@PostLabels.Of(t.Channel)</span>
                             }
                         </td>
-                        <td><span class="status status-@PostLabels.Css(p.Status)">@PostLabels.Of(p.Status)</span></td>
+                        <td>
+                            <span class="status status-@PostLabels.Css(p.Status)">@PostLabels.Of(p.Status)</span>
+                            @if (p.Status == PostStatus.AwaitingApproval)
+                            {
+                                <div class="approval-actions">
+                                    <button class="btn btn-primary btn-xs" @onclick="() => ApproveAsync(p.Id)" disabled="@busy">Approuver</button>
+                                    <button class="btn btn-ghost btn-xs" @onclick="() => RejectAsync(p.Id)" disabled="@busy">Refuser</button>
+                                </div>
+                            }
+                        </td>
                         <td class="num">@(s?.PageViews ?? 0)</td>
                         <td class="num"><strong>@(s?.Leads ?? 0)</strong></td>
                     </tr>
@@ -65,10 +98,36 @@ else
     private IReadOnlyList<PostView>? items;
     private IReadOnlyDictionary<string, CampaignStats> stats = new Dictionary<string, CampaignStats>();
 
-    protected override async Task OnInitializedAsync()
+    private string? message;
+    private bool messageIsError;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
-        items = await Posts.ListAsync();
+        items = (await Posts.ListAsync()).Where(i => i.Post.Status != PostStatus.Cancelled || !i.Post.FromAutopilot).ToList();
         stats = await Stats.GetCampaignStatsAsync(items.Select(i => i.Post.Campaign).ToList());
+    }
+
+    private async Task ApproveAsync(Guid id)
+    {
+        busy = true;
+        var result = await Autopilot.ApproveAsync(id);
+        message = result.IsSuccess ? "Publication approuvée : elle partira à l'heure prévue." : result.Error;
+        messageIsError = result.IsFailure;
+        await LoadAsync();
+        busy = false;
+    }
+
+    private async Task RejectAsync(Guid id)
+    {
+        busy = true;
+        var result = await Autopilot.RejectAsync(id);
+        message = result.IsSuccess ? "Publication refusée." : result.Error;
+        messageIsError = result.IsFailure;
+        await LoadAsync();
+        busy = false;
     }
 
     private static string DateOf(Post p) =>

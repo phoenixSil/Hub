@@ -75,7 +75,7 @@ internal sealed class PostService(
         {
             post = await db.Posts.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (post is null) return Result<Guid>.Failure("Publication introuvable.");
-            if (post.Status is not (PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed))
+            if (post.Status is not (PostStatus.Draft or PostStatus.Scheduled or PostStatus.Failed or PostStatus.AwaitingApproval))
                 return Result<Guid>.Failure("Une publication déjà partie ne peut plus être modifiée.");
         }
         else
@@ -112,7 +112,7 @@ internal sealed class PostService(
         await using var db = await factory.CreateDbContextAsync(ct);
         var post = await db.Posts.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (post is null) return Result.Failure("Publication introuvable.");
-        if (post.Status is not (PostStatus.Draft or PostStatus.Scheduled)) return Result.Failure("Cette publication ne peut plus être programmée.");
+        if (post.Status is not (PostStatus.Draft or PostStatus.Scheduled or PostStatus.AwaitingApproval)) return Result.Failure("Cette publication ne peut plus être programmée.");
         post.ScheduledAt = when;
         post.Status = PostStatus.Scheduled;
         await db.SaveChangesAsync(ct);

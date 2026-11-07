@@ -16,6 +16,8 @@
     <PackageVersion Include="SkiaSharp" Version="3.116.1" />
     <PackageVersion Include="QRCoder" Version="1.6.0" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
+    <!-- 3.0.4 : dernière version bâtie sur SkiaSharp 3.116.1 (rendu des visuels SVG en PNG). -->
+    <PackageVersion Include="Svg.Skia" Version="3.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
