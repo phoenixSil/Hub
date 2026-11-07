@@ -148,6 +148,7 @@ if (!string.IsNullOrWhiteSpace(canonicalHost))
 app.UseStaticFiles(); // images envoyées par le back-office (wwwroot/uploads)
 
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<LegacyRedirectMiddleware>(); // anciennes adresses → 301
 app.UseMiddleware<VisitTrackingMiddleware>();
 
 app.UseAuthentication();

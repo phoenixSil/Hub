@@ -20,7 +20,8 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; scroll-padding-top: 88px; -webkit-text-size-adjust: 100%; }
+:target { scroll-margin-top: 88px; }
 body { margin: 0; font-family: var(--font); color: var(--text); background: var(--bg); line-height: 1.65; font-size: 16px; }
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--blue-dark); text-underline-offset: 3px; }
