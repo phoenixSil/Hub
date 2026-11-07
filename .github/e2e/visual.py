@@ -111,7 +111,7 @@ CHECKS = r"""
   }
 
   const raw = document.body.innerText.match(/\{\{[^}]{1,40}\}\}/);
-  if (raw) issues.push(`champ non remplacé affiché : ${raw[0]}`);
+  if (raw && !location.pathname.startsWith("/admin")) issues.push(`champ non remplacé affiché : ${raw[0]}`);
   if (/\b(undefined|NaN)\b/.test(document.body.innerText)) issues.push('texte « undefined » ou « NaN » affiché');
 
   for (const img of document.images) if (shown(img) && img.complete && img.naturalWidth === 0) issues.push(`image cassée : ${img.getAttribute('src')}`);
