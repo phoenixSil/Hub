@@ -163,4 +163,67 @@ public class PhotoVisualTests
         Assert.True(blocked.IsFailure);
         Assert.Contains("SAFETY", blocked.Error);
     }
+
+    [Theory]
+    [InlineData(SkiaPhotoComposer.Top)]
+    [InlineData(SkiaPhotoComposer.Poster)]
+    public void Les_mises_en_page_du_haut_laissent_le_bas_de_la_photo_libre(string layout)
+    {
+        var overlay = new PhotoOverlay("Quelle pièce détestez-vous nettoyer ?", "détestez-vous", null,
+            "QUESTION", "ScintiNet", "418 953-3284", "scintinet.com", "#0097CE", "#E2E735", layout);
+
+        var png = Composer.Compose(Photo(2048, 2048), overlay)!;
+        using var bitmap = SKBitmap.Decode(png);
+        Assert.Equal(new SKColor(0xC8, 0xB8, 0xA0), bitmap.GetPixel(540, 1000));
+        var changed = 0;
+        for (var y = 10; y < 330; y += 4)
+        for (var x = 60; x < 1020; x += 4)
+            if (bitmap.GetPixel(x, y) != new SKColor(0xC8, 0xB8, 0xA0)) changed++;
+        Assert.True(changed > 5000, $"{layout} : texte absent ({changed})");
+
+        var output = Environment.GetEnvironmentVariable("HUB_TEST_OUTPUT");
+        if (!string.IsNullOrEmpty(output))
+        {
+            Directory.CreateDirectory(output);
+            File.WriteAllBytes(Path.Combine(output, $"photo-{layout}.png"), png);
+        }
+    }
+
+    [Fact]
+    public async Task Le_format_impose_et_les_scenes_recentes_guident_la_photo()
+    {
+        var ai = new FakeAi(Brief("Avant, après : la différence"));
+        var idea = Idea with { Format = "avant-apres", AvoidScenes = ["Photorealistic ... sofa in a bright living room"] };
+        var result = await new PostVisualDesigner(ai, new FakeImages(), Composer, new FakeQuota(0), TimeProvider.System).DesignAsync(idea);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal("avant-apres", result.Value!.Format);
+        Assert.NotNull(result.Value.Scene);
+        Assert.Contains("Avant / après", ai.Last!.User);
+        Assert.Contains("Split-screen", ai.Last.User);
+        Assert.Contains("NE PAS refaire", ai.Last.User);
+        Assert.Contains("sofa in a bright living room", ai.Last.User);
+        Assert.Contains("cadrage :", ai.Last.User);
+    }
+
+    [Fact]
+    public void Deux_directions_tirees_ne_sont_presque_jamais_identiques()
+    {
+        var random = new Random(42);
+        var picks = Enumerable.Range(0, 30)
+            .Select(_ => PhotoDirection.Pick(Idea, Composer.Layouts, random))
+            .Select(d => $"{d.Format.Key}|{d.Camera}|{d.Light}|{d.Place}|{d.Palette}")
+            .ToList();
+        Assert.True(picks.Distinct().Count() >= 28);
+        Assert.True(picks.Select(p => p.Split('|')[0]).Distinct().Count() >= 6);
+    }
+
+    [Fact]
+    public void Sans_IA_la_consigne_photo_suit_le_format()
+    {
+        var d = PhotoDirection.Pick(Idea with { Format = "vu-du-dessus" }, Composer.Layouts, new Random(1));
+        var brief = PostVisualDesigner.TemplateBrief(Idea, d, DateTimeOffset.UtcNow);
+        Assert.Contains("flat lay", brief.Scene);
+        Assert.Contains("No text", brief.Scene);
+    }
 }

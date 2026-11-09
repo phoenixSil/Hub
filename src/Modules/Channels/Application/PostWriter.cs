@@ -12,7 +12,10 @@ public sealed record PostIdea(
     string Topic,
     string? Details,
     string Tone,
-    ChannelType Channel);
+    ChannelType Channel,
+    // Technique de rédaction du format publicitaire (voir CreativeFormats), et type d'accroche à utiliser.
+    string? Technique = null,
+    string? Hook = null);
 
 public sealed record PostSuggestion(string Text, string Model);
 
@@ -65,10 +68,13 @@ internal sealed class PostWriter(IAiTextGenerator ai) : IPostWriter
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Tu rédiges des publications {Network(i.Channel)} pour {i.CompanyName}, une entreprise de services à {i.City}.");
-        sb.AppendLine("Rédige en français du Québec, au vouvoiement, avec des phrases courtes et concrètes.");
-        sb.AppendLine("Propose 3 variantes différentes (angle, accroche, longueur), chacune de 40 à 120 mots.");
-        sb.AppendLine("- Commence par une accroche qui parle d'un besoin réel du client.");
-        sb.AppendLine("- Termine par un appel à l'action clair (demander un devis gratuit, prendre rendez-vous).");
+        sb.AppendLine("Tu écris comme un concepteur-rédacteur publicitaire de talent : chaque texte doit arrêter le défilement, donner une émotion et donner envie d'agir.");
+        sb.AppendLine("Rédige en français du Québec, au vouvoiement, avec des phrases courtes, concrètes et vivantes.");
+        sb.AppendLine("Propose 3 variantes VRAIMENT différentes (accroche, angle, structure, longueur), chacune de 30 à 120 mots.");
+        sb.AppendLine("- La première ligne est l'accroche : elle doit surprendre ou interpeller (jamais « Saviez-vous que nous offrons… » ni « Chez X, nous… »).");
+        sb.AppendLine("- Parle du lecteur et de ce qu'il gagne (temps, sérénité, fierté), pas de l'entreprise.");
+        sb.AppendLine("- Varie les structures : histoire courte, liste, question, contraste, dialogue, humour léger.");
+        sb.AppendLine("- Termine par un appel à l'action clair et adapté (demander un devis gratuit, commenter, enregistrer, partager, prendre rendez-vous).");
         sb.AppendLine("- 1 à 3 émojis au plus, et 2 à 4 mots-clics pertinents en fin de texte (ex. #Québec).");
         sb.AppendLine("- N'écris PAS de lien : il est ajouté automatiquement sous la publication.");
         sb.AppendLine("- N'invente ni prix, ni rabais, ni promesse, ni témoignage qui ne figurent pas dans le sujet.");
@@ -79,6 +85,8 @@ internal sealed class PostWriter(IAiTextGenerator ai) : IPostWriter
     internal static string UserPrompt(PostIdea i) =>
         $"Sujet : {i.Topic}\n" +
         (string.IsNullOrWhiteSpace(i.Details) ? "" : $"Précisions : {i.Details}\n") +
+        (string.IsNullOrWhiteSpace(i.Technique) ? "" : $"Technique de rédaction imposée : {i.Technique}\n") +
+        (string.IsNullOrWhiteSpace(i.Hook) ? "" : $"Type d'accroche pour la première variante : {i.Hook}\n") +
         $"Ton souhaité : {i.Tone}\n\nPropose les 3 variantes au format JSON demandé.";
 
     private const string Schema = """

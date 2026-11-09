@@ -13,11 +13,13 @@ public sealed class SkiaPhotoComposer(ILogger<SkiaPhotoComposer> logger) : IPhot
     public const string Bottom = "Bas";
     public const string Band = "Bandeau";
     public const string Card = "Carte";
+    public const string Top = "Haut";
+    public const string Poster = "Affiche";
 
     private static readonly SKColor Navy = new(0x10, 0x23, 0x3F);
     private const float Margin = 60;
 
-    public IReadOnlyList<string> Layouts { get; } = [Bottom, Band, Card];
+    public IReadOnlyList<string> Layouts { get; } = [Bottom, Band, Card, Top, Poster];
 
     public byte[]? Compose(byte[] photo, PhotoOverlay o, int size = 1080)
     {
@@ -37,6 +39,8 @@ public sealed class SkiaPhotoComposer(ILogger<SkiaPhotoComposer> logger) : IPhot
             {
                 case Band: DrawBand(canvas, o, size, primary, accent); break;
                 case Card: DrawCard(canvas, o, size, primary, accent); break;
+                case Top: DrawTop(canvas, o, size, primary, accent); break;
+                case Poster: DrawPoster(canvas, o, size, primary, accent); break;
                 default: DrawBottom(canvas, o, size, primary, accent); break;
             }
 
@@ -71,6 +75,40 @@ public sealed class SkiaPhotoComposer(ILogger<SkiaPhotoComposer> logger) : IPhot
         DrawBlock(canvas, o, block, Margin, top, SKColors.White, accent, SKColors.White.WithAlpha(225), primary, SKColors.White);
         using var line = new SKPaint { Color = accent };
         canvas.DrawRect(0, size - 10, size, 10, line);
+    }
+
+    /// <summary>Texte blanc sur un dégradé sombre en haut de la photo (le sujet occupe le bas).</summary>
+    private static void DrawTop(SKCanvas canvas, PhotoOverlay o, int size, SKColor primary, SKColor accent)
+    {
+        var width = size - 2 * Margin;
+        var block = Measure(o, width, titleMax: 80);
+        const float top = 56;
+        using (var shade = new SKPaint())
+        {
+            var end = Math.Min(size, top + block.Height + 240);
+            shade.Shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(0, end),
+                [Navy.WithAlpha(235), Navy.WithAlpha(150), Navy.WithAlpha(0)], [0f, 0.6f, 1f], SKShaderTileMode.Clamp);
+            canvas.DrawRect(0, 0, size, end, shade);
+        }
+        using (var line = new SKPaint { Color = accent })
+            canvas.DrawRect(0, 0, size, 10, line);
+        DrawBlock(canvas, o, block, Margin, top, SKColors.White, accent, SKColors.White.WithAlpha(225), primary, SKColors.White);
+    }
+
+    /// <summary>Affiche : grand aplat de la couleur principale en haut avec le texte, la photo dessous.</summary>
+    private static void DrawPoster(SKCanvas canvas, PhotoOverlay o, int size, SKColor primary, SKColor accent)
+    {
+        var width = size - 2 * Margin;
+        var block = Measure(o with { Badge = null }, width, titleMax: 84);
+        var panelBottom = Math.Max(size * 0.34f, block.Height + 100);
+        using (var panel = new SKPaint { Color = primary })
+            canvas.DrawRect(0, 0, size, panelBottom, panel);
+        using (var bar = new SKPaint { Color = accent })
+            canvas.DrawRect(0, panelBottom - 10, size, 10, bar);
+        var highlight = Contrast(accent, primary) >= 2.2 ? accent : Navy;
+        DrawBlock(canvas, o with { Badge = null }, block, Margin, 50, SKColors.White, highlight, SKColors.White.WithAlpha(235), primary, SKColors.White);
+        if (!string.IsNullOrWhiteSpace(o.Badge))
+            DrawBadge(canvas, o.Badge!, Margin, panelBottom + 24, accent, Navy);
     }
 
     /// <summary>Bandeau de la couleur principale sous la photo, liseré de la couleur d'accent.</summary>

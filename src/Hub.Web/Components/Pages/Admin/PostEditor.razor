@@ -148,6 +148,10 @@ else
                             <select @bind="visualStyle" aria-label="Style du visuel">
                                 @foreach (var st in Designer.Styles) { <option value="@st">@st</option> }
                             </select>
+                            <select @bind="visualFormat" aria-label="Format publicitaire">
+                                <option value="">Format : au hasard</option>
+                                @foreach (var f in CreativeFormats.All) { <option value="@f.Key">@f.Name</option> }
+                            </select>
                             <input @bind="facts" @bind:event="oninput" placeholder="Chiffres à afficher (ex. -20 %), facultatif" aria-label="Chiffres autorisés sur le visuel" />
                             <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy"
                                         Disabled="@string.IsNullOrWhiteSpace(VisualTopic)" BusyText="@(WantsPhoto ? "Création de la photo…" : Designer.UsesAi ? "Claude dessine…" : "Préparation…")">
@@ -347,6 +351,7 @@ else
     private byte[]? visualPng;
     private string? generatedImage;
     private VisualKind visualKind = VisualKind.Photo;
+    private string visualFormat = "";
     private bool WantsPhoto => Designer.MakesPhotos && visualKind == VisualKind.Photo;
     private string VisualDataUrl => visualPng is null ? "" : "data:image/png;base64," + Convert.ToBase64String(visualPng);
     private string? previewFor;
@@ -435,7 +440,9 @@ else
             company.Name, company.Phone, company.PrimaryColor, company.AccentColor,
             VisualTopic, draft.Message, facts, visualStyle,
             Site: company.SiteUrl,
-            Kind: WantsPhoto ? VisualKind.Photo : VisualKind.Illustration));
+            Kind: WantsPhoto ? VisualKind.Photo : VisualKind.Illustration,
+            Format: string.IsNullOrEmpty(visualFormat) ? null : visualFormat,
+            AvoidScenes: visual?.Scene is { } last ? [last] : null));
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         // Aperçu = image finale : dessinée côté serveur, avec la police de la marque.
