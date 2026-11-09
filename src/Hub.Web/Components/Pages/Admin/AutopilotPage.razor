@@ -98,6 +98,7 @@ else
                 <div class="actions">
                     <BusyButton OnClick="SaveAsync" IsBusy="@(action == "save")" AnyBusy="busy" BusyText="Enregistrement…">Enregistrer</BusyButton>
                     <BusyButton Class="btn btn-outline btn-sm" OnClick="RunNowAsync" IsBusy="@(action == "run")" AnyBusy="busy" BusyText="Demande envoyée…">Préparer la semaine maintenant</BusyButton>
+                    <BusyButton Class="btn btn-ghost btn-sm" OnClick="RedoAsync" IsBusy="@(action == "redo")" AnyBusy="busy" BusyText="Demande envoyée…">Refaire les publications à venir</BusyButton>
                 </div>
             </div>
         </div>
@@ -165,6 +166,20 @@ else
         End();
         feedback = result.IsSuccess
             ? "C'est parti : les publications de la semaine arrivent dans « Publications » d'ici quelques minutes."
+            : result.Error ?? "Vérifiez les champs signalés.";
+        feedbackIsError = result.IsFailure;
+    }
+
+    private async Task RedoAsync()
+    {
+        Begin("redo", "Enregistrement puis demande de redressement…");
+        await Task.Yield();
+        var saved = await Autopilot.SaveAsync(form!);
+        errors = saved.FieldErrors;
+        var result = saved.IsSuccess ? await Autopilot.RedoUpcomingAsync() : saved;
+        End();
+        feedback = result.IsSuccess
+            ? "C'est parti : les publications du pilote à venir (pas encore publiées) sont refaites avec de nouveaux formats. Elles arrivent dans « Publications » d'ici quelques minutes, à valider. Vos publications écrites à la main ne sont pas touchées."
             : result.Error ?? "Vérifiez les champs signalés.";
         feedbackIsError = result.IsFailure;
     }

@@ -55,6 +55,42 @@ internal sealed class AutopilotRunner(
 {
     public const string Author = "Pilote automatique";
 
+    /// <summary>
+    /// Redressement : les publications du pilote à venir et pas encore publiées sont remplacées par de nouvelles,
+    /// préparées avec les formats publicitaires variés. Les publications écrites à la main ne sont jamais touchées.
+    /// </summary>
+    /// <param name="onlyOldFormat">Vrai : seulement celles préparées avant les formats (redressement automatique).</param>
+    /// <returns>Nombre de publications remplacées par de nouvelles.</returns>
+    public async Task<Result<int>> RedoUpcomingAsync(bool onlyOldFormat, CancellationToken ct = default)
+    {
+        var now = clock.GetUtcNow();
+        await using (var db = await factory.CreateDbContextAsync(ct))
+        {
+            var old = await RedoCandidates(db.Posts, now, onlyOldFormat).ToListAsync(ct);
+            if (old.Count == 0) return Result<int>.Success(0);
+            foreach (var post in old) post.Status = PostStatus.Cancelled;
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Redressement : {Count} publication(s) du pilote à refaire", old.Count);
+        }
+        return await RunAsync(force: true, ct);
+    }
+
+    /// <summary>
+    /// Publications du pilote pas encore publiées, de demain à la fin de la semaine préparée :
+    /// exactement les jours que le pilote sait remplir à nouveau (celles d'aujourd'hui sont gardées).
+    /// </summary>
+    internal static IQueryable<Post> RedoCandidates(IQueryable<Post> posts, DateTimeOffset now, bool onlyOldFormat)
+    {
+        var today = AutopilotSchedule.LocalDay(now);
+        var from = BusinessTime.FromLocal(today.AddDays(1).ToDateTime(TimeOnly.MinValue));
+        var to = BusinessTime.FromLocal(today.AddDays(AutopilotSchedule.HorizonDays + 1).ToDateTime(TimeOnly.MinValue));
+        var query = posts.Where(p => p.FromAutopilot
+                                     && (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled)
+                                     && p.PublishedAt == null
+                                     && p.ScheduledAt > from && p.ScheduledAt < to);
+        return onlyOldFormat ? query.Where(p => p.Format == null) : query;
+    }
+
     public async Task<Result<int>> RunAsync(bool force, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
