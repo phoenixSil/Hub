@@ -84,7 +84,19 @@ internal sealed class AutopilotRunner(
             var history = await HistoryAsync(db, ct);
             var audiences = AutopilotService.ReadAudiences(settings.AudiencesJson);
             var brief = await BriefAsync(db, slots, ct);
-            var plan = await planner.PlanAsync(new AutopilotPlanRequest(context, audiences, slots, history, settings.Guidelines, now, brief), ct);
+
+            // Variété : formats et scènes des dernières publications (même pas encore parues), à ne pas répéter.
+            var recent = await db.Posts.AsNoTracking()
+                .Where(p => p.Status != PostStatus.Cancelled && p.FromAutopilot)
+                .OrderByDescending(p => p.ScheduledAt ?? p.PublishedAt)
+                .Take(20)
+                .Select(p => new { p.Format, p.SceneNote })
+                .ToListAsync(ct);
+            var pillars = Enumerable.Range(0, slots.Count).Select(i => brief?.SlotPillars.ElementAtOrDefault(i)).ToList();
+            var formats = CreativeFormats.Assign(pillars, recent.Select(p => p.Format).ToList(), Random.Shared);
+            var recentScenes = recent.Where(p => p.SceneNote != null).Select(p => p.SceneNote!).Take(10).ToList();
+
+            var plan = await planner.PlanAsync(new AutopilotPlanRequest(context, audiences, slots, history, settings.Guidelines, now, brief, formats), ct);
             if (plan.IsFailure)
             {
                 problems.Add(plan.Error!);
@@ -94,8 +106,9 @@ internal sealed class AutopilotRunner(
                 var channels = AutopilotService.ReadChannels(settings.Channels);
                 foreach (var item in plan.Value!)
                 {
-                    var post = await PrepareAsync(item, context, settings, channels, problems, ct);
+                    var post = await PrepareAsync(item, context, settings, channels, recentScenes, problems, ct);
                     if (post is null) continue;
+                    if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     db.Posts.Add(post.Value.Post);
                     db.PostTargets.AddRange(post.Value.Targets);
                     created++;
@@ -116,7 +129,8 @@ internal sealed class AutopilotRunner(
     }
 
     private async Task<(Post Post, List<PostTarget> Targets)?> PrepareAsync(
-        PlannedPost item, AutopilotContext context, AutopilotSettings settings, IReadOnlyList<ChannelType> channels, List<string> problems, CancellationToken ct)
+        PlannedPost item, AutopilotContext context, AutopilotSettings settings, IReadOnlyList<ChannelType> channels,
+        IReadOnlyList<string> recentScenes, List<string> problems, CancellationToken ct)
     {
         var audience = AutopilotService.ReadAudiences(settings.AudiencesJson).FirstOrDefault(a => a.Name == item.Audience);
         // Le public n'est transmis qu'à l'IA : les modèles de texte sans IA reprendraient la consigne mot pour mot.
@@ -124,14 +138,18 @@ internal sealed class AutopilotRunner(
             ? $"{item.Angle}\nPublic visé : {item.Audience}{(audience is null ? "" : " — " + audience.Description)}. Adresse-toi à ce public."
               + (item.Pillar is null ? "" : $"\nPilier de contenu : {item.Pillar}.")
             : item.Angle;
-        var text = await writer.SuggestAsync(new PostIdea(context.CompanyName, context.City, item.Topic, details, item.Tone, ChannelType.Facebook), ct);
+        var format = CreativeFormats.Find(item.Format);
+        var hook = CreativeFormats.Hooks[Random.Shared.Next(CreativeFormats.Hooks.Length)];
+        var text = await writer.SuggestAsync(new PostIdea(context.CompanyName, context.City, item.Topic, details, item.Tone, ChannelType.Facebook,
+            Technique: format?.Copy, Hook: hook), ct);
         if (text.IsFailure) { problems.Add(text.Error!); return null; }
         var suggestion = text.Value![0];
 
         var imageUrl = item.ImageUrl;
         var visualKind = "Importée";
         var visual = await designer.DesignAsync(new VisualIdea(context.CompanyName, context.Phone, context.PrimaryColor, context.AccentColor,
-            item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl), ct);
+            item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl,
+            Format: item.Format, AvoidScenes: recentScenes), ct);
         if (visual.IsSuccess && (visual.Value!.Png ?? (visual.Value.Svg is { } svg ? renderer.RenderPng(svg) : null)) is { } png)
         {
             var saved = await store.SavePngAsync(png, ct);
@@ -157,6 +175,8 @@ internal sealed class AutopilotRunner(
             VisualKind = imageUrl is null ? null : visualKind,
             Theme = item.Style,
             Pillar = item.Pillar?.Truncate(40),
+            Format = (visual.IsSuccess ? visual.Value!.Format : null) ?? item.Format,
+            SceneNote = visual.IsSuccess ? visual.Value!.Scene?.Truncate(400) : null,
             FromAutopilot = true,
             CreatedBy = Author,
             AiModel = suggestion.Model,
@@ -195,7 +215,7 @@ internal sealed class AutopilotRunner(
         var recent = await db.Posts.AsNoTracking()
             .Where(p => p.Status == PostStatus.Published || p.Status == PostStatus.PartiallyPublished)
             .OrderByDescending(p => p.PublishedAt).Take(30)
-            .Select(p => new { p.Id, p.Title, p.Audience, p.PublishedAt, p.Campaign, p.Theme, p.Pillar })
+            .Select(p => new { p.Id, p.Title, p.Audience, p.PublishedAt, p.Campaign, p.Theme, p.Pillar, p.Format })
             .ToListAsync(ct);
         if (recent.Count == 0) return [];
         var results = await source.GetResultsAsync(recent.Select(p => p.Campaign).ToList(), ct);
@@ -209,7 +229,7 @@ internal sealed class AutopilotRunner(
             var r = results.GetValueOrDefault(p.Campaign);
             var s = stats.GetValueOrDefault(p.Id);
             return new AutopilotHistory(p.Title, p.Audience, p.PublishedAt, r.Visits, r.Leads, r.Won, p.Theme,
-                s?.Reach ?? 0, s?.Interactions ?? 0, p.Pillar);
+                s?.Reach ?? 0, s?.Interactions ?? 0, p.Pillar, p.Format);
         }).ToList();
     }
 

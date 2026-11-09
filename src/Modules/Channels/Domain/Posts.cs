@@ -62,6 +62,12 @@ public sealed class Post : TenantEntity
 
     /// <summary>Pilier de contenu du plan marketing (Conseiller, Montrer, Rassurer, Proposer…).</summary>
     public string? Pillar { get; set; }
+
+    /// <summary>Format publicitaire (avant-apres, humour, question…), pour varier et comparer les résultats.</summary>
+    public string? Format { get; set; }
+
+    /// <summary>Résumé de la scène de la photo générée, pour ne pas refaire la même image.</summary>
+    public string? SceneNote { get; set; }
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

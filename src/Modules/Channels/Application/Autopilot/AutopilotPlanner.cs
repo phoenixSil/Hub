@@ -19,7 +19,8 @@ public sealed record PlannedPost(
     string? Facts,
     string Style,
     string Tone,
-    string? Pillar = null);
+    string? Pillar = null,
+    string? Format = null);
 
 /// <summary>Ce que le plan marketing impose à la semaine : l'objectif, l'étape en cours, et le pilier de chaque créneau.</summary>
 public sealed record PlanBrief(
@@ -35,7 +36,9 @@ public sealed record AutopilotPlanRequest(
     IReadOnlyList<AutopilotHistory> History,
     string? Guidelines,
     DateTimeOffset Now,
-    PlanBrief? Plan = null);
+    PlanBrief? Plan = null,
+    // Format publicitaire de chaque créneau (voir CreativeFormats) ; choisi automatiquement s'il est vide.
+    IReadOnlyList<string>? Formats = null);
 
 public interface IAutopilotPlanner
 {
@@ -59,6 +62,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         if (r.Context.Pages.Count == 0)
             return Result<IReadOnlyList<PlannedPost>>.Failure("Aucun service ni offre publiés : le pilote n'a rien à présenter.");
         var audiences = r.Audiences.Count > 0 ? r.Audiences : [new AutopilotAudience("Grand public", "Les clients de la région", 12)];
+        r = WithFormats(r, Random.Shared);
 
         if (!ai.IsAvailable) return Result<IReadOnlyList<PlannedPost>>.Success(Rotation(r, audiences));
 
@@ -69,6 +73,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         {
             var items = JsonNode.Parse(response.Value!.Json)?["publications"]?.AsArray() ?? [];
             var plan = new List<PlannedPost>();
+            var special = new HashSet<string>();
             for (var i = 0; i < r.Slots.Count && i < items.Count; i++)
             {
                 var n = items[i];
@@ -88,7 +93,8 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
                     Facts: page?.Facts,
                     Style: style,
                     Tone: page?.IsPromotion == true ? "Promotionnel" : "Chaleureux",
-                    Pillar: SlotPillar(r, i)));
+                    Pillar: SlotPillar(r, i),
+                    Format: CreativeFormats.ForAudience(SlotFormat(r, i), audience.Name, special)));
             }
             return plan.Count == 0
                 ? Result<IReadOnlyList<PlannedPost>>.Failure("L'IA n'a proposé aucun sujet.")
@@ -103,6 +109,8 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
     /// <summary>Sans IA : chaque créneau prend la page et le public suivants, sans répéter les derniers sujets.</summary>
     internal static IReadOnlyList<PlannedPost> Rotation(AutopilotPlanRequest r, IReadOnlyList<AutopilotAudience> audiences)
     {
+        r = WithFormats(r, Random.Shared);
+        var special = new HashSet<string>();
         var recent = r.History.Select(h => h.Title).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pages = r.Context.Pages.OrderBy(p => recent.Contains(p.Title)).ThenByDescending(p => p.IsPromotion).ToList();
         return r.Slots.Select((slot, i) =>
@@ -114,9 +122,21 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
                 : $"{page.Summary}\nApproche : {r.Plan!.Pillars.FirstOrDefault(p => p.Name == pillar)?.Description ?? pillar}";
             return new PlannedPost(AtHour(slot, audience.Hour), audience.Name, page.Title,
                 angle, page.Url, page.ImageUrl, page.Facts,
-                page.IsPromotion ? "Promotion" : "Service", page.IsPromotion ? "Promotionnel" : "Chaleureux", pillar);
+                page.IsPromotion ? "Promotion" : "Service", page.IsPromotion ? "Promotionnel" : "Chaleureux", pillar,
+                CreativeFormats.ForAudience(SlotFormat(r, i), audience.Name, special));
         }).ToList();
     }
+
+    /// <summary>Un format publicitaire par créneau : jamais deux fois le même dans la semaine, les moins récents d'abord.</summary>
+    internal static AutopilotPlanRequest WithFormats(AutopilotPlanRequest r, Random random)
+    {
+        if (r.Formats is { Count: > 0 }) return r;
+        var pillars = Enumerable.Range(0, r.Slots.Count).Select(i => SlotPillar(r, i)).ToList();
+        return r with { Formats = CreativeFormats.Assign(pillars, r.History.Select(h => h.Format).ToList(), random) };
+    }
+
+    private static string SlotFormat(AutopilotPlanRequest r, int i) =>
+        r.Formats is { Count: > 0 } f ? f[i % f.Count] : CreativeFormats.All[i % CreativeFormats.All.Count].Key;
 
     private static string? SlotPillar(AutopilotPlanRequest r, int i) =>
         r.Plan is { SlotPillars.Count: > 0 } plan ? plan.SlotPillars[i % plan.SlotPillars.Count] : null;
@@ -137,7 +157,10 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         - le style du visuel parmi : {string.Join(", ", Styles)}.
 
         Règles :
-        - Varie les services, les publics et les angles ; ne répète pas un sujet publié récemment.
+        - Chaque créneau a un FORMAT publicitaire imposé : le sujet et l'angle doivent être pensés pour ce format.
+        - Varie vraiment : chaque publication de la semaine porte sur un service, une pièce ou une situation différents ;
+          ne reprends pas un sujet des publications récentes. Des sujets précis et accrocheurs, jamais génériques
+          (« Le four après le souper des Fêtes » plutôt que « Service de ménage »).
         - Privilégie ce qui a apporté des visites et des demandes, sans tout miser dessus.
         - Tiens compte de la saison et des fêtes au Québec à ces dates.
         - Ne promets rien qui ne soit pas dans la description des pages ; aucun prix ni pourcentage inventé.
@@ -162,8 +185,10 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         for (var i = 0; i < r.Slots.Count; i++)
         {
             var pillar = SlotPillar(r, i);
+            var format = CreativeFormats.Find(r.Formats is { Count: > 0 } ? SlotFormat(r, i) : null);
             sb.AppendLine("- " + TimeZoneInfo.ConvertTime(r.Slots[i], BusinessTime.Zone).ToString("dddd d MMMM", Fr)
-                          + (pillar is null ? "" : $" · pilier « {pillar} » (le sujet et l'angle doivent suivre ce pilier)"));
+                          + (pillar is null ? "" : $" · pilier « {pillar} » (le sujet et l'angle doivent suivre ce pilier)")
+                          + (format is null ? "" : $" · format « {format.Name} » : {format.Copy}"));
         }
         sb.AppendLine().AppendLine("Publics :");
         foreach (var a in audiences) sb.AppendLine($"- {a.Name} : {a.Description}");
@@ -179,6 +204,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
             AppendAverages(sb, "Résultats moyens par public", r.History, h => h.Audience);
             AppendAverages(sb, "Résultats moyens par type de sujet", r.History, h => h.Theme);
             AppendAverages(sb, "Résultats moyens par pilier", r.History, h => h.Pillar);
+            AppendAverages(sb, "Résultats moyens par format", r.History, h => CreativeFormats.Find(h.Format)?.Name);
             sb.AppendLine(r.Plan?.Objective == PlanObjective.Visibility
                 ? "Fais davantage de ce qui atteint le plus de monde et suscite des interactions, en gardant un peu de variété pour continuer d'apprendre."
                 : "Fais davantage de ce qui apporte des demandes, en gardant un peu de variété pour continuer d'apprendre.");

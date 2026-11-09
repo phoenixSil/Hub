@@ -315,6 +315,10 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Format")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<bool>("FromAutopilot")
                         .HasColumnType("bit");
 
@@ -337,6 +341,10 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SceneNote")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
 
                     b.Property<DateTimeOffset?>("ScheduledAt")
                         .HasColumnType("datetimeoffset");
