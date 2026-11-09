@@ -38,6 +38,9 @@ public interface IAutopilotService
     /// <summary>Demande une préparation immédiate (en arrière-plan) des publications manquantes de la semaine.</summary>
     Task<Result> RunNowAsync(CancellationToken ct = default);
 
+    /// <summary>Refait toutes les publications du pilote à venir (pas encore publiées) avec les formats variés.</summary>
+    Task<Result> RedoUpcomingAsync(CancellationToken ct = default);
+
     Task<Result> ApproveAsync(Guid postId, CancellationToken ct = default);
     Task<Result> RejectAsync(Guid postId, CancellationToken ct = default);
     Task<int> PendingCountAsync(CancellationToken ct = default);
@@ -123,6 +126,14 @@ internal sealed class AutopilotService(
         return Result.Success();
     }
 
+    public async Task<Result> RedoUpcomingAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        if (!await db.AutopilotSettings.AnyAsync(ct)) return Result.Failure("Enregistrez d'abord les réglages du pilote.");
+        trigger.Request(tenant.TenantId, redo: true);
+        return Result.Success();
+    }
+
     public async Task<Result> ApproveAsync(Guid postId, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -156,9 +167,10 @@ internal sealed class AutopilotService(
 /// <summary>File des demandes « Préparer maintenant », lue par <see cref="AutopilotWorker"/>.</summary>
 internal sealed class AutopilotTrigger
 {
-    private readonly System.Threading.Channels.Channel<Guid> requests = System.Threading.Channels.Channel.CreateUnbounded<Guid>();
-    public void Request(Guid tenantId) => requests.Writer.TryWrite(tenantId);
-    public ChannelReader<Guid> Reader => requests.Reader;
+    private readonly System.Threading.Channels.Channel<(Guid TenantId, bool Redo)> requests =
+        System.Threading.Channels.Channel.CreateUnbounded<(Guid TenantId, bool Redo)>();
+    public void Request(Guid tenantId, bool redo = false) => requests.Writer.TryWrite((tenantId, redo));
+    public ChannelReader<(Guid TenantId, bool Redo)> Reader => requests.Reader;
 }
 
 /// <summary>
@@ -176,9 +188,17 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
         try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        // Redressement automatique, une seule fois : les publications à venir préparées avant les formats variés sont refaites.
+        try { await RedoOldFormatsAsync(stoppingToken); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogError(ex, "Redressement des publications à venir"); }
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            while (trigger.Reader.TryRead(out var tenantId)) await RunAsync(tenantId, force: true, stoppingToken);
+            while (trigger.Reader.TryRead(out var request))
+            {
+                if (request.Redo) await RedoAsync(request.TenantId, onlyOldFormat: false, stoppingToken);
+                else await RunAsync(request.TenantId, force: true, stoppingToken);
+            }
 
             try { await RunDueAsync(stoppingToken); }
             catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogError(ex, "Pilote automatique"); }
@@ -206,6 +226,33 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
                 .Select(s => s.TenantId).ToListAsync(ct);
         }
         foreach (var tenantId in due) await RunAsync(tenantId, force: false, ct);
+    }
+
+    private async Task RedoOldFormatsAsync(CancellationToken ct)
+    {
+        List<Guid> tenants;
+        await using (var scope = scopes.CreateAsyncScope())
+        {
+            var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ChannelsDbContext>>();
+            await using var db = await factory.CreateDbContextAsync(ct);
+            tenants = await AutopilotRunner.RedoCandidates(db.Posts.IgnoreQueryFilters(), clock.GetUtcNow(), onlyOldFormat: true)
+                .Select(p => p.TenantId).Distinct().ToListAsync(ct);
+        }
+        foreach (var tenantId in tenants) await RedoAsync(tenantId, onlyOldFormat: true, ct);
+    }
+
+    private async Task RedoAsync(Guid tenantId, bool onlyOldFormat, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenantId);
+            await scope.ServiceProvider.GetRequiredService<AutopilotRunner>().RedoUpcomingAsync(onlyOldFormat, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Redressement des publications de l'entreprise {TenantId}", tenantId);
+        }
     }
 
     private async Task RunAsync(Guid tenantId, bool force, CancellationToken ct)
