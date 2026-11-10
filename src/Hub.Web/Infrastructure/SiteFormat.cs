@@ -25,6 +25,13 @@ public static class SiteFormat
 
     public static string Logo(Tenant t) => string.IsNullOrWhiteSpace(t.LogoUrl) ? "/images/site/logo.png" : t.LogoUrl!;
 
+    /// <summary>Logo posé sur les visuels clairs : celui de l'entreprise, sinon celui du site, rogné au plus près.</summary>
+    public static string VisualLogo(Tenant t) => string.IsNullOrWhiteSpace(t.LogoUrl) ? "/images/site/logo-couleur.png" : t.LogoUrl!;
+
+    /// <summary>Logo posé sur les visuels foncés ; null = le logo normal sur une pastille blanche.</summary>
+    public static string? VisualLogoOnDark(Tenant t) =>
+        !string.IsNullOrWhiteSpace(t.LogoOnDarkUrl) ? t.LogoOnDarkUrl : string.IsNullOrWhiteSpace(t.LogoUrl) ? "/images/site/logo-blanc.png" : null;
+
     public static string LocalityLine(Tenant t) =>
         string.Join(", ", new[] { t.City, t.Region }.Where(x => !string.IsNullOrWhiteSpace(x)));
 

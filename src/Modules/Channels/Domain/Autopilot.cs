@@ -27,6 +27,9 @@ public sealed class AutopilotSettings : TenantEntity
     /// <summary>Consignes libres pour l'IA (ex. « ne jamais parler de prix », « mettre en avant les aînés »).</summary>
     public string? Guidelines { get; set; }
 
+    /// <summary>Styles visuels écartés par l'administrateur (clés séparées par des virgules).</summary>
+    public string? DisabledStyles { get; set; }
+
     public DateTimeOffset? LastRunAt { get; set; }
     public string? LastRunSummary { get; set; }
 }

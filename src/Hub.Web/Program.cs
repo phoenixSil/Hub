@@ -83,6 +83,7 @@ else
 builder.Services.Configure<SeniorCreditOptions>(builder.Configuration.GetSection(SeniorCreditOptions.Section));
 builder.Services.Configure<TurnstileOptions>(builder.Configuration.GetSection(TurnstileOptions.Section));
 builder.Services.AddHttpClient<TurnstileVerifier>();
+builder.Services.AddHttpClient(nameof(MediaVisualStore), c => c.Timeout = TimeSpan.FromSeconds(20));
 
 // Interface
 builder.Services.AddRazorComponents()

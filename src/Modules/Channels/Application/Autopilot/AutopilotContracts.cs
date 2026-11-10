@@ -26,7 +26,9 @@ public sealed record AutopilotContext(
     string AccentColor,
     string? SiteUrl,
     string AdminEmail,
-    IReadOnlyList<AutopilotPage> Pages);
+    IReadOnlyList<AutopilotPage> Pages,
+    string? LogoUrl = null,
+    string? LogoOnDarkUrl = null);
 
 /// <summary>Fournie par l'hôte : le module ne connaît ni le catalogue, ni le contenu, ni les statistiques.</summary>
 public interface IAutopilotContextSource
@@ -47,4 +49,7 @@ public interface IVisualRenderer
 public interface IVisualStore
 {
     Task<Result<string>> SavePngAsync(byte[] png, CancellationToken ct = default);
+
+    /// <summary>Relit une image publiée (adresse du site ou du stockage) ; null si elle est introuvable.</summary>
+    Task<byte[]?> LoadAsync(string url, CancellationToken ct = default);
 }

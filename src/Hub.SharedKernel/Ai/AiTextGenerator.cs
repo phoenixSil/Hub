@@ -1,7 +1,11 @@
 namespace Hub.SharedKernel.Ai;
 
 /// <summary>Demande de texte structuré : consignes, demande, schéma JSON de la réponse.</summary>
-public sealed record AiJsonRequest(string System, string User, string JsonSchema, int MaxTokens = 1500);
+public sealed record AiJsonRequest(string System, string User, string JsonSchema, int MaxTokens = 1500,
+    IReadOnlyList<AiImageInput>? Images = null);
+
+/// <summary>Image jointe à une demande (l'IA la regarde avant de lire le texte).</summary>
+public sealed record AiImageInput(byte[] Bytes, string MediaType = "image/jpeg");
 
 public sealed record AiJsonResponse(string Json, string Model, int InputTokens, int OutputTokens);
 

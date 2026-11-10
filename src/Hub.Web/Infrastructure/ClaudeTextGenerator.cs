@@ -14,6 +14,21 @@ internal sealed class ClaudeTextGenerator(HttpClient http, IOptions<AnthropicOpt
     public bool IsAvailable => true;
     public string ModelName => options.Value.Model;
 
+    /// <summary>Texte seul, ou images (base64) suivies du texte quand la demande en joint.</summary>
+    internal static JsonNode Content(AiJsonRequest r)
+    {
+        if (r.Images is not { Count: > 0 } images) return JsonValue.Create(r.User)!;
+        var parts = new JsonArray();
+        foreach (var image in images)
+            parts.Add(new JsonObject
+            {
+                ["type"] = "image",
+                ["source"] = new JsonObject { ["type"] = "base64", ["media_type"] = image.MediaType, ["data"] = Convert.ToBase64String(image.Bytes) },
+            });
+        parts.Add(new JsonObject { ["type"] = "text", ["text"] = r.User });
+        return parts;
+    }
+
     public async Task<Result<AiJsonResponse>> GenerateJsonAsync(AiJsonRequest r, CancellationToken ct = default)
     {
         var body = new JsonObject
@@ -25,7 +40,7 @@ internal sealed class ClaudeTextGenerator(HttpClient http, IOptions<AnthropicOpt
             {
                 ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = JsonNode.Parse(r.JsonSchema) },
             },
-            ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = r.User }),
+            ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = Content(r) }),
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, options.Value.Endpoint)

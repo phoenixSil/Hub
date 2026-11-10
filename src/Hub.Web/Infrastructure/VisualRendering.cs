@@ -101,8 +101,43 @@ internal sealed class BrandAssetLoader(SkiaModel model) : Svg.Model.ISvgAssetLoa
 }
 
 /// <summary>Enregistre le PNG d'un visuel dans le stockage des médias (local ou Azure Blob).</summary>
-internal sealed class MediaVisualStore(IMediaStorage media) : IVisualStore
+internal sealed class MediaVisualStore(IMediaStorage media, IWebHostEnvironment env, IHttpClientFactory http,
+    Microsoft.Extensions.Options.IOptions<MediaOptions> options, ILogger<MediaVisualStore> logger) : IVisualStore
 {
+    private const int MaxBytes = 12 * 1024 * 1024;
+
+    /// <summary>
+    /// Relit une image : fichier du site (« /images/… », « /uploads/… ») ou image du stockage Azure.
+    /// Aucune autre adresse n'est lue (le serveur ne va pas chercher n'importe quoi sur Internet).
+    /// </summary>
+    public async Task<byte[]?> LoadAsync(string url, CancellationToken ct = default)
+    {
+        try
+        {
+            if (url.StartsWith('/') && !url.StartsWith("//"))
+            {
+                var root = Path.GetFullPath(env.WebRootPath);
+                var path = Path.GetFullPath(Path.Combine(root, Uri.UnescapeDataString(url.Split('?')[0]).TrimStart('/')));
+                return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) && File.Exists(path)
+                    ? await File.ReadAllBytesAsync(path, ct) : null;
+            }
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || !IsMediaHost(uri)) return null;
+            using var response = await http.CreateClient(nameof(MediaVisualStore)).GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaxBytes) return null;
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            return bytes.Length > MaxBytes ? null : bytes;
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or TaskCanceledException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Image illisible : {Url}", url);
+            return null;
+        }
+    }
+
+    private bool IsMediaHost(Uri uri) =>
+        uri.Host.EndsWith(".blob.core.windows.net", StringComparison.OrdinalIgnoreCase)
+        || (Uri.TryCreate(options.Value.PublicBaseUrl, UriKind.Absolute, out var cdn) && string.Equals(cdn.Host, uri.Host, StringComparison.OrdinalIgnoreCase));
+
     public async Task<Result<string>> SavePngAsync(byte[] png, CancellationToken ct = default)
     {
         try

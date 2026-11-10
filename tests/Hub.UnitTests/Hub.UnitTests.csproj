@@ -12,6 +12,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="logo-test.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Hub.SharedKernel\Hub.SharedKernel.csproj" />
     <ProjectReference Include="..\..\src\Modules\Leads\Hub.Modules.Leads.csproj" />
     <ProjectReference Include="..\..\src\Modules\Content\Hub.Modules.Content.csproj" />

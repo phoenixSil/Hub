@@ -44,7 +44,9 @@ internal sealed class AutopilotContextSource(
             company.AccentColor,
             company.SiteUrl,
             company.AdminNotificationEmail,
-            pages);
+            pages,
+            SiteFormat.VisualLogo(company),
+            SiteFormat.VisualLogoOnDark(company));
     }
 
     public async Task<IReadOnlyDictionary<string, (int Visits, int Leads, int Won)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)

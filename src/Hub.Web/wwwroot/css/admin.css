@@ -302,3 +302,13 @@ code.break { word-break: break-all; }
     .plan-mix th:nth-child(4), .plan-mix td:nth-child(4) { display: none; }
     .plan-mix td { overflow-wrap: normal; }
 }
+
+/* Planche d'essai des styles */
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 0 0 20px; }
+.board-item { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: opacity .2s; }
+.board-item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.board-item figcaption { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
+.board-item.is-off { opacity: .45; }
+.board-error { aspect-ratio: 1; display: grid; place-items: center; padding: 16px; text-align: center; color: #b42318; background: #fef3f2; font-size: .85rem; }
+.board-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; margin: 8px 0 16px; }
+.board-styles .check, .board-item .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
