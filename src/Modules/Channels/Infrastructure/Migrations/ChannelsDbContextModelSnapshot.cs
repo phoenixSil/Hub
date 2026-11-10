@@ -127,6 +127,10 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("DisabledStyles")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("Enabled")
                         .HasColumnType("bit");
 
@@ -298,6 +302,10 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<string>("AiModel")
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ArtStyle")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("Audience")
                         .HasMaxLength(100)

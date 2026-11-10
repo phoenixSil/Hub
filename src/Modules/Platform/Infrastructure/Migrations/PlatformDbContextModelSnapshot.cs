@@ -155,6 +155,9 @@ namespace Hub.Modules.Platform.Infrastructure.Migrations
                     b.Property<DateOnly?>("LastWeeklyReportOn")
                         .HasColumnType("date");
 
+                    b.Property<string>("LogoOnDarkUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("LogoUrl")
                         .HasColumnType("nvarchar(max)");
 
