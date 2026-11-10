@@ -250,7 +250,10 @@ internal sealed class PostVisualDesigner(
             brief = TemplateBrief(idea, direction, clock.GetUtcNow());
         }
 
-        var prompt = direction.Poster ? PosterPrompt(brief) : brief.Scene;
+        var prompt = direction.Poster ? PosterPrompt(brief)
+            // Le texte est posé par notre application : l'IA d'image ne doit en écrire aucun.
+            : brief.Scene.Contains("No text", StringComparison.OrdinalIgnoreCase) ? brief.Scene
+            : brief.Scene.TrimEnd() + " No text, no letters, no words, no logos, no watermark, no brand names.";
         var image = await images.GenerateAsync(new AiImageRequest(prompt), ct);
         if (image.IsFailure) return Result<PostVisual>.Failure(image.Error!);
         if (quota is not null) await quota.RecordAsync(ct);
