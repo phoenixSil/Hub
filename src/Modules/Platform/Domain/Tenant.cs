@@ -19,6 +19,9 @@ public sealed class Tenant
     public string SecondaryColor { get; set; } = "#38D430";
     public string AccentColor { get; set; } = "#E2E735";
     public string? LogoUrl { get; set; }
+
+    /// <summary>Logo pour fond foncé (texte blanc), posé sur les visuels sombres ; vide = le logo normal sur une pastille blanche.</summary>
+    public string? LogoOnDarkUrl { get; set; }
     public string? FaviconUrl { get; set; }
     public string? DefaultOgImageUrl { get; set; }
 

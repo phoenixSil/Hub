@@ -128,6 +128,9 @@ internal sealed class AutopilotRunner(
                 .Take(20)
                 .Select(p => new { p.Format, p.SceneNote })
                 .ToListAsync(ct);
+            var memory = await CreativeMemoryAsync(db, settings, ct);
+            var recentImages = memory.RecentImageUrls.ToList();
+            var recentStyles = memory.RecentStyles.ToList();
             var pillars = Enumerable.Range(0, slots.Count).Select(i => brief?.SlotPillars.ElementAtOrDefault(i)).ToList();
             var formats = CreativeFormats.Assign(pillars, recent.Select(p => p.Format).ToList(), Random.Shared);
             var recentScenes = recent.Where(p => p.SceneNote != null).Select(p => p.SceneNote!).Take(10).ToList();
@@ -142,9 +145,12 @@ internal sealed class AutopilotRunner(
                 var channels = AutopilotService.ReadChannels(settings.Channels);
                 foreach (var item in plan.Value!)
                 {
-                    var post = await PrepareAsync(item, context, settings, channels, recentScenes, problems, ct);
+                    var post = await PrepareAsync(item, context, settings, channels, recentScenes,
+                        memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
                     if (post is null) continue;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
+                    if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
+                    if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
                     db.Posts.Add(post.Value.Post);
                     db.PostTargets.AddRange(post.Value.Targets);
                     created++;
@@ -166,7 +172,7 @@ internal sealed class AutopilotRunner(
 
     private async Task<(Post Post, List<PostTarget> Targets)?> PrepareAsync(
         PlannedPost item, AutopilotContext context, AutopilotSettings settings, IReadOnlyList<ChannelType> channels,
-        IReadOnlyList<string> recentScenes, List<string> problems, CancellationToken ct)
+        IReadOnlyList<string> recentScenes, CreativeMemory memory, List<string> problems, CancellationToken ct)
     {
         var audience = AutopilotService.ReadAudiences(settings.AudiencesJson).FirstOrDefault(a => a.Name == item.Audience);
         // Le public n'est transmis qu'à l'IA : les modèles de texte sans IA reprendraient la consigne mot pour mot.
@@ -185,7 +191,8 @@ internal sealed class AutopilotRunner(
         var visualKind = "Importée";
         var visual = await designer.DesignAsync(new VisualIdea(context.CompanyName, context.Phone, context.PrimaryColor, context.AccentColor,
             item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl,
-            Format: item.Format, AvoidScenes: recentScenes), ct);
+            Format: item.Format, AvoidScenes: recentScenes, Memory: memory,
+            LogoUrl: context.LogoUrl, LogoOnDarkUrl: context.LogoOnDarkUrl), ct);
         if (visual.IsSuccess && (visual.Value!.Png ?? (visual.Value.Svg is { } svg ? renderer.RenderPng(svg) : null)) is { } png)
         {
             var saved = await store.SavePngAsync(png, ct);
@@ -213,6 +220,7 @@ internal sealed class AutopilotRunner(
             Pillar = item.Pillar?.Truncate(40),
             Format = (visual.IsSuccess ? visual.Value!.Format : null) ?? item.Format,
             SceneNote = visual.IsSuccess ? visual.Value!.Scene?.Truncate(400) : null,
+            ArtStyle = visual.IsSuccess ? visual.Value!.ArtStyle : null,
             FromAutopilot = true,
             CreatedBy = Author,
             AiModel = suggestion.Model,
@@ -221,6 +229,21 @@ internal sealed class AutopilotRunner(
             Status = settings.PublishWithoutApproval ? PostStatus.Scheduled : PostStatus.AwaitingApproval,
         };
         return (post, channels.Select(c => new PostTarget { PostId = post.Id, Channel = c }).ToList());
+    }
+
+    /// <summary>Les 10 dernières images et leurs styles (publications non refusées), et les styles désactivés.</summary>
+    internal static async Task<CreativeMemory> CreativeMemoryAsync(ChannelsDbContext db, AutopilotSettings? settings, CancellationToken ct)
+    {
+        var recent = await db.Posts.AsNoTracking()
+            .Where(p => p.Status != PostStatus.Cancelled && p.ImageUrl != null)
+            .OrderByDescending(p => p.ScheduledAt ?? p.PublishedAt ?? p.CreatedAt)
+            .Take(10)
+            .Select(p => new { p.ImageUrl, p.ArtStyle })
+            .ToListAsync(ct);
+        return new CreativeMemory(
+            recent.Select(p => p.ImageUrl!).ToList(),
+            recent.Where(p => p.ArtStyle != null).Select(p => p.ArtStyle!).ToList(),
+            CreativeStyles.Parse(settings?.DisabledStyles).ToHashSet());
     }
 
     /// <summary>

@@ -38,6 +38,12 @@ public interface IAutopilotService
     /// <summary>Demande une préparation immédiate (en arrière-plan) des publications manquantes de la semaine.</summary>
     Task<Result> RunNowAsync(CancellationToken ct = default);
 
+    /// <summary>Dernières images, leurs styles, et les styles désactivés : pour varier aussi les visuels faits à la main.</summary>
+    Task<CreativeMemory> CreativeMemoryAsync(CancellationToken ct = default);
+
+    /// <summary>Styles visuels que le pilote et l'éditeur n'utilisent plus.</summary>
+    Task<Result> SaveDisabledStylesAsync(IReadOnlyCollection<string> keys, CancellationToken ct = default);
+
     /// <summary>Refait toutes les publications du pilote à venir (pas encore publiées) avec les formats variés.</summary>
     Task<Result> RedoUpcomingAsync(CancellationToken ct = default);
 
@@ -123,6 +129,25 @@ internal sealed class AutopilotService(
         await using var db = await factory.CreateDbContextAsync(ct);
         if (!await db.AutopilotSettings.AnyAsync(ct)) return Result.Failure("Enregistrez d'abord les réglages du pilote.");
         trigger.Request(tenant.TenantId);
+        return Result.Success();
+    }
+
+    public async Task<CreativeMemory> CreativeMemoryAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await AutopilotRunner.CreativeMemoryAsync(db, await db.AutopilotSettings.AsNoTracking().FirstOrDefaultAsync(ct), ct);
+    }
+
+    public async Task<Result> SaveDisabledStylesAsync(IReadOnlyCollection<string> keys, CancellationToken ct = default)
+    {
+        var valid = keys.Where(k => CreativeStyles.Find(k) is not null).Distinct().ToList();
+        if (valid.Count > CreativeStyles.All.Count - 4) return Result.Failure("Gardez au moins 4 styles pour que les visuels restent variés.");
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
+        if (settings is null)
+            db.AutopilotSettings.Add(settings = new AutopilotSettings { AudiencesJson = JsonSerializer.Serialize(DefaultAudiences, Json) });
+        settings.DisabledStyles = valid.Count == 0 ? null : string.Join(",", valid);
+        await db.SaveChangesAsync(ct);
         return Result.Success();
     }
 

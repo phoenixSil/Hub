@@ -1,0 +1,206 @@
+@page "/admin/planche"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IPostVisualDesigner Designer
+@inject IAutopilotService Autopilot
+@inject IVisualStore Visuals
+@inject ICurrentTenant Tenant
+
+<PageTitle>Planche d'essai</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Planche d'essai des styles</h1>
+        <p class="muted">
+            Douze visuels d'essai, un par format publicitaire, chacun dans un style différent. Gardez les styles qui vous
+            plaisent et décochez les autres : le pilote automatique et l'éditeur n'utiliseront plus que les styles cochés.
+        </p>
+    </div>
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
+}
+
+<div class="admin-card">
+    <h2>Créer la planche</h2>
+    @if (!Designer.MakesPhotos)
+    {
+        <p class="muted">Aucun service d'images n'est configuré (clé Google Gemini) : la planche ne peut pas être créée.</p>
+    }
+    else
+    {
+        <p>Douze images sont créées l'une après l'autre (environ 5 minutes). Elles comptent dans le plafond mensuel de photos.
+           Gardez cette page ouverte pendant la création.</p>
+        <div class="actions">
+            @if (running)
+            {
+                <span class="busy-banner"><span class="spinner" aria-hidden="true"></span> Image @(done + 1) sur @total… (@current)</span>
+                <button class="btn btn-ghost btn-sm" @onclick="Stop">Arrêter</button>
+            }
+            else
+            {
+                <button class="btn btn-primary" @onclick="RunAsync">Créer la planche (12 images)</button>
+            }
+        </div>
+    }
+</div>
+
+@if (results.Count > 0)
+{
+    <div class="board-grid">
+        @foreach (var r in results)
+        {
+            var style = CreativeStyles.Find(r.Style);
+            <figure class="board-item @(enabled.Contains(r.Style) ? null : "is-off")">
+                @if (r.Url is not null)
+                {
+                    <img src="@r.Url" alt="Essai : @style?.Name, @r.FormatName" loading="lazy" />
+                }
+                else
+                {
+                    <div class="board-error">@r.Error</div>
+                }
+                <figcaption>
+                    <label class="check">
+                        <input type="checkbox" checked="@enabled.Contains(r.Style)" @onchange="e => Toggle(r.Style, (bool)e.Value!)" />
+                        <strong>@style?.Name</strong>
+                    </label>
+                    <span class="muted small">@r.FormatName</span>
+                </figcaption>
+            </figure>
+        }
+    </div>
+}
+
+<div class="admin-card">
+    <h2>Styles utilisés (@enabled.Count sur @CreativeStyles.All.Count)</h2>
+    <p class="muted small">Gardez-en au moins 4 pour que les visuels restent variés.</p>
+    <div class="board-styles">
+        @foreach (var s in CreativeStyles.All)
+        {
+            <label class="check" title="@s.Prompt">
+                <input type="checkbox" checked="@enabled.Contains(s.Key)" @onchange="e => Toggle(s.Key, (bool)e.Value!)" />
+                @s.Name
+            </label>
+        }
+    </div>
+    <div class="actions">
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">Enregistrer les styles</button>
+    </div>
+</div>
+
+@code {
+    private sealed record BoardResult(string Style, string FormatName, string? Url, string? Error);
+
+    // Sujets d'essai concrets, un par format, pour juger les styles sur de vraies situations.
+    private static readonly Dictionary<string, (string Topic, string Message)> Samples = new()
+    {
+        ["avant-apres"] = ("La cuisine après le souper des Fêtes", "Le lendemain de la fête, on s'occupe de la cuisine. Vous, vous profitez."),
+        ["gros-plan"] = ("Une salle de bain qui brille", "Robinetterie, céramique, miroirs : tout brille, sans que vous leviez le petit doigt."),
+        ["vu-du-dessus"] = ("3 produits maison pour nettoyer", "Vinaigre, bicarbonate et citron : notre trio pour un nettoyage efficace et doux."),
+        ["humour"] = ("La montagne de lavage du dimanche", "La pile de lavage vous regarde ? On s'en occupe."),
+        ["temps-retrouve"] = ("Vos samedis, sans corvées", "Patinoire, café, jeux en famille : retrouvez vos samedis, on garde la maison propre."),
+        ["coulisses"] = ("L'équipe en action", "Une méthode, du soin, et une équipe fière de son travail."),
+        ["portrait"] = ("Rentrer dans une maison propre", "Imaginez ouvrir la porte après le travail et respirer l'odeur du propre."),
+        ["question"] = ("Quelle pièce détestez-vous nettoyer ?", "Salle de bain, four ou fenêtres ? Dites-le-nous en commentaire !"),
+        ["saison"] = ("L'entrée en hiver : bottes, sel et calcium", "Nos astuces pour garder l'entrée propre tout l'hiver à Québec."),
+        ["offre"] = ("Devis gratuit en 24 heures", "Demandez votre devis : réponse en un jour ouvrable, sans engagement."),
+        ["aines"] = ("Rester chez soi, en toute sérénité", "Notre aide à domicile permet aux aînés de profiter de leur maison et de leur famille."),
+        ["astuce"] = ("Le four propre sans produits agressifs", "Le saviez-vous ? Une pâte de bicarbonate laissée une nuit fait des miracles."),
+    };
+
+    private readonly List<BoardResult> results = [];
+    private HashSet<string> enabled = [];
+    private CancellationTokenSource? cts;
+    private bool running;
+    private bool saving;
+    private int done;
+    private int total;
+    private string? current;
+    private string? feedback;
+    private bool feedbackIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var memory = await Autopilot.CreativeMemoryAsync();
+        enabled = CreativeStyles.All.Select(s => s.Key).Where(k => !memory.DisabledStyles.Contains(k)).ToHashSet();
+    }
+
+    private async Task RunAsync()
+    {
+        if (running) return;
+        running = true;
+        feedback = null;
+        results.Clear();
+        cts = new CancellationTokenSource();
+        var ct = cts.Token;
+        try
+        {
+            var company = await Tenant.GetAsync(ct);
+            var styles = CreativeStyles.All.Where(s => enabled.Contains(s.Key)).OrderBy(_ => Random.Shared.Next()).ToList();
+            if (styles.Count == 0) styles = CreativeStyles.All.OrderBy(_ => Random.Shared.Next()).ToList();
+            var formats = CreativeFormats.All;
+            total = formats.Count;
+            for (done = 0; done < total && !ct.IsCancellationRequested; done++)
+            {
+                var format = formats[done];
+                var style = styles[done % styles.Count];
+                current = $"{style.Name} · {format.Name}";
+                StateHasChanged();
+                var sample = Samples.TryGetValue(format.Key, out var x) ? x : (format.Name, format.Name);
+                var visual = await Designer.DesignAsync(new VisualIdea(company.Name, company.Phone, company.PrimaryColor, company.AccentColor,
+                    sample.Item1, sample.Item2, null, "Service",
+                    Audience: format.Audience is null ? null : "Aînés et leurs proches",
+                    Site: company.SiteUrl, Kind: VisualKind.Photo, Format: format.Key, ArtStyle: style.Key, SingleAttempt: true,
+                    LogoUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogo(company),
+                    LogoOnDarkUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogoOnDark(company)), ct);
+                if (visual.IsSuccess && visual.Value!.Png is { } png)
+                {
+                    var saved = await Visuals.SavePngAsync(png, ct);
+                    results.Add(new BoardResult(style.Key, format.Name, saved.IsSuccess ? saved.Value : null, saved.IsSuccess ? null : saved.Error));
+                }
+                else
+                {
+                    results.Add(new BoardResult(style.Key, format.Name, null, visual.Error ?? "Aucune image."));
+                    if (visual.Error?.Contains("Plafond") == true) break;
+                }
+                StateHasChanged();
+            }
+            feedback = "Planche terminée : décochez les styles qui ne vous plaisent pas, puis enregistrez.";
+            feedbackIsError = false;
+        }
+        catch (OperationCanceledException)
+        {
+            feedback = "Création arrêtée.";
+        }
+        finally
+        {
+            running = false;
+            current = null;
+        }
+    }
+
+    private void Stop() => cts?.Cancel();
+
+    private void Toggle(string key, bool on)
+    {
+        if (on) enabled.Add(key); else enabled.Remove(key);
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        var result = await Autopilot.SaveDisabledStylesAsync(CreativeStyles.All.Select(s => s.Key).Where(k => !enabled.Contains(k)).ToList());
+        saving = false;
+        feedbackIsError = result.IsFailure;
+        feedback = result.IsSuccess ? $"Styles enregistrés : {enabled.Count} styles utilisés par le pilote et l'éditeur." : result.Error;
+    }
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        cts?.Dispose();
+    }
+}

@@ -68,6 +68,9 @@ public sealed class Post : TenantEntity
 
     /// <summary>Résumé de la scène de la photo générée, pour ne pas refaire la même image.</summary>
     public string? SceneNote { get; set; }
+
+    /// <summary>Style visuel de l'image (voir la bible de styles), pour ne pas le répéter.</summary>
+    public string? ArtStyle { get; set; }
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

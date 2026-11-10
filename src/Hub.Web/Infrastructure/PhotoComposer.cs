@@ -56,6 +56,113 @@ public sealed class SkiaPhotoComposer(ILogger<SkiaPhotoComposer> logger) : IPhot
         }
     }
 
+    // --- Affiche conçue par l'IA ---------------------------------------------------------------
+
+    /// <summary>
+    /// Affiche dont le texte a été écrit par l'IA d'image : recadrage carré, vrai logo dans le coin laissé libre
+    /// (version blanche sur fond foncé, normale sur fond clair, sinon sur une pastille), coordonnées en petit en bas.
+    /// </summary>
+    public byte[]? FinishPoster(byte[] poster, PosterFinish f, int size = 1080)
+    {
+        try
+        {
+            using var source = SKBitmap.Decode(poster);
+            if (source is null) return null;
+            using var image = SKImage.FromBitmap(source);
+            using var bitmap = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
+            using var canvas = new SKCanvas(bitmap);
+            canvas.Clear(SKColors.White);
+            DrawCover(canvas, image, size);
+
+            const float margin = 36;
+            var top = f.Corner.StartsWith("haut", StringComparison.Ordinal);
+            var left = f.Corner.EndsWith("gauche", StringComparison.Ordinal);
+            var logoWidth = size * 0.27f;
+
+            using var light = f.LogoForLight is null ? null : SKBitmap.Decode(f.LogoForLight);
+            using var dark = f.LogoForDark is null ? null : SKBitmap.Decode(f.LogoForDark);
+            var reference = light ?? dark;
+            if (reference is not null)
+            {
+                var logoHeight = logoWidth * reference.Height / reference.Width;
+                var rect = SKRect.Create(left ? margin : size - margin - logoWidth, top ? margin : size - margin - logoHeight - 52, logoWidth, logoHeight);
+                var background = Luminance(bitmap, rect);
+                SKBitmap logo;
+                SKColor? pill = null;
+                if (background < 0.45 && dark is not null) logo = dark;
+                else if (background >= 0.45 && light is not null) logo = light;
+                else if (light is not null) { logo = light; pill = SKColors.White.WithAlpha(235); }
+                else { logo = dark!; pill = Navy.WithAlpha(220); }
+                if (pill is { } p)
+                {
+                    using var back = new SKPaint { Color = p, IsAntialias = true };
+                    canvas.DrawRoundRect(new SKRoundRect(SKRect.Inflate(rect, 18, 14), 18), back);
+                }
+                using var logoImage = SKImage.FromBitmap(logo);
+                canvas.DrawImage(logoImage, rect, new SKSamplingOptions(SKCubicResampler.Mitchell));
+            }
+
+            // Coordonnées : petite pastille en bas, du côté opposé au logo quand il est en bas.
+            var contact = string.Join("  ·  ", new[] { f.Phone, f.Site }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            if (contact.Length > 0)
+            {
+                using var font = Font(true, 25);
+                var width = font.MeasureText(contact) + 44;
+                var x = top ? (size - width) / 2 : left ? size - margin - width : margin;
+                var r = SKRect.Create(x, size - margin - 46, width, 46);
+                using (var back = new SKPaint { Color = Navy.WithAlpha(215), IsAntialias = true })
+                    canvas.DrawRoundRect(new SKRoundRect(r, 23), back);
+                using var paint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+                canvas.DrawText(contact, r.Left + 22, r.MidY + 9, SKTextAlign.Left, font, paint);
+            }
+
+            canvas.Flush();
+            using var snapshot = SKImage.FromBitmap(bitmap);
+            using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
+            return data.ToArray();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Finition de l'affiche impossible");
+            return null;
+        }
+    }
+
+    public byte[]? Thumbnail(byte[] image, int size = 512)
+    {
+        try
+        {
+            using var source = SKBitmap.Decode(image);
+            if (source is null) return null;
+            var scale = Math.Min(1f, size / (float)Math.Max(source.Width, source.Height));
+            using var resized = source.Resize(new SKImageInfo(Math.Max(1, (int)(source.Width * scale)), Math.Max(1, (int)(source.Height * scale))),
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+            using var img = SKImage.FromBitmap(resized ?? source);
+            using var data = img.Encode(SKEncodedImageFormat.Jpeg, 80);
+            return data.ToArray();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Miniature impossible");
+            return null;
+        }
+    }
+
+    /// <summary>Luminosité moyenne (0 à 1) d'une zone de l'image.</summary>
+    internal static double Luminance(SKBitmap bitmap, SKRect rect)
+    {
+        double sum = 0;
+        var n = 0;
+        for (var y = (int)Math.Max(0, rect.Top); y < Math.Min(bitmap.Height, rect.Bottom); y += 6)
+        for (var x = (int)Math.Max(0, rect.Left); x < Math.Min(bitmap.Width, rect.Right); x += 6)
+        {
+            var c = bitmap.GetPixel(x, y);
+            sum += (0.2126 * c.Red + 0.7152 * c.Green + 0.0722 * c.Blue) / 255.0;
+            n++;
+        }
+        return n == 0 ? 1 : sum / n;
+    }
+
     // --- Mises en page -------------------------------------------------------------------------
 
     /// <summary>Texte blanc sur un dégradé sombre en bas de la photo.</summary>

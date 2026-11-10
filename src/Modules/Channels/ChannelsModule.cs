@@ -93,6 +93,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Pillar).HasMaxLength(40);
             e.Property(x => x.Format).HasMaxLength(40);
             e.Property(x => x.SceneNote).HasMaxLength(400);
+            e.Property(x => x.ArtStyle).HasMaxLength(40);
             e.HasIndex(x => new { x.Status, x.ScheduledAt });
             e.HasIndex(x => new { x.TenantId, x.Campaign });
         });
@@ -115,6 +116,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Channels).HasMaxLength(200);
             e.Property(x => x.Guidelines).HasMaxLength(2000);
             e.Property(x => x.LastRunSummary).HasMaxLength(1000);
+            e.Property(x => x.DisabledStyles).HasMaxLength(1000);
             e.HasIndex(x => x.TenantId).IsUnique();
         });
 

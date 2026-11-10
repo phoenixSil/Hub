@@ -54,6 +54,7 @@ ADMIN = [
     ("admin-pilote", "/admin/pilote-automatique"),
     ("admin-resultats", "/admin/resultats"),
     ("admin-plan", "/admin/plan-marketing"),
+    ("admin-planche", "/admin/planche"),
     ("admin-services", "/admin/services"),
     ("admin-secteurs", "/admin/secteurs"),
     ("admin-offres", "/admin/offres"),

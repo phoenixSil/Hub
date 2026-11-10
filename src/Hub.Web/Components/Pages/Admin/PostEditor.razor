@@ -163,6 +163,10 @@ else
                         {
                             <div class="visual-proposal">
                                 <img src="@VisualDataUrl" alt="Proposition de visuel : @visual.Headline" />
+                                @if (CreativeStyles.Find(visual.ArtStyle) is { } st)
+                                {
+                                    <p class="muted small">Style : @st.Name@(CreativeFormats.Find(visual.Format) is { } fm ? $" · Format : {fm.Name}" : "")</p>
+                                }
                                 <div class="actions">
                                     <BusyButton OnClick="UseVisualAsync" IsBusy="@(action == "use-visual")" AnyBusy="busy" BusyText="Préparation de l'image…">Utiliser ce visuel</BusyButton>
                                     <BusyButton Class="btn btn-outline btn-sm" OnClick="DesignAsync" IsBusy="@(action == "design")" AnyBusy="busy" BusyText="Nouvelle proposition…">Autre proposition</BusyButton>
@@ -436,13 +440,17 @@ else
             ? "Claude imagine la scène, puis la photo est créée et mise en page… (environ 30 à 60 secondes)"
             : Designer.UsesAi ? "Claude dessine le visuel… (1 à 2 minutes)" : "Préparation du visuel…");
         var company = await Tenant.GetAsync();
+        var memory = await Autopilot.CreativeMemoryAsync();
         var result = await Designer.DesignAsync(new VisualIdea(
             company.Name, company.Phone, company.PrimaryColor, company.AccentColor,
             VisualTopic, draft.Message, facts, visualStyle,
             Site: company.SiteUrl,
             Kind: WantsPhoto ? VisualKind.Photo : VisualKind.Illustration,
             Format: string.IsNullOrEmpty(visualFormat) ? null : visualFormat,
-            AvoidScenes: visual?.Scene is { } last ? [last] : null));
+            AvoidScenes: visual?.Scene is { } last ? [last] : null,
+            Memory: visual?.ArtStyle is { } lastStyle ? memory with { RecentStyles = [lastStyle, .. memory.RecentStyles] } : memory,
+            LogoUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogo(company),
+            LogoOnDarkUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogoOnDark(company)));
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         // Aperçu = image finale : dessinée côté serveur, avec la police de la marque.
