@@ -69,7 +69,8 @@ h1:focus, h1:focus-visible { outline: none; }
 .topbar-social { display: flex; gap: 12px; }
 .site-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .header-inner { display: flex; align-items: center; gap: 24px; min-height: 72px; }
-.brand img { height: 46px; width: auto; }
+.brand { flex-shrink: 0; }
+.brand img { height: 46px; width: auto; max-width: none; }
 .main-nav { margin-left: auto; }
 .main-nav > ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
 .main-nav a { display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; white-space: nowrap; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 500; font-size: .92rem; }
@@ -399,5 +400,9 @@ h1:focus, h1:focus-visible { outline: none; }
 .steps-list { margin: 0 0 24px; padding-left: 1.2em; }
 .steps-list li { margin-bottom: 6px; }
 .balance-form { display: flex; gap: 8px; }
-.balance-form input { flex: 1; min-width: 0; text-transform: uppercase; font-family: Consolas, Menlo, monospace; }
+.balance-form input { flex: 1; min-width: 0; text-transform: uppercase; font-family: Consolas, Menlo, monospace; font-size: .95rem;
+    padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+.balance-form input:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 4px rgba(0,151,206,.15); }
+.topbar-gift { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; font-weight: 600; color: var(--lime) !important; text-decoration: none; }
+.topbar-gift:hover { text-decoration: underline; }
 .giftcard-hero .hl { color: var(--lime); }
