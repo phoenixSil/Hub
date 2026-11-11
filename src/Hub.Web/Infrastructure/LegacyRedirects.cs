@@ -21,6 +21,7 @@ public static class LegacyRedirectResolver
         ["reservation"] = "/rendez-vous", ["reserver"] = "/rendez-vous", ["prendre-rendez-vous"] = "/rendez-vous",
         ["questions-frequentes"] = "/faq", ["foire-aux-questions"] = "/faq",
         ["politique-de-confidentialite"] = "/confidentialite", ["privacy-policy"] = "/confidentialite", ["confidentialité"] = "/confidentialite",
+        ["cartes-cadeaux"] = "/carte-cadeau", ["carte-cadeaux"] = "/carte-cadeau", ["gift-card"] = "/carte-cadeau", ["cheque-cadeau"] = "/carte-cadeau",
         ["zones-desservies"] = "/secteurs", ["territoire"] = "/secteurs", ["regions"] = "/secteurs",
     };
 
@@ -114,7 +115,7 @@ public sealed class LegacyRedirectMiddleware(RequestDelegate next, IConfiguratio
     /// <summary>Les pages publiques actuelles, mêmes sources que le plan du site.</summary>
     public static async Task<IReadOnlyCollection<string>> LivePathsAsync(ICatalogQueries catalog, IContentQueries content, CancellationToken ct)
     {
-        var paths = new List<string> { "/", "/devis", "/rendez-vous", "/contact", "/faq", "/secteurs", "/merci" };
+        var paths = new List<string> { "/", "/devis", "/rendez-vous", "/contact", "/faq", "/secteurs", "/merci", "/carte-cadeau" };
         foreach (var category in await catalog.GetCatalogAsync(ct))
             paths.AddRange(category.Services.Select(s => s.Url));
         var site = await content.GetAsync(ct);

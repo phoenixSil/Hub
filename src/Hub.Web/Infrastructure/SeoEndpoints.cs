@@ -23,7 +23,7 @@ public static class SeoEndpoints
         app.MapGet("/sitemap.xml", async (HttpContext ctx, ICatalogQueries catalog, IContentQueries content) =>
         {
             var baseUrl = BaseUrl(ctx);
-            var paths = new List<string> { "/", "/devis", "/rendez-vous", "/contact", "/faq", "/secteurs" };
+            var paths = new List<string> { "/", "/devis", "/rendez-vous", "/contact", "/faq", "/secteurs", "/carte-cadeau" };
 
             foreach (var category in await catalog.GetCatalogAsync(ctx.RequestAborted))
                 paths.AddRange(category.Services.Select(s => s.Url));

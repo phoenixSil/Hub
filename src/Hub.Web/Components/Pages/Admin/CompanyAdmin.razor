@@ -35,6 +35,12 @@
                 <span class="muted small">Posé sur les visuels sombres des publications. Fond transparent, rogné au plus près.</span>
             </div>
             <div class="field">
+                <label for="gcpay">Instructions de paiement des cartes-cadeaux</label>
+                <textarea id="gcpay" rows="3" maxlength="1000" @bind="tenant.GiftCardPaymentInstructions"
+                          placeholder="Ex. Virement Interac à paiement@exemple.com (réponse : carte), ou par téléphone au 418 000-0000."></textarea>
+                <span class="muted small">Envoyées à l'acheteur juste après sa demande. Vide : « nous vous contactons pour le paiement ».</span>
+            </div>
+            <div class="field">
                 <label for="season">Thème saisonnier du site</label>
                 <select id="season" @bind="tenant.SeasonalTheme">
                     <option value="auto">Automatique (selon les dates)</option>

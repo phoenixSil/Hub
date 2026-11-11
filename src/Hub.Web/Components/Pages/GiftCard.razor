@@ -1,0 +1,201 @@
+@page "/carte-cadeau"
+@using Hub.Modules.GiftCards.Application
+@using Hub.Modules.GiftCards.Domain
+@inject ICurrentTenant CurrentTenant
+@inject IGiftCardService GiftCards
+@inject TurnstileVerifier Turnstile
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+@if (tenant is null)
+{
+    return;
+}
+
+<Seo Title="Carte-cadeau" Description="@($"Offrez une carte-cadeau {tenant.Name} : du temps libre et une maison qui brille. Sans date d'expiration.")" SiteName="@tenant.Name" />
+
+<section class="page-hero page-hero-plain giftcard-hero">
+    <div class="container">
+        <span class="eyebrow eyebrow-light">Carte-cadeau</span>
+        <h1>Offrez du temps, offrez <span class="hl">du propre</span></h1>
+        <p class="hero-lead">Une carte-cadeau @tenant.Name, c'est une maison qui brille sans lever le petit doigt : pour vos parents,
+            une nouvelle maman, un ami qui déménage… Sans date d'expiration, utilisable sur tous nos services.</p>
+    </div>
+</section>
+
+<section class="section section-form">
+    <div class="container form-layout">
+        <form method="post" @formname="giftcard" @onsubmit="SubmitAsync" class="lead-form" data-track-form="carte-cadeau" novalidate>
+            <AntiforgeryToken />
+            @if (error is not null)
+            {
+                <div class="alert alert-error" role="alert">@error</div>
+            }
+            <fieldset>
+                <legend>Montant</legend>
+                <div class="amount-choices" role="radiogroup" aria-label="Montant de la carte">
+                    @foreach (var a in Suggested)
+                    {
+                        <label class="amount-choice">
+                            <input type="radio" name="Model.Amount" value="@a" checked="@(Model!.Amount == a)" />
+                            <span>@Money(a)</span>
+                        </label>
+                    }
+                    <label class="amount-choice">
+                        <input type="radio" name="Model.Amount" value="0" checked="@(Model!.Amount == 0)" />
+                        <span>Autre</span>
+                    </label>
+                </div>
+                <div class="field amount-custom">
+                    <label for="custom">Autre montant (25 $ à 1 000 $)</label>
+                    <input id="custom" name="Model.CustomAmount" value="@Model.CustomAmount" type="number" min="25" max="1000" step="5" inputmode="numeric" />
+                </div>
+                <FieldError For="Amount" Errors="errors" />
+            </fieldset>
+
+            <fieldset>
+                <legend>Pour qui ?</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="rname">Nom de la personne <span class="req">*</span></label>
+                        <input id="rname" name="Model.RecipientName" value="@Model.RecipientName" required maxlength="160" />
+                        <FieldError For="RecipientName" Errors="errors" />
+                    </div>
+                    <div class="field">
+                        <label for="remail">Son courriel</label>
+                        <input id="remail" name="Model.RecipientEmail" value="@Model.RecipientEmail" type="email" maxlength="256" />
+                        <span class="hint">Laissez vide pour recevoir la carte vous-même et l'offrir en main propre.</span>
+                        <FieldError For="RecipientEmail" Errors="errors" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="msg">Votre petit mot (facultatif)</label>
+                    <textarea id="msg" name="Model.Message" rows="3" maxlength="400">@Model.Message</textarea>
+                    <FieldError For="Message" Errors="errors" />
+                </div>
+                <div class="field">
+                    <label for="when">Date d'envoi (facultatif)</label>
+                    <input id="when" name="Model.DeliverOn" value="@Model.DeliverOn?.ToString("yyyy-MM-dd")" type="date" min="@today.ToString("yyyy-MM-dd")" />
+                    <span class="hint">Par exemple le 24 décembre. Vide : dès le paiement reçu.</span>
+                    <FieldError For="DeliverOn" Errors="errors" />
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Vos coordonnées</legend>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="bname">Votre nom <span class="req">*</span></label>
+                        <input id="bname" name="Model.BuyerName" value="@Model.BuyerName" autocomplete="name" required maxlength="160" />
+                        <FieldError For="BuyerName" Errors="errors" />
+                    </div>
+                    <div class="field">
+                        <label for="bphone">Téléphone</label>
+                        <input id="bphone" name="Model.BuyerPhone" value="@Model.BuyerPhone" type="tel" autocomplete="tel" maxlength="40" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="bemail">Votre courriel <span class="req">*</span></label>
+                    <input id="bemail" name="Model.BuyerEmail" value="@Model.BuyerEmail" type="email" autocomplete="email" required maxlength="256" />
+                    <FieldError For="BuyerEmail" Errors="errors" />
+                </div>
+            </fieldset>
+
+            <FormExtras ModelName="Model" Consent="Model.ConsentGiven" TenantName="@tenant.Name" Errors="errors" />
+            <button type="submit" class="btn btn-primary btn-lg">Commander la carte-cadeau</button>
+            <p class="muted small">Aucun paiement en ligne : nous vous écrivons avec les instructions de paiement, puis la carte part toute seule.</p>
+        </form>
+
+        <aside class="aside-card giftcard-aside">
+            <div class="giftcard-preview" aria-hidden="true">
+                <img src="/images/site/logo-blanc.png" alt="" width="150" height="47" />
+                <span class="gc-label">Carte-cadeau</span>
+                <span class="gc-amount">@Money(Model!.Amount > 0 ? Model.Amount : Model.CustomAmount ?? 100)</span>
+                <span class="gc-code">XXXX-XXXX-XXXX</span>
+            </div>
+            <h2>Comment ça marche</h2>
+            <ol class="steps-list">
+                <li>Vous choisissez le montant et la personne.</li>
+                <li>Nous vous écrivons pour le paiement (virement Interac ou autre).</li>
+                <li>La carte, avec son code, part par courriel tout de suite ou à la date choisie.</li>
+                <li>Elle s'utilise sur tous nos services, en une ou plusieurs fois.</li>
+            </ol>
+
+            <h2 id="solde">Vérifier un solde</h2>
+            <form method="get" action="/carte-cadeau#solde" class="balance-form">
+                <label for="code" class="sr-only">Code de la carte</label>
+                <input id="code" name="code" value="@Code" placeholder="XXXX-XXXX-XXXX" maxlength="20" autocomplete="off" />
+                <button type="submit" class="btn btn-outline btn-sm">Vérifier</button>
+            </form>
+            @if (Code is not null)
+            {
+                @if (balance is null)
+                {
+                    <p class="alert alert-error small" role="status">Aucune carte active avec ce code.</p>
+                }
+                else
+                {
+                    <p class="alert alert-success small" role="status">
+                        Solde : <strong>@Money(balance.Balance)</strong> sur @Money(balance.Amount)@(balance.Status == GiftCardStatus.Used ? " (entièrement utilisée)" : "").
+                    </p>
+                }
+            }
+        </aside>
+    </div>
+</section>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "giftcard")] private GiftCardForm? Model { get; set; }
+    [SupplyParameterFromQuery(Name = "code")] private string? Code { get; set; }
+
+    private static readonly decimal[] Suggested = [50, 75, 100, 150, 200];
+    private Tenant? tenant;
+    private DateOnly today;
+    private GiftCardBalance? balance;
+    private IReadOnlyDictionary<string, string>? errors;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenant = await CurrentTenant.GetAsync();
+        today = Hub.SharedKernel.Time.BusinessTime.Today(Clock);
+        Model ??= new GiftCardForm();
+        if (!string.IsNullOrWhiteSpace(Code)) balance = await GiftCards.CheckBalanceAsync(Code);
+    }
+
+    private static string Money(decimal d) => d.ToString("#,0", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) + " $";
+
+    private async Task SubmitAsync()
+    {
+        if (LeadRequest.IsSpam(Model!.Website))
+        {
+            Navigation.NavigateTo("/merci?demande=carte-cadeau");
+            return;
+        }
+        if (!await Turnstile.VerifyAsync(HttpContext))
+        {
+            error = "La vérification anti-robot a échoué. Réessayez ou appelez-nous.";
+            return;
+        }
+        var result = await GiftCards.RequestAsync(new GiftCardRequest
+        {
+            Amount = Model.Amount > 0 ? Model.Amount : Model.CustomAmount ?? 0,
+            BuyerName = Model.BuyerName,
+            BuyerEmail = Model.BuyerEmail,
+            BuyerPhone = Model.BuyerPhone,
+            RecipientName = Model.RecipientName,
+            RecipientEmail = Model.RecipientEmail,
+            Message = Model.Message,
+            DeliverOn = Model.DeliverOn,
+            ConsentGiven = Model.ConsentGiven,
+        });
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/merci?demande=carte-cadeau");
+            return;
+        }
+        errors = result.FieldErrors;
+        error = result.FieldErrors.Count > 0 ? "Vérifiez les champs indiqués ci-dessous." : result.Error;
+    }
+}

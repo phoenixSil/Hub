@@ -25,6 +25,9 @@ public sealed class Tenant
 
     /// <summary>Habillage saisonnier du site : « auto » (selon les dates), « aucun », « halloween » ou « noel ».</summary>
     public string SeasonalTheme { get; set; } = "auto";
+
+    /// <summary>Comment payer une carte-cadeau (ex. virement Interac), envoyé à l'acheteur après sa demande.</summary>
+    public string? GiftCardPaymentInstructions { get; set; }
     public string? FaviconUrl { get; set; }
     public string? DefaultOgImageUrl { get; set; }
 

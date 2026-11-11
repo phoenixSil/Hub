@@ -9,6 +9,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
 8. Le plan marketing se crée, se lance (le pilote passe au rythme du plan) et relève les chiffres.
+9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
 
 Usage : python3 e2e.py http://localhost:5080
 """
@@ -153,6 +154,36 @@ def marketing_plan(page):
     expect(page.locator("select").first).to_have_value("7")
 
 
+@step("Carte-cadeau : demandée sur le site, payée, envoyée puis utilisée")
+def gift_card(page):
+    page.goto(BASE + "/carte-cadeau", wait_until="networkidle")
+    page.locator("label.amount-choice", has_text="75").click()
+    page.fill("#rname", "Jeanne Essai")
+    page.fill("#remail", "jeanne@example.com")
+    page.fill("#msg", "Joyeux Noël !")
+    page.fill("#bname", "Marie Essai")
+    page.fill("#bemail", "marie@example.com")
+    page.locator(".consent-field input[type=checkbox]").check()
+    page.locator("form.lead-form button[type=submit]").click()
+    page.wait_for_url("**/merci?demande=carte-cadeau", timeout=15000)
+
+    page.goto(BASE + "/admin/cartes-cadeaux", wait_until="networkidle")
+    page.wait_for_timeout(1000)
+    row = page.locator("tr", has_text="Marie Essai").first
+    code = row.locator("code").inner_text().strip()
+    row.locator("button", has_text="Paiement reçu").click()
+    expect(page.locator(".alert-success")).to_be_visible(timeout=15000)
+    expect(page.locator("tr", has_text="Marie Essai").first.locator(".status")).to_have_text("Payée")
+
+    page.fill("#rcode", code.lower().replace("-", " "))
+    page.fill("#ramount", "25")
+    page.locator("button", has_text="Déduire du solde").click()
+    expect(page.locator(".alert-success")).to_contain_text("50 $", timeout=15000)
+
+    page.goto(BASE + f"/carte-cadeau?code={code}", wait_until="networkidle")
+    expect(page.locator(".giftcard-aside .alert-success")).to_contain_text("50 $")
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -167,10 +198,11 @@ with sync_playwright() as p:
     legacy_redirects(page)
     anchor_offset(page)
     marketing_plan(page)
+    gift_card(page)
     browser.close()
 
 if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, carte-cadeau")

@@ -41,6 +41,7 @@ PUBLIC = [
     ("confidentialite", "/confidentialite"),
     ("404", "/page-inconnue"),
     ("connexion", "/compte/connexion"),
+    ("carte-cadeau", "/carte-cadeau"),
     ("accueil-noel", "/?theme=noel"),
     ("accueil-halloween", "/?theme=halloween"),
 ]
@@ -57,6 +58,7 @@ ADMIN = [
     ("admin-resultats", "/admin/resultats"),
     ("admin-plan", "/admin/plan-marketing"),
     ("admin-planche", "/admin/planche"),
+    ("admin-cartes-cadeaux", "/admin/cartes-cadeaux"),
     ("admin-services", "/admin/services"),
     ("admin-secteurs", "/admin/secteurs"),
     ("admin-offres", "/admin/offres"),

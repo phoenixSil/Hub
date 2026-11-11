@@ -18,6 +18,7 @@ public class ModuleBoundariesTests
         ["Analytics"] = typeof(Hub.Modules.Analytics.AnalyticsModule).Assembly,
         ["Channels"] = typeof(Hub.Modules.Channels.ChannelsModule).Assembly,
         ["Quotes"] = typeof(Hub.Modules.Quotes.QuotesModule).Assembly,
+        ["GiftCards"] = typeof(Hub.Modules.GiftCards.GiftCardsModule).Assembly,
     };
 
     public static TheoryData<string> ModuleNames() => new(Modules.Keys);
