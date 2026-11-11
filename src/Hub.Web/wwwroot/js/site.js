@@ -46,6 +46,27 @@
         start();
     }
 
+    // Thème de Noël : bouton pour arrêter (ou relancer) la neige, choix retenu dans ce navigateur.
+    function initSnow() {
+        var button = document.querySelector("[data-snow-toggle]");
+        if (!button || button.dataset.ready) return;
+        button.dataset.ready = "1";
+        var slide = button.closest(".season-slide");
+        function apply(off) {
+            slide.classList.toggle("snow-off", off);
+            button.setAttribute("aria-pressed", off ? "true" : "false");
+            button.textContent = off ? "Relancer la neige" : "Arrêter la neige";
+        }
+        var saved = false;
+        try { saved = localStorage.getItem("hub_snow_off") === "1"; } catch (e) { }
+        apply(saved);
+        button.addEventListener("click", function () {
+            var off = !slide.classList.contains("snow-off");
+            apply(off);
+            try { localStorage.setItem("hub_snow_off", off ? "1" : "0"); } catch (e) { }
+        });
+    }
+
     // Consentement à la mesure (Loi 25) : aucun identifiant de visite sans « Accepter ».
     function initConsent() {
         var box = document.getElementById("consent");
@@ -104,7 +125,7 @@
         if (nav && e.target.closest && e.target.closest(".mobile-panel a")) nav.removeAttribute("open");
     });
 
-    function init() { initCarousel(); initConsent(); initTurnstile(); initForms(); }
+    function init() { initCarousel(); initSnow(); initConsent(); initTurnstile(); initForms(); }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();

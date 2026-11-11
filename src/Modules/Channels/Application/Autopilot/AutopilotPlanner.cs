@@ -171,6 +171,8 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Aujourd'hui : {TimeZoneInfo.ConvertTime(r.Now, BusinessTime.Zone).ToString("dddd d MMMM yyyy", Fr)}");
+        if (!string.IsNullOrWhiteSpace(r.Context.Season))
+            sb.AppendLine().AppendLine($"Thème saisonnier du site en cours : {r.Context.Season}. Oriente environ la moitié des sujets de la semaine sur cette fête (préparer, recevoir, nettoyer après).");
         if (r.Plan is { } plan)
         {
             sb.AppendLine().AppendLine(plan.Objective == PlanObjective.Visibility

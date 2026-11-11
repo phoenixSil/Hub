@@ -1,0 +1,63 @@
+@* Décor d'un thème saisonnier : le « S » du logo déguisé, et le décor de fond (chauves-souris ou neige).
+   Tout est décoratif (aria-hidden) ; les animations s'arrêtent si le visiteur a demandé moins d'animations. *@
+
+<div class="season-decor" aria-hidden="true">
+    @if (Season.Key == "noel")
+    {
+        <div class="snow">
+            @foreach (var f in Flakes)
+            {
+                <span class="flake" style="left:@(f.X)%;--d:@(f.Delay)s;--t:@(f.Duration)s;--s:@(f.Size)px"></span>
+            }
+        </div>
+    }
+    else
+    {
+        <svg class="bat bat-1" viewBox="0 0 60 26"><path d="M2 10 Q12 -2 22 10 Q26 4 30 10 Q34 4 38 10 Q48 -2 58 10 Q46 14 30 24 Q14 14 2 10Z" /></svg>
+        <svg class="bat bat-2" viewBox="0 0 60 26"><path d="M2 10 Q12 -2 22 10 Q26 4 30 10 Q34 4 38 10 Q48 -2 58 10 Q46 14 30 24 Q14 14 2 10Z" /></svg>
+        <svg class="bat bat-3" viewBox="0 0 60 26"><path d="M2 10 Q12 -2 22 10 Q26 4 30 10 Q34 4 38 10 Q48 -2 58 10 Q46 14 30 24 Q14 14 2 10Z" /></svg>
+    }
+
+    <div class="season-mascot">
+        <img src="/images/site/logo-mark.png" alt="" width="269" height="271" />
+        @if (Season.Key == "noel")
+        {
+            <svg class="hat hat-noel" viewBox="0 0 120 90">
+                <path d="M14 70 Q40 6 96 14 Q78 26 86 58 Z" fill="#c8102e" />
+                <path d="M6 66 Q50 50 98 56 L98 72 Q52 66 8 82 Z" fill="#ffffff" />
+                <circle cx="100" cy="14" r="11" fill="#ffffff" />
+            </svg>
+            <svg class="sparkle sp-1" viewBox="0 0 20 20"><path d="M10 0 L12.5 7.5 L20 10 L12.5 12.5 L10 20 L7.5 12.5 L0 10 L7.5 7.5Z" /></svg>
+            <svg class="sparkle sp-2" viewBox="0 0 20 20"><path d="M10 0 L12.5 7.5 L20 10 L12.5 12.5 L10 20 L7.5 12.5 L0 10 L7.5 7.5Z" /></svg>
+            <svg class="sparkle sp-3" viewBox="0 0 20 20"><path d="M10 0 L12.5 7.5 L20 10 L12.5 12.5 L10 20 L7.5 12.5 L0 10 L7.5 7.5Z" /></svg>
+        }
+        else
+        {
+            <svg class="hat hat-halloween" viewBox="0 0 120 100">
+                <path d="M30 74 L70 4 Q76 0 78 8 L86 70 Z" fill="#121a24" stroke="#2f5872" stroke-width="2" />
+                <path d="M34 66 L84 62 L86 72 L34 76 Z" fill="#f28c28" />
+                <ellipse cx="58" cy="78" rx="56" ry="12" fill="#121a24" stroke="#2f5872" stroke-width="2" />
+            </svg>
+            <svg class="pumpkin" viewBox="0 0 60 50">
+                <ellipse cx="30" cy="31" rx="27" ry="18" fill="#f28c28" />
+                <path d="M18 31 Q30 12 42 31 M30 14 V48" stroke="#d4701a" stroke-width="2" fill="none" />
+                <path d="M30 14 Q31 5 38 3" stroke="#38d430" stroke-width="4" fill="none" stroke-linecap="round" />
+            </svg>
+        }
+    </div>
+</div>
+@if (Season.Key == "noel")
+{
+    <button type="button" class="snow-toggle" data-snow-toggle aria-pressed="false">Arrêter la neige</button>
+}
+
+@code {
+    [Parameter, EditorRequired] public SeasonalTheme Season { get; set; } = default!;
+
+    private sealed record Flake(int X, double Delay, double Duration, int Size);
+
+    // Positions fixes (pas de hasard) : le rendu est identique d'une page à l'autre et dans les tests visuels.
+    private static readonly Flake[] Flakes = Enumerable.Range(0, 28)
+        .Select(i => new Flake((i * 37) % 100, Math.Round(i * 0.73 % 9, 1), 9 + i % 6, 3 + i % 4))
+        .ToArray();
+}

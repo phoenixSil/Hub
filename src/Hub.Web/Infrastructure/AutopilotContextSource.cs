@@ -46,7 +46,8 @@ internal sealed class AutopilotContextSource(
             company.AdminNotificationEmail,
             pages,
             SiteFormat.VisualLogo(company),
-            SiteFormat.VisualLogoOnDark(company));
+            SiteFormat.VisualLogoOnDark(company),
+            SeasonalThemes.Resolve(company.SeasonalTheme, Hub.SharedKernel.Time.BusinessTime.Today(clock))?.Name);
     }
 
     public async Task<IReadOnlyDictionary<string, (int Visits, int Leads, int Won)>> GetResultsAsync(IReadOnlyCollection<string> campaigns, CancellationToken ct = default)

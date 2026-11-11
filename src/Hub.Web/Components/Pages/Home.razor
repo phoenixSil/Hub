@@ -16,6 +16,21 @@
 
 <section class="hero" data-carousel aria-roledescription="carrousel" aria-label="Nos offres">
     <div class="hero-track">
+        @if (season is not null)
+        {
+            <div class="hero-slide season-slide season-@season.Key" style="--season-bg:@season.SlideBackground;--season-text:@season.SlideText">
+                <SeasonDecor Season="season" />
+                <div class="container hero-content">
+                    <span class="eyebrow eyebrow-light">@season.Eyebrow</span>
+                    <p class="hero-title">@season.Title <span class="hl">@season.Highlight</span></p>
+                    <p class="hero-lead">@season.Lead</p>
+                    <div class="hero-actions">
+                        <a class="btn btn-primary btn-lg" href="@season.CtaUrl">@season.Cta <Icon Name="arrow-right" Size="18" /></a>
+                        <a class="btn btn-ghost-light btn-lg" href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="18" /> @tenant.Phone</a>
+                    </div>
+                </div>
+            </div>
+        }
         <div class="hero-slide" style="--hero-image:url('/images/site/hero.webp')">
             <div class="container hero-content">
                 @if (!string.IsNullOrWhiteSpace(hero?.Eyebrow))
@@ -48,10 +63,10 @@
             </div>
         }
     </div>
-    @if (promotions.Count > 0)
+    @if (promotions.Count + (season is null ? 0 : 1) > 0)
     {
         <div class="hero-dots" role="tablist">
-            @for (var i = 0; i <= promotions.Count; i++)
+            @for (var i = 0; i <= promotions.Count + (season is null ? 0 : 1); i++)
             {
                 <button type="button" class="hero-dot" data-slide="@i" aria-label="Diapositive @(i + 1)"></button>
             }
@@ -236,6 +251,7 @@
     private ContentBlock? hero;
     private IReadOnlyList<CategoryWithServices> catalog = [];
     private List<Promotion> promotions = [];
+    private SeasonalTheme? season;
 
     protected override async Task OnInitializedAsync()
     {
@@ -244,5 +260,6 @@
         catalog = await Catalog.GetCatalogAsync();
         hero = site.Block("home.hero");
         promotions = site.LivePromotions(Hub.SharedKernel.Time.BusinessTime.Today(Clock)).ToList();
+        season = SeasonalThemeContext.For(tenant, Clock, Navigation);
     }
 }

@@ -450,7 +450,8 @@ else
             AvoidScenes: visual?.Scene is { } last ? [last] : null,
             Memory: visual?.ArtStyle is { } lastStyle ? memory with { RecentStyles = [lastStyle, .. memory.RecentStyles] } : memory,
             LogoUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogo(company),
-            LogoOnDarkUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogoOnDark(company)));
+            LogoOnDarkUrl: Hub.Web.Infrastructure.SiteFormat.VisualLogoOnDark(company),
+            Season: Hub.Web.Infrastructure.SeasonalThemes.Resolve(company.SeasonalTheme, Hub.SharedKernel.Time.BusinessTime.Today(Clock))?.Name));
         End();
         if (result.IsFailure) { feedback = result.Error; feedbackIsError = true; return; }
         // Aperçu = image finale : dessinée côté serveur, avec la police de la marque.
