@@ -3,7 +3,7 @@
 .admin-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
 .admin-sidebar { background: var(--ink); color: #b7c7d3; padding: 20px 14px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0; height: 100vh; overflow: auto; }
 .admin-brand { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #fff; padding: 0 8px; }
-.admin-brand img { background: #fff; border-radius: 8px; padding: 6px 8px; height: 42px; width: auto; align-self: flex-start; max-width: 100%; object-fit: contain; }
+.admin-brand img { background: #fff; border-radius: 8px; padding: 6px 8px; height: 42px; width: auto; align-self: flex-start; max-width: 100%; }
 .admin-brand span { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: #8fb3c7; }
 .admin-sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 .admin-sidebar nav a { color: #c9d6df; text-decoration: none; padding: 8px 10px; border-radius: 8px; font-size: .92rem; }
