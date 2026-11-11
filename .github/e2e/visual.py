@@ -144,6 +144,13 @@ CHECKS = r"""
   if (/\b(undefined|NaN)\b/.test(document.body.innerText)) issues.push('texte « undefined » ou « NaN » affiché');
 
   for (const img of document.images) if (shown(img) && img.complete && img.naturalWidth === 0) issues.push(`image cassée : ${img.getAttribute('src')}`);
+  // Image écrasée ou étirée (ex. logo comprimé par un menu trop large) : proportions affichées ≠ proportions réelles.
+  for (const img of document.images) {
+    if (!shown(img) || !img.complete || !img.naturalWidth || getComputedStyle(img).objectFit !== 'fill') continue;
+    const r = img.getBoundingClientRect();
+    const ratio = (r.width / r.height) / (img.naturalWidth / img.naturalHeight);
+    if (r.width > 24 && (ratio < 0.9 || ratio > 1.1)) issues.push(`image déformée (${Math.round(ratio * 100)} %) : ${img.getAttribute('src')}`);
+  }
 
   for (const card of document.querySelectorAll('.admin-card, .card, .admin-head, .field, .auth-card')) {
     if (!shown(card)) continue;
