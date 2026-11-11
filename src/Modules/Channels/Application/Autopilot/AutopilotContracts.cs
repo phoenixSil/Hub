@@ -28,7 +28,9 @@ public sealed record AutopilotContext(
     string AdminEmail,
     IReadOnlyList<AutopilotPage> Pages,
     string? LogoUrl = null,
-    string? LogoOnDarkUrl = null);
+    string? LogoOnDarkUrl = null,
+    // Thème saisonnier du site en cours (« Halloween », « Noël »), ou null.
+    string? Season = null);
 
 /// <summary>Fournie par l'hôte : le module ne connaît ni le catalogue, ni le contenu, ni les statistiques.</summary>
 public interface IAutopilotContextSource

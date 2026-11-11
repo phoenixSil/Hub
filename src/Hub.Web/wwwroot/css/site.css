@@ -319,3 +319,61 @@ h1:focus, h1:focus-visible { outline: none; }
     .consent { left: 8px; right: 8px; bottom: 8px; }
     .consent-inner { padding: 14px 16px; font-size: .84rem; }
 }
+
+/* ===== Thèmes saisonniers : l'identité ScintiNet reste dominante, la saison n'est qu'un accessoire ===== */
+.season-bar { display: block; padding: 8px 16px; text-align: center; font-size: .9rem; font-weight: 600; line-height: 1.4;
+    background: var(--season-bar-bg); color: var(--season-bar-text); text-decoration: none; }
+.season-bar:hover { color: var(--season-bar-text); text-decoration: underline; }
+.season-bar svg { vertical-align: -2px; }
+.season-lights { height: 14px; background-color: #fff; border-bottom: 1px solid var(--line);
+    background-image: radial-gradient(circle at 8px 7px, var(--lime) 0 3.5px, transparent 4px),
+                      radial-gradient(circle at 24px 7px, var(--blue) 0 3.5px, transparent 4px),
+                      radial-gradient(circle at 40px 7px, #c8102e 0 3.5px, transparent 4px),
+                      radial-gradient(circle at 56px 7px, var(--green) 0 3.5px, transparent 4px),
+                      radial-gradient(circle at 72px 7px, #e8c766 0 3.5px, transparent 4px);
+    background-size: 80px 14px; background-repeat: repeat-x; }
+
+.season-slide { background: var(--season-bg); color: var(--season-text); isolation: isolate; }
+.season-slide .hero-content { position: relative; z-index: 2; padding-right: clamp(0px, 30vw, 380px); }
+.season-slide .hero-title, .season-slide .hero-lead { color: var(--season-text); text-shadow: 0 1px 3px rgba(0, 0, 0, .28); }
+.season-decor { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.season-mascot { position: absolute; right: max(4vw, calc((100% - var(--container)) / 2 + 24px)); top: 50%; transform: translateY(-46%);
+    width: clamp(170px, 24vw, 300px); }
+.season-mascot img { width: 100%; height: auto; filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .25)); }
+.season-mascot .hat { position: absolute; width: 58%; }
+.hat-halloween { left: -6%; top: -40%; transform: rotate(-14deg); }
+.hat-noel { left: -4%; top: -26%; transform: rotate(-12deg); }
+.season-mascot .pumpkin { position: absolute; width: 26%; right: -6%; bottom: -4%; }
+.season-mascot .sparkle { position: absolute; fill: #e8c766; }
+.sp-1 { width: 12%; right: -12%; top: 6%; } .sp-2 { width: 8%; right: -4%; top: 28%; } .sp-3 { width: 10%; left: -14%; bottom: 10%; }
+
+.bat { position: absolute; width: 54px; fill: #061f2e; opacity: .85; }
+.bat-1 { top: 14%; left: 46%; } .bat-2 { top: 8%; left: 58%; width: 38px; } .bat-3 { top: 22%; left: 64%; width: 30px; }
+
+.snow { position: absolute; inset: 0; }
+.flake { position: absolute; top: -10px; width: var(--s); height: var(--s); border-radius: 50%; background: #fff; opacity: .7; }
+.snow-toggle { position: absolute; z-index: 3; right: 16px; bottom: 16px; border: 1px solid rgba(255, 255, 255, .6); background: rgba(0, 0, 0, .18);
+    color: #fff; border-radius: 99px; padding: 6px 14px; font: inherit; font-size: .8rem; cursor: pointer; }
+.snow-toggle:hover { background: rgba(0, 0, 0, .3); }
+.season-slide.snow-off .flake { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .flake { animation: snow-fall var(--t) linear var(--d) infinite; }
+    .bat { animation: bat-fly 3.2s ease-out both; }
+    .bat-2 { animation-delay: .25s; } .bat-3 { animation-delay: .5s; }
+}
+/* Sans animation : la neige reste en place, en décor fixe. */
+@media (prefers-reduced-motion: reduce) {
+    .flake { top: calc(var(--d) * 10%); }
+    .snow-toggle { display: none; }
+}
+@keyframes snow-fall { to { transform: translate3d(14px, 760px, 0); } }
+@keyframes bat-fly { from { transform: translate3d(-60vw, 40px, 0) scale(.6); opacity: 0; } 30% { opacity: .85; } to { transform: none; } }
+
+@media (max-width: 760px) {
+    .season-slide .hero-content { padding-right: 0; padding-top: 150px; }
+    .season-mascot { width: 104px; top: 34px; right: 22px; transform: none; }
+    .bat-1 { left: 12%; top: 6%; } .bat-2 { left: 34%; top: 12%; } .bat-3 { display: none; }
+    .season-bar { font-size: .82rem; }
+    .snow-toggle { bottom: 12px; right: 12px; }
+}

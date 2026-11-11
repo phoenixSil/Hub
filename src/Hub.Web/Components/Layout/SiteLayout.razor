@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @inject ICurrentTenant CurrentTenant
 @inject ICatalogQueries Catalog
+@inject TimeProvider Clock
+@inject NavigationManager Nav
 
 @if (tenant is null)
 {
@@ -9,6 +11,12 @@
 }
 
 <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+@if (season is not null)
+{
+    <a class="season-bar season-@season.Key" href="@season.CtaUrl"
+       style="--season-bar-bg:@season.BarBackground;--season-bar-text:@season.BarText">@season.Bar <Icon Name="arrow-right" Size="14" /></a>
+}
 
 <div class="topbar">
     <div class="container topbar-inner">
@@ -76,7 +84,12 @@
     </div>
 </header>
 
-<main id="contenu">
+@if (season?.Key == "noel")
+{
+    <div class="season-lights" aria-hidden="true"></div>
+}
+
+<main id="contenu" class="@(season is null ? null : $"season-{season.Key}")">
     @Body
 </main>
 
@@ -157,10 +170,12 @@
 @code {
     private Tenant? tenant;
     private IReadOnlyList<CategoryWithServices> catalog = [];
+    private SeasonalTheme? season;
 
     protected override async Task OnInitializedAsync()
     {
         tenant = await CurrentTenant.GetAsync();
         catalog = await Catalog.GetCatalogAsync();
+        season = SeasonalThemeContext.For(tenant, Clock, Nav);
     }
 }

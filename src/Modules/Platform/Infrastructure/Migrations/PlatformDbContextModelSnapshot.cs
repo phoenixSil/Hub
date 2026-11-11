@@ -194,6 +194,10 @@ namespace Hub.Modules.Platform.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("SeasonalTheme")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SecondaryColor")
                         .IsRequired()
                         .HasMaxLength(16)

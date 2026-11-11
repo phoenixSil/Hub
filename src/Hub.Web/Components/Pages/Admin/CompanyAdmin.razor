@@ -34,6 +34,22 @@
                 <ImagePicker @bind-Value="tenant.LogoOnDarkUrl" />
                 <span class="muted small">Posé sur les visuels sombres des publications. Fond transparent, rogné au plus près.</span>
             </div>
+            <div class="field">
+                <label for="season">Thème saisonnier du site</label>
+                <select id="season" @bind="tenant.SeasonalTheme">
+                    <option value="auto">Automatique (selon les dates)</option>
+                    @foreach (var t in SeasonalThemes.All) { <option value="@t.Key">@t.Name (forcé)</option> }
+                    <option value="aucun">Aucun</option>
+                </select>
+                <span class="muted small">
+                    En automatique : @string.Join(" ; ", SeasonalThemes.All.Select(t => $"{t.Name} {SeasonalThemes.Period(t)}")).
+                    Aperçu :
+                    @foreach (var t in SeasonalThemes.All)
+                    {
+                        <a href="/?theme=@t.Key" target="_blank" rel="noopener">@t.Name</a><text> </text>
+                    }
+                </span>
+            </div>
             <div class="field-row">
                 <div class="field"><label>Couleur principale</label><div class="color-field"><InputText type="color" @bind-Value="tenant.PrimaryColor" /><code>@tenant.PrimaryColor</code></div></div>
                 <div class="field"><label>Couleur secondaire</label><div class="color-field"><InputText type="color" @bind-Value="tenant.SecondaryColor" /><code>@tenant.SecondaryColor</code></div></div>

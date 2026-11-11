@@ -22,6 +22,9 @@ public sealed class Tenant
 
     /// <summary>Logo pour fond foncé (texte blanc), posé sur les visuels sombres ; vide = le logo normal sur une pastille blanche.</summary>
     public string? LogoOnDarkUrl { get; set; }
+
+    /// <summary>Habillage saisonnier du site : « auto » (selon les dates), « aucun », « halloween » ou « noel ».</summary>
+    public string SeasonalTheme { get; set; } = "auto";
     public string? FaviconUrl { get; set; }
     public string? DefaultOgImageUrl { get; set; }
 

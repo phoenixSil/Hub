@@ -41,6 +41,8 @@ PUBLIC = [
     ("confidentialite", "/confidentialite"),
     ("404", "/page-inconnue"),
     ("connexion", "/compte/connexion"),
+    ("accueil-noel", "/?theme=noel"),
+    ("accueil-halloween", "/?theme=halloween"),
 ]
 
 ADMIN = [
@@ -111,6 +113,28 @@ CHECKS = r"""
     const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
     if (w > 4 && h > 4 && w * h > 0.2 * Math.min(a.width * a.height, b.width * b.height))
       issues.push(`éléments superposés : « ${name(controls[i])} » et « ${name(controls[j])} »`);
+  }
+
+  // Thèmes saisonniers : chaque texte reste lisible (contraste AA) et le « S » déguisé ne cache aucun texte.
+  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]) => [r, g, b].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+    .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const backOf = e => { for (let x = e; x; x = x.parentElement) { const c = rgb(getComputedStyle(x).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.9)) return c; } return [255, 255, 255]; };
+  for (const e of document.querySelectorAll('.season-bar, .season-slide .hero-title, .season-slide .hero-lead, .season-slide .eyebrow, .season-slide .btn, .snow-toggle')) {
+    if (!shown(e)) continue;
+    const s = getComputedStyle(e), fg = rgb(s.color), bg = backOf(e);
+    const [l1, l2] = [lum(fg), lum(bg)].sort((a, b) => b - a), ratio = (l1 + 0.05) / (l2 + 0.05);
+    const large = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.6 && parseInt(s.fontWeight) >= 700);
+    if (ratio < (large ? 3 : 4.5)) issues.push(`texte peu lisible (${ratio.toFixed(1)}:1) : « ${name(e)} »`);
+  }
+  const mascot = document.querySelector('.season-mascot');
+  if (mascot && shown(mascot)) {
+    const m = mascot.getBoundingClientRect();
+    for (const t of document.querySelectorAll('.season-slide .hero-title, .season-slide .hero-lead, .season-slide .hero-actions .btn, .season-slide .eyebrow')) {
+      const r = t.getBoundingClientRect();
+      const w = Math.min(m.right, r.right) - Math.max(m.left, r.left), h = Math.min(m.bottom, r.bottom) - Math.max(m.top, r.top);
+      if (w > 4 && h > 4) issues.push(`le logo déguisé cache un texte : « ${name(t)} »`);
+    }
   }
 
   const raw = document.body.innerText.match(/\{\{[^}]{1,40}\}\}/);

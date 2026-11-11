@@ -192,7 +192,7 @@ internal sealed class AutopilotRunner(
         var visual = await designer.DesignAsync(new VisualIdea(context.CompanyName, context.Phone, context.PrimaryColor, context.AccentColor,
             item.Topic, suggestion.Text, item.Facts, item.Style, Audience: item.Audience, Site: context.SiteUrl,
             Format: item.Format, AvoidScenes: recentScenes, Memory: memory,
-            LogoUrl: context.LogoUrl, LogoOnDarkUrl: context.LogoOnDarkUrl), ct);
+            LogoUrl: context.LogoUrl, LogoOnDarkUrl: context.LogoOnDarkUrl, Season: context.Season), ct);
         if (visual.IsSuccess && (visual.Value!.Png ?? (visual.Value.Svg is { } svg ? renderer.RenderPng(svg) : null)) is { } png)
         {
             var saved = await store.SavePngAsync(png, ct);

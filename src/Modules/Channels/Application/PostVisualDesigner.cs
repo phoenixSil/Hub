@@ -35,7 +35,9 @@ public sealed record VisualIdea(
     bool SingleAttempt = false,
     // Logos de l'entreprise : sur fond clair, et sur fond foncé.
     string? LogoUrl = null,
-    string? LogoOnDarkUrl = null);
+    string? LogoOnDarkUrl = null,
+    // Thème saisonnier du site en cours (« Halloween », « Noël »), ou null.
+    string? Season = null);
 
 /// <summary>
 /// Ce que le moteur créatif sait des dernières images (pour ne pas les répéter) et les styles désactivés.
@@ -418,6 +420,9 @@ internal sealed class PostVisualDesigner(
         sb.AppendLine($"Public visé : {(string.IsNullOrWhiteSpace(i.Audience) ? "(général)" : i.Audience)}");
         sb.AppendLine($"Faits autorisés : {(string.IsNullOrWhiteSpace(i.Facts) ? "(aucun)" : i.Facts)}");
         sb.AppendLine($"Saison à Québec : {Season(now)}");
+        if (!string.IsNullOrWhiteSpace(i.Season))
+            sb.AppendLine($"Thème saisonnier du site : {i.Season} — ajoute une touche festive de saison (détail, accessoire, ambiance), " +
+                          "sans perdre l'identité de la marque (ses couleurs restent dominantes).");
         sb.AppendLine();
         sb.AppendLine($"Style visuel imposé : {d.Style.Name} — {d.Style.Prompt}");
         sb.AppendLine($"Référence d'inspiration : {d.Reference}");
