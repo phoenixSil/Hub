@@ -26,7 +26,14 @@
                     <p class="hero-lead">@season.Lead</p>
                     <div class="hero-actions">
                         <a class="btn btn-primary btn-lg" href="@season.CtaUrl">@season.Cta <Icon Name="arrow-right" Size="18" /></a>
-                        <a class="btn btn-ghost-light btn-lg" href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="18" /> @tenant.Phone</a>
+                        @if (season.Key == "noel")
+                        {
+                            <a class="btn btn-ghost-light btn-lg" href="/carte-cadeau">Offrir une carte-cadeau</a>
+                        }
+                        else
+                        {
+                            <a class="btn btn-ghost-light btn-lg" href="@SiteFormat.PhoneHref(tenant.Phone)"><Icon Name="phone" Size="18" /> @tenant.Phone</a>
+                        }
                     </div>
                 </div>
             </div>

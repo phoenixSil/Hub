@@ -64,3 +64,19 @@ public static class LeadRequest
 
     public static bool IsSpam(string? honeypot) => !string.IsNullOrWhiteSpace(honeypot);
 }
+
+public sealed class GiftCardForm
+{
+    /// <summary>Montant choisi parmi les suggestions ; 0 = « Autre montant ».</summary>
+    public decimal Amount { get; set; } = 100;
+    public decimal? CustomAmount { get; set; }
+    public string BuyerName { get; set; } = string.Empty;
+    public string BuyerEmail { get; set; } = string.Empty;
+    public string? BuyerPhone { get; set; }
+    public string RecipientName { get; set; } = string.Empty;
+    public string? RecipientEmail { get; set; }
+    public string? Message { get; set; }
+    public DateOnly? DeliverOn { get; set; }
+    public bool ConsentGiven { get; set; }
+    public string? Website { get; set; }
+}

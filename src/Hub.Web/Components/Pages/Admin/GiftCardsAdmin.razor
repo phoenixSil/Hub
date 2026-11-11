@@ -1,0 +1,168 @@
+@page "/admin/cartes-cadeaux"
+@rendermode InteractiveServer
+@using Hub.Modules.GiftCards.Application
+@using Hub.Modules.GiftCards.Domain
+@inject IGiftCardService GiftCards
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Cartes-cadeaux</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Cartes-cadeaux</h1>
+        <p class="muted">
+            Les cartes demandées sur <a href="/carte-cadeau" target="_blank">la page Carte-cadeau</a>. Quand le paiement est reçu,
+            cliquez « Paiement reçu » : la carte part toute seule, tout de suite ou à la date choisie par l'acheteur.
+            Les instructions de paiement envoyées à l'acheteur se règlent dans <a href="/admin/entreprise">Entreprise</a>.
+        </p>
+    </div>
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")" role="status">@feedback</div>
+}
+
+<div class="admin-card">
+    <h2>Utiliser une carte</h2>
+    <p class="muted small">Pour un service payé avec une carte : le montant est déduit du solde.</p>
+    <div class="field-row giftcard-redeem">
+        <div class="field"><label for="rcode">Code</label><input id="rcode" @bind="redeemCode" placeholder="XXXX-XXXX-XXXX" maxlength="20" /></div>
+        <div class="field"><label for="ramount">Montant ($)</label><input id="ramount" type="number" min="1" step="0.01" @bind="redeemAmount" /></div>
+        <div class="field"><label for="rnote">Note</label><input id="rnote" @bind="redeemNote" placeholder="Ex. ménage du 12 décembre" maxlength="300" /></div>
+    </div>
+    <BusyButton OnClick="RedeemAsync" IsBusy="@(action == "redeem")" AnyBusy="busy" BusyText="Enregistrement…">Déduire du solde</BusyButton>
+</div>
+
+<div class="admin-card filters">
+    <select @bind="filter" @bind:after="LoadAsync" aria-label="Statut">
+        <option value="">Toutes les cartes</option>
+        @foreach (var s in Enum.GetValues<GiftCardStatus>())
+        {
+            <option value="@s">@Label(s)</option>
+        }
+    </select>
+</div>
+
+<div class="admin-card">
+    @if (cards.Count == 0)
+    {
+        <p class="muted">Aucune carte pour l'instant.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="admin-table">
+                <thead><tr><th>Demandée</th><th>Code</th><th class="num">Montant</th><th class="num">Solde</th><th>Acheteur</th><th>Pour</th><th>Envoi</th><th>Statut</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var c in cards)
+                    {
+                        <tr>
+                            <td>@AdminFormat.Local(c.CreatedAt)</td>
+                            <td><code>@c.Code</code></td>
+                            <td class="num">@Money(c.Amount)</td>
+                            <td class="num">@Money(c.Balance)</td>
+                            <td>@c.BuyerName<br /><span class="muted small">@c.BuyerEmail@(c.BuyerPhone is null ? "" : " · " + c.BuyerPhone)</span></td>
+                            <td>@c.RecipientName<br /><span class="muted small">@(c.RecipientEmail ?? "remise par l'acheteur")</span></td>
+                            <td>
+                                @if (c.SentAt is { } sent) { <span>Envoyée le @AdminFormat.Local(sent)</span> }
+                                else if (c.DeliverOn is { } d) { <span>Prévue le @AdminFormat.Day(d)</span> }
+                                else { <span class="muted">Dès le paiement</span> }
+                                @if (c.LastError is not null) { <br /><span class="small" style="color:#b42318">Échec : @c.LastError</span> }
+                            </td>
+                            <td><span class="status status-@(c.Status switch { GiftCardStatus.Active => "active", GiftCardStatus.AwaitingPayment => "approval", _ => "lost" })">@Label(c.Status)</span></td>
+                            <td class="actions">
+                                @if (c.Status == GiftCardStatus.AwaitingPayment)
+                                {
+                                    <BusyButton Class="btn btn-primary btn-sm" OnClick="() => PaidAsync(c.Id)" IsBusy="@(action == $"paid-{c.Id}")" AnyBusy="busy" BusyText="Envoi…">Paiement reçu</BusyButton>
+                                }
+                                @if (c.Status is GiftCardStatus.Active or GiftCardStatus.Used)
+                                {
+                                    <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ResendAsync(c.Id)" IsBusy="@(action == $"resend-{c.Id}")" AnyBusy="busy" BusyText="Envoi…">@(c.SentAt is null ? "Envoyer maintenant" : "Renvoyer")</BusyButton>
+                                }
+                                @if (c.Status is GiftCardStatus.AwaitingPayment or GiftCardStatus.Active)
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick="() => CancelAsync(c.Id)" disabled="@busy">Annuler</button>
+                                }
+                            </td>
+                        </tr>
+                        @if (c.Message is not null || c.Uses.Count > 0)
+                        {
+                            <tr class="sub-row">
+                                <td colspan="9" class="muted small">
+                                    @if (c.Message is not null) { <span>Mot : « @c.Message »</span> }
+                                    @foreach (var u in c.Uses) { <span> · Utilisée le @AdminFormat.Local(u.At) : @Money(u.Amount)@(u.Note is null ? "" : $" ({u.Note})")</span> }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<GiftCardView> cards = [];
+    private string filter = "";
+    private string? redeemCode;
+    private decimal? redeemAmount;
+    private string? redeemNote;
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        cards = await GiftCards.ListAsync(Enum.TryParse<GiftCardStatus>(filter, out var s) ? s : null);
+
+    private Task PaidAsync(Guid id) => RunAsync($"paid-{id}", () => GiftCards.MarkPaidAsync(id, null),
+        "Paiement enregistré : la carte est envoyée (ou partira à la date choisie).");
+
+    private Task ResendAsync(Guid id) => RunAsync($"resend-{id}", () => GiftCards.ResendAsync(id), "Carte envoyée.");
+
+    private Task CancelAsync(Guid id) => RunAsync($"cancel-{id}", () => GiftCards.CancelAsync(id), "Carte annulée.");
+
+    private async Task RedeemAsync()
+    {
+        if (busy) return;
+        busy = true;
+        action = "redeem";
+        try
+        {
+            var user = (await Auth.GetAuthenticationStateAsync()).User.Identity?.Name;
+            var result = await GiftCards.RedeemAsync(redeemCode ?? "", redeemAmount ?? 0, redeemNote, user);
+            feedbackIsError = result.IsFailure;
+            feedback = result.IsSuccess ? $"Montant déduit. Nouveau solde : {Money(result.Value)}." : result.Error;
+            if (result.IsSuccess) { redeemCode = null; redeemAmount = null; redeemNote = null; await LoadAsync(); }
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private async Task RunAsync(string name, Func<Task<Result>> work, string success)
+    {
+        if (busy) return;
+        busy = true;
+        action = name;
+        try
+        {
+            var result = await work();
+            feedbackIsError = result.IsFailure;
+            feedback = result.IsSuccess ? success : result.Error;
+            await LoadAsync();
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private static string Money(decimal d) => d.ToString(d % 1 == 0 ? "#,0" : "#,0.00", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) + " $";
+
+    private static string Label(GiftCardStatus s) => s switch
+    {
+        GiftCardStatus.AwaitingPayment => "En attente de paiement",
+        GiftCardStatus.Active => "Payée",
+        GiftCardStatus.Used => "Utilisée",
+        _ => "Annulée",
+    };
+}

@@ -11,6 +11,7 @@ using Hub.Modules.Platform;
 using Hub.Modules.Platform.Application;
 using Hub.Modules.Platform.Domain;
 using Hub.Modules.Quotes;
+using Hub.Modules.GiftCards;
 using Hub.Modules.Quotes.Application;
 using Hub.SharedKernel.Caching;
 using Hub.SharedKernel.Email;
@@ -46,8 +47,10 @@ builder.Services
     .AddLeadsModule(connectionString)
     .AddAnalyticsModule(connectionString)
     .AddChannelsModule(builder.Configuration, connectionString)
-    .AddQuotesModule(builder.Configuration, connectionString);
+    .AddQuotesModule(builder.Configuration, connectionString)
+    .AddGiftCardsModule(connectionString);
 builder.Services.AddScoped<IQuoteContextSource, QuoteContextSource>();
+builder.Services.AddScoped<Hub.Modules.GiftCards.Application.IGiftCardContextSource, GiftCardContextSource>();
 builder.Services.AddScoped<Hub.Modules.Channels.Application.Autopilot.IAutopilotContextSource, AutopilotContextSource>();
 builder.Services.AddSingleton<Hub.Modules.Channels.Application.Autopilot.IVisualRenderer, SkiaVisualRenderer>();
 builder.Services.AddScoped<Hub.Modules.Channels.Application.Autopilot.IVisualStore, MediaVisualStore>();

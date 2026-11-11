@@ -12,6 +12,7 @@
     <Project Path="src/Modules/Analytics/Hub.Modules.Analytics.csproj" />
     <Project Path="src/Modules/Channels/Hub.Modules.Channels.csproj" />
     <Project Path="src/Modules/Quotes/Hub.Modules.Quotes.csproj" />
+    <Project Path="src/Modules/GiftCards/Hub.Modules.GiftCards.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hub.ArchitectureTests/Hub.ArchitectureTests.csproj" />

@@ -31,6 +31,7 @@
     <ProjectReference Include="..\Modules\Content\Hub.Modules.Content.csproj" />
     <ProjectReference Include="..\Modules\Leads\Hub.Modules.Leads.csproj" />
     <ProjectReference Include="..\Modules\Analytics\Hub.Modules.Analytics.csproj" />
+    <ProjectReference Include="..\Modules\GiftCards\Hub.Modules.GiftCards.csproj" />
     <ProjectReference Include="..\Modules\Channels\Hub.Modules.Channels.csproj" />
     <ProjectReference Include="..\Modules\Quotes\Hub.Modules.Quotes.csproj" />
   </ItemGroup>

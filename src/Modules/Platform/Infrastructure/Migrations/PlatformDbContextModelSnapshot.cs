@@ -143,6 +143,9 @@ namespace Hub.Modules.Platform.Infrastructure.Migrations
                     b.Property<string>("FaviconUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("GiftCardPaymentInstructions")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("GoogleBusinessUrl")
                         .HasColumnType("nvarchar(max)");
 

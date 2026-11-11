@@ -36,7 +36,8 @@ public static class SeasonalThemes
         Title: "Le ménage d'après fête,", Highlight: "ensorcelé",
         Lead: "Bonbons écrasés, décorations, maquillage sur les tissus : on fait tout briller.",
         Cta: "Demander un devis", CtaUrl: "/devis",
-        From: (10, 15), To: (11, 2),
+        // Jusqu'à la veille du thème de Noël : le site passe de l'un à l'autre tout seul.
+        From: (10, 15), To: (11, 19),
         BarBackground: "#e2e735", BarText: "#0b3954",
         SlideBackground: "#0b3954", SlideText: "#ffffff");
 
