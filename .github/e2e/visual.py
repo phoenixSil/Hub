@@ -147,9 +147,12 @@ CHECKS = r"""
   // Image écrasée ou étirée (ex. logo comprimé par un menu trop large) : proportions affichées ≠ proportions réelles.
   for (const img of document.images) {
     if (!shown(img) || !img.complete || !img.naturalWidth || getComputedStyle(img).objectFit !== 'fill') continue;
-    const r = img.getBoundingClientRect();
-    const ratio = (r.width / r.height) / (img.naturalWidth / img.naturalHeight);
-    if (r.width > 24 && (ratio < 0.9 || ratio > 1.1)) issues.push(`image déformée (${Math.round(ratio * 100)} %) : ${img.getAttribute('src')}`);
+    const r = img.getBoundingClientRect(), st = getComputedStyle(img), px = v => parseFloat(v) || 0;
+    // Proportions de l'image elle-même : sans les marges intérieures ni la bordure (ex. logo sur pastille blanche).
+    const w = r.width - px(st.paddingLeft) - px(st.paddingRight) - px(st.borderLeftWidth) - px(st.borderRightWidth);
+    const h = r.height - px(st.paddingTop) - px(st.paddingBottom) - px(st.borderTopWidth) - px(st.borderBottomWidth);
+    const ratio = (w / h) / (img.naturalWidth / img.naturalHeight);
+    if (w > 24 && h > 0 && (ratio < 0.9 || ratio > 1.1)) issues.push(`image déformée (${Math.round(ratio * 100)} %) : ${img.getAttribute('src')}`);
   }
 
   for (const card of document.querySelectorAll('.admin-card, .card, .admin-head, .field, .auth-card')) {
