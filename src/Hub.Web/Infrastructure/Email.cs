@@ -29,6 +29,13 @@ internal sealed class ResendEmailSender(HttpClient http, IOptions<ResendOptions>
         };
         if (!string.IsNullOrWhiteSpace(message.ReplyTo))
             payload["reply_to"] = message.ReplyTo;
+        if (message.Attachments is { Count: > 0 } files)
+            payload["attachments"] = files.Select(f => new Dictionary<string, object?>
+            {
+                ["filename"] = f.FileName,
+                ["content"] = Convert.ToBase64String(f.Content),
+                ["content_type"] = f.ContentType,
+            }).ToArray();
 
         try
         {
@@ -68,10 +75,13 @@ internal sealed class FileEmailSender(string folder, ILogger<FileEmailSender> lo
               <b>Courriel local (non envoyé)</b><br>
               À : {System.Net.WebUtility.HtmlEncode(message.To)}<br>
               Répondre à : {System.Net.WebUtility.HtmlEncode(message.ReplyTo ?? "")}<br>
-              Sujet : {System.Net.WebUtility.HtmlEncode(message.Subject)}
+              Sujet : {System.Net.WebUtility.HtmlEncode(message.Subject)}<br>
+              Pièces jointes : {System.Net.WebUtility.HtmlEncode(string.Join(", ", (message.Attachments ?? []).Select(a => a.FileName)))}
             </div>
             """;
         await File.WriteAllTextAsync(file, header + message.HtmlBody, ct);
+        foreach (var a in message.Attachments ?? [])
+            await File.WriteAllBytesAsync(Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(file)}_{Path.GetFileName(a.FileName)}"), a.Content, ct);
         logger.LogInformation("Courriel local enregistré : {File}", file);
         return Result.Success();
     }
@@ -82,7 +92,8 @@ internal sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : I
 {
     public Task<Result> SendAsync(EmailMessage message, CancellationToken ct = default)
     {
-        logger.LogInformation("Courriel (non envoyé, aucune clé Resend) à {To} : {Subject}", message.To, message.Subject);
+        logger.LogInformation("Courriel (non envoyé, aucune clé Resend) à {To} : {Subject} ({Count} pièce(s) jointe(s))",
+            message.To, message.Subject, message.Attachments?.Count ?? 0);
         return Task.FromResult(Result.Success());
     }
 }

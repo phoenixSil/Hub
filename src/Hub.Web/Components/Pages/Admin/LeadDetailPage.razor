@@ -99,6 +99,44 @@
             </div>
         }
 
+        <div class="admin-card reply-card">
+            <h2>Répondre par courriel</h2>
+            <p class="muted small">Envoyé à <strong>@l.Email</strong> au nom de l'entreprise ; si le client répond, sa réponse arrive dans votre boîte courriel habituelle.
+                L'envoi est noté dans le suivi ci-dessous.</p>
+            @if (replyResult is not null)
+            {
+                <div class="alert @(replyIsError ? "alert-error" : "alert-success")" role="status">@replyResult</div>
+            }
+            <div class="field">
+                <label for="rsubject">Sujet</label>
+                <input id="rsubject" @bind="replySubject" maxlength="200" />
+                <FieldError Errors="replyErrors" For="Subject" />
+            </div>
+            <div class="field">
+                <label for="rbody">Message</label>
+                <textarea id="rbody" rows="12" @bind="replyBody" placeholder="Collez ou écrivez votre réponse. Une ligne vide sépare les paragraphes ; les lignes qui commencent par « - » deviennent une liste."></textarea>
+                <FieldError Errors="replyErrors" For="Body" />
+            </div>
+            <div class="field">
+                <label for="rfiles">Pièces jointes (PDF, images, Word, Excel · 15 Mo au total)</label>
+                <InputFile id="rfiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx" OnChange="AddFilesAsync" />
+                <FieldError Errors="replyErrors" For="Attachments" />
+                @if (replyFiles.Count > 0)
+                {
+                    <ul class="attachment-list">
+                        @foreach (var f in replyFiles)
+                        {
+                            <li>
+                                <span><Icon Name="file-signature" Size="14" /> @f.FileName <span class="muted small">(@Size(f.Content.Length))</span></span>
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => replyFiles.Remove(f)" aria-label="Retirer @f.FileName">Retirer</button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+            <BusyButton OnClick="SendReplyAsync" IsBusy="sending" BusyText="Envoi…">Envoyer le courriel</BusyButton>
+        </div>
+
         <div class="admin-card">
             <h2>Suivi</h2>
             <div class="field">
@@ -112,7 +150,7 @@
                     <li>
                         <span class="muted small">@AdminFormat.Local(a.CreatedAt) · @a.Author</span>
                         <strong>@a.Action</strong>
-                        @if (a.Note is not null) { <p>@a.Note</p> }
+                        @if (a.Note is not null) { <p class="timeline-note">@a.Note</p> }
                     </li>
                 }
             </ol>
@@ -134,6 +172,64 @@
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
+    // Réponse par courriel
+    private string? replySubject;
+    private string? replyBody;
+    private readonly List<Hub.SharedKernel.Email.EmailAttachment> replyFiles = [];
+    private IReadOnlyDictionary<string, string>? replyErrors;
+    private string? replyResult;
+    private bool replyIsError;
+    private bool sending;
+
+    private async Task AddFilesAsync(InputFileChangeEventArgs e)
+    {
+        replyErrors = null;
+        foreach (var file in e.GetMultipleFiles(Hub.Modules.Leads.Application.LeadEmailLimits.MaxAttachments))
+        {
+            var ext = Path.GetExtension(file.Name);
+            if (!Hub.SharedKernel.Email.EmailAttachment.AllowedTypes.TryGetValue(ext, out var type))
+            {
+                replyErrors = new Dictionary<string, string> { ["Attachments"] = $"« {file.Name} » : seuls les PDF, images, documents Word et Excel sont permis." };
+                continue;
+            }
+            if (replyFiles.Sum(f => (long)f.Content.Length) + file.Size > Hub.SharedKernel.Email.EmailAttachment.MaxTotalBytes)
+            {
+                replyErrors = new Dictionary<string, string> { ["Attachments"] = "Les pièces jointes dépassent 15 Mo au total." };
+                continue;
+            }
+            await using var stream = file.OpenReadStream(Hub.SharedKernel.Email.EmailAttachment.MaxTotalBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            replyFiles.Add(new Hub.SharedKernel.Email.EmailAttachment(Path.GetFileName(file.Name), type, memory.ToArray()));
+        }
+    }
+
+    private async Task SendReplyAsync()
+    {
+        if (sending) return;
+        sending = true;
+        replyResult = null;
+        try
+        {
+            var result = await Leads.SendReplyAsync(Id, replySubject ?? "", replyBody ?? "", replyFiles.ToList(), await AuthorAsync());
+            replyErrors = result.FieldErrors;
+            replyIsError = result.IsFailure;
+            replyResult = result.IsSuccess
+                ? $"Courriel envoyé à {detail?.Lead.Email}{(replyFiles.Count > 0 ? $" avec {replyFiles.Count} pièce(s) jointe(s)" : "")}."
+                : result.FieldErrors.Count > 0 ? "Vérifiez les champs signalés." : result.Error;
+            if (result.IsSuccess)
+            {
+                replySubject = null;
+                replyBody = null;
+                replyFiles.Clear();
+                await LoadAsync();
+            }
+        }
+        finally { sending = false; }
+    }
+
+    private static string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024:0.0} Mo" : $"{Math.Max(1, bytes / 1024)} Ko";
+
     private IReadOnlyList<ServiceArea> areas = [];
 
     private string AreaName(string slug) =>
@@ -144,6 +240,8 @@
         if (areas.Count == 0) areas = (await ContentQueries.GetAsync()).Areas;
         detail = await Leads.GetAsync(Id);
         notFound = detail is null;
+        if (detail is not null && replySubject is null)
+            replySubject = detail.Lead.Subject is { Length: > 0 } subj ? (subj.StartsWith("Re", StringComparison.OrdinalIgnoreCase) ? subj : "Re : " + subj) : "Votre demande";
         if (detail?.Lead.PreferredDate is { } d && confirmAt is null)
         {
             var hour = detail.Lead.PreferredSlot switch { TimeSlot.Afternoon => 13, TimeSlot.LateDay => 16, _ => 9 };

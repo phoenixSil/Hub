@@ -316,3 +316,10 @@ code.break { word-break: break-all; }
 /* Cartes-cadeaux */
 .giftcard-redeem .field { flex: 1; }
 .admin-table .sub-row td { border-top: 0; padding-top: 0; }
+
+/* Réponse par courriel depuis une demande */
+.attachment-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.attachment-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
+    background: #f4f7fa; border: 1px solid var(--line); border-radius: 8px; }
+.attachment-list li > span { min-width: 0; overflow-wrap: anywhere; }
+.timeline-note { white-space: pre-line; }
