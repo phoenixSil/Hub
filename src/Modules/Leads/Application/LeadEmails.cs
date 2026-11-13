@@ -135,19 +135,27 @@ internal static class LeadEmails
         var blocks = body.Replace("\r\n", "\n").Trim().Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
         foreach (var block in blocks)
         {
+            // Dans un bloc, les lignes ordinaires forment un paragraphe et les puces consécutives une vraie liste
+            // (« Voici nos services : » suivi de « - … » donne un paragraphe puis une liste).
             var lines = block.Split('\n').Select(l => l.TrimEnd()).Where(l => l.Length > 0).ToList();
-            var bullets = lines.Count > 0 && lines.All(l => IsBullet(l));
-            if (bullets)
+            var i = 0;
+            while (i < lines.Count)
             {
-                html.Append("<ul style=\"margin:0 0 14px;padding-left:22px\">");
-                foreach (var l in lines) html.Append($"<li style=\"margin:0 0 4px\">{E(StripBullet(l))}</li>");
-                html.Append("</ul>");
-            }
-            else
-            {
-                html.Append("<p style=\"margin:0 0 14px\">");
-                html.Append(string.Join("<br>", lines.Select(l => IsBullet(l) ? "• " + E(StripBullet(l)) : E(l))));
-                html.Append("</p>");
+                var bullet = IsBullet(lines[i]);
+                var run = lines.Skip(i).TakeWhile(l => IsBullet(l) == bullet).ToList();
+                i += run.Count;
+                if (bullet)
+                {
+                    html.Append("<ul style=\"margin:0 0 14px;padding-left:22px\">");
+                    foreach (var l in run) html.Append($"<li style=\"margin:0 0 4px\">{E(StripBullet(l))}</li>");
+                    html.Append("</ul>");
+                }
+                else
+                {
+                    html.Append($"<p style=\"margin:0 0 {(i < lines.Count ? 6 : 14)}px\">");
+                    html.Append(string.Join("<br>", run.Select(E)));
+                    html.Append("</p>");
+                }
             }
         }
         return $"""

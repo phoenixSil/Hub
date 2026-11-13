@@ -13,8 +13,10 @@ public class LeadReplyTests
     public void Le_texte_colle_devient_des_paragraphes_et_des_listes()
     {
         var html = LeadEmails.Reply("Bonjour Madame Renard,\n\nVoici nos services :\n- Entretien ménager\n- Repas <maison>\n\nCordialement,\nSillery", Tenant);
-        Assert.Contains("<p style=\"margin:0 0 14px\">Bonjour Madame Renard,</p>", html);
-        Assert.Contains("Voici nos services :<br>• Entretien ménager", html);
+        Assert.Contains($"<p style=\"margin:0 0 14px\">{System.Net.WebUtility.HtmlEncode("Bonjour Madame Renard,")}</p>", html);
+        // Une phrase d'introduction suivie de puces : un paragraphe, puis une vraie liste.
+        Assert.Contains("Voici nos services :</p><ul", html);
+        Assert.Contains($">{System.Net.WebUtility.HtmlEncode("Entretien ménager")}</li>", html);
         Assert.Contains("Repas &lt;maison&gt;", html); // le texte est encodé
         Assert.Contains("Cordialement,<br>Sillery", html);
         Assert.Contains("418 953-3284", html);
