@@ -35,6 +35,19 @@ public interface ILeadInbox
     Task ChangeStatusAsync(Guid id, LeadStatus status, string author, CancellationToken ct = default);
     Task AddNoteAsync(Guid id, string note, string author, CancellationToken ct = default);
     Task<Result> ConfirmAppointmentAsync(Guid id, DateTimeOffset when, string? note, string author, CancellationToken ct = default);
+
+    /// <summary>
+    /// Répond au client par courriel depuis le Hub, avec des pièces jointes (offre en PDF…).
+    /// L'envoi est noté dans le suivi ; une demande « Nouvelle » passe à « Contactée ».
+    /// </summary>
+    Task<Result> SendReplyAsync(Guid id, string subject, string body, IReadOnlyList<Hub.SharedKernel.Email.EmailAttachment> attachments,
+        string author, CancellationToken ct = default);
+}
+
+public static class LeadEmailLimits
+{
+    /// <summary>Nombre maximal de pièces jointes dans une réponse au client.</summary>
+    public const int MaxAttachments = 5;
 }
 
 /// <summary>Disponibilités pour les demandes de rendez-vous.</summary>

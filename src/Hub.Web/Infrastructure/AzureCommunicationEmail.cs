@@ -5,6 +5,7 @@ using Hub.SharedKernel.Email;
 using Microsoft.Extensions.Options;
 using AcsEmailMessage = Azure.Communication.Email.EmailMessage;
 using HubEmailMessage = Hub.SharedKernel.Email.EmailMessage;
+using AcsEmailAttachment = Azure.Communication.Email.EmailAttachment;
 
 namespace Hub.Web.Infrastructure;
 
@@ -36,6 +37,8 @@ internal sealed class AzureCommunicationEmailSender(
                 new EmailContent(message.Subject) { Html = message.HtmlBody });
             if (!string.IsNullOrWhiteSpace(message.ReplyTo))
                 email.ReplyTo.Add(new EmailAddress(message.ReplyTo));
+            foreach (var a in message.Attachments ?? [])
+                email.Attachments.Add(new AcsEmailAttachment(a.FileName, a.ContentType, BinaryData.FromBytes(a.Content)));
 
             // WaitUntil.Started : le service accepte le courriel ; l'envoi se poursuit de son côté.
             await _client.Value.SendAsync(WaitUntil.Started, email, ct);

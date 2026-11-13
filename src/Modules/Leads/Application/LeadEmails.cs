@@ -1,3 +1,4 @@
+using Hub.SharedKernel.Email;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -110,6 +111,67 @@ internal static class LeadEmails
         var subject = $"[{tenant.Name}] Rappel : {leads.Count} demande{(leads.Count > 1 ? "s" : "")} sans réponse";
         return (subject, Layout(tenant, "Demandes en attente", body));
     }
+
+    /// <summary>Vérifie une réponse au client : sujet, message, pièces jointes (types et poids permis).</summary>
+    public static Dictionary<string, string> ValidateReply(string? subject, string? body, IReadOnlyList<EmailAttachment> attachments)
+    {
+        var errors = new Dictionary<string, string>();
+        if (string.IsNullOrWhiteSpace(subject) || subject.Length > 200) errors["Subject"] = "Indiquez un sujet (200 caractères au plus).";
+        if (string.IsNullOrWhiteSpace(body) || body.Length > 20000) errors["Body"] = "Écrivez le message (20 000 caractères au plus).";
+        if (attachments.Count > LeadEmailLimits.MaxAttachments) errors["Attachments"] = $"{LeadEmailLimits.MaxAttachments} pièces jointes au plus.";
+        else if (attachments.Sum(a => (long)a.Content.Length) > EmailAttachment.MaxTotalBytes) errors["Attachments"] = "Les pièces jointes dépassent 15 Mo au total.";
+        else if (attachments.FirstOrDefault(a => !EmailAttachment.AllowedTypes.ContainsKey(Path.GetExtension(a.FileName))) is { } bad)
+            errors["Attachments"] = $"« {bad.FileName} » : seuls les PDF, images, documents Word et Excel sont permis.";
+        return errors;
+    }
+
+    /// <summary>
+    /// Réponse personnelle au client : le texte tapé (ou collé) dans le Hub, mis en forme simplement
+    /// (paragraphes, listes à puces), avec les coordonnées de l'entreprise en pied de page.
+    /// </summary>
+    public static string Reply(string body, TenantInfo tenant)
+    {
+        var html = new StringBuilder();
+        var blocks = body.Replace("\r\n", "\n").Trim().Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+        foreach (var block in blocks)
+        {
+            var lines = block.Split('\n').Select(l => l.TrimEnd()).Where(l => l.Length > 0).ToList();
+            var bullets = lines.Count > 0 && lines.All(l => IsBullet(l));
+            if (bullets)
+            {
+                html.Append("<ul style=\"margin:0 0 14px;padding-left:22px\">");
+                foreach (var l in lines) html.Append($"<li style=\"margin:0 0 4px\">{E(StripBullet(l))}</li>");
+                html.Append("</ul>");
+            }
+            else
+            {
+                html.Append("<p style=\"margin:0 0 14px\">");
+                html.Append(string.Join("<br>", lines.Select(l => IsBullet(l) ? "• " + E(StripBullet(l)) : E(l))));
+                html.Append("</p>");
+            }
+        }
+        return $"""
+            <!DOCTYPE html>
+            <html lang="fr"><head><meta charset="utf-8"></head>
+            <body style="margin:0;padding:24px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1e293b">
+              <div style="max-width:640px">
+                {html}
+                <div style="margin-top:22px;padding-top:12px;border-top:3px solid {E(tenant.PrimaryColor)};color:#475569;font-size:13px">
+                  <strong style="color:#1e293b">{E(tenant.Name)}</strong>{(string.IsNullOrWhiteSpace(tenant.Tagline) ? "" : " · " + E(tenant.Tagline))}<br>
+                  {E(tenant.Phone)} · {E(tenant.PublicEmail)}
+                </div>
+              </div>
+            </body></html>
+            """;
+    }
+
+    private static bool IsBullet(string line)
+    {
+        var t = line.TrimStart();
+        return t.StartsWith("- ") || t.StartsWith("• ") || t.StartsWith("● ") || t.StartsWith("* ");
+    }
+
+    private static string StripBullet(string line) => line.TrimStart()[2..].Trim();
 
     private static string Digits(string phone) => "+" + new string(phone.Where(char.IsDigit).ToArray());
 

@@ -100,4 +100,32 @@ internal sealed class LeadInboxService(
             : Result.Failure("Rendez-vous enregistré, mais le courriel de confirmation n'a pas pu partir : " + sent.Error);
     }
 
+    public async Task<Result> SendReplyAsync(Guid id, string subject, string body, IReadOnlyList<EmailAttachment> attachments,
+        string author, CancellationToken ct = default)
+    {
+        var errors = LeadEmails.ValidateReply(subject, body, attachments);
+        if (errors.Count > 0) return Result.Invalid(errors);
+
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var lead = await db.Leads.FirstOrDefaultAsync(l => l.Id == id, ct);
+        if (lead is null) return Result.Failure("Demande introuvable.");
+
+        var info = await tenantInfo.GetCurrentAsync(ct);
+        var html = LeadEmails.Reply(body, info);
+        var sent = await email.SendAsync(new EmailMessage(lead.Email, subject.Trim(), html,
+            ReplyTo: info.PublicEmail, FromName: info.Name, Attachments: attachments), ct);
+        if (sent.IsFailure) return Result.Failure("Le courriel n'est pas parti : " + sent.Error);
+
+        var files = attachments.Count == 0 ? "" : "\nPièces jointes : " + string.Join(", ", attachments.Select(a => a.FileName));
+        var note = $"Sujet : {subject.Trim()}{files}\n\n{body.Trim()}";
+        db.Activities.Add(new LeadActivity
+        {
+            LeadId = id, Author = author,
+            Action = attachments.Count == 0 ? "Courriel envoyé au client" : $"Courriel envoyé au client ({attachments.Count} pièce{(attachments.Count > 1 ? "s" : "")} jointe{(attachments.Count > 1 ? "s" : "")})",
+            Note = note.Length > 4000 ? note[..3997] + "…" : note,
+        });
+        if (lead.Status == LeadStatus.New) lead.Status = LeadStatus.Contacted;
+        await db.SaveChangesAsync(ct);
+        return Result.Success();
+    }
 }
