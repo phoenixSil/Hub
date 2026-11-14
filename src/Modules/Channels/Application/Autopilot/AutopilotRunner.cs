@@ -15,22 +15,42 @@ public static class AutopilotSchedule
 {
     public const int HorizonDays = 7;
 
+    /// <summary>Rythme maximal : 21 publications par semaine, soit jusqu'à 3 par jour (communication soutenue).</summary>
+    public const int MaxPostsPerWeek = 21;
+
+    /// <summary>Heures des publications quand il y en a plusieurs le même jour : matin et soir, ou matin, midi et soir.</summary>
+    public static int[] Waves(int perDay) => perDay switch { <= 1 => [], 2 => [9, 18], _ => [8, 12, 19] };
+
+    /// <summary>Publications par jour au plus pour un rythme hebdomadaire (1 jusqu'à 7 par semaine, puis 2, puis 3).</summary>
+    public static int PerDay(int postsPerWeek) => Math.Clamp((int)Math.Ceiling(postsPerWeek / 7.0), 1, 3);
+
     /// <summary>
-    /// Jours (à minuit, heure locale) où placer les publications manquantes : sur les 7 prochains jours,
-    /// en évitant les jours déjà occupés et en répartissant les publications sur la semaine.
+    /// Créneaux où placer les publications manquantes, sur les 7 prochains jours, répartis sur la semaine.
+    /// Jusqu'à 7 par semaine : une par jour au plus, à minuit (l'heure est choisie ensuite selon le public visé).
+    /// Au-delà : plusieurs par jour, chacune à une heure fixe différente (voir <see cref="Waves"/>).
     /// </summary>
-    public static IReadOnlyList<DateTimeOffset> FreeDays(DateTimeOffset now, int postsPerWeek, int alreadyPlanned, IReadOnlyCollection<DateOnly> busyDays)
+    public static IReadOnlyList<DateTimeOffset> FreeDays(DateTimeOffset now, int postsPerWeek, int alreadyPlanned, IReadOnlyCollection<DateOnly> busyDays) =>
+        FreeSlots(now, postsPerWeek, alreadyPlanned, busyDays.ToDictionary(d => d, _ => 1));
+
+    public static IReadOnlyList<DateTimeOffset> FreeSlots(DateTimeOffset now, int postsPerWeek, int alreadyPlanned, IReadOnlyDictionary<DateOnly, int> busyCount)
     {
-        var need = Math.Clamp(postsPerWeek, 1, 7) - alreadyPlanned;
+        postsPerWeek = Math.Clamp(postsPerWeek, 1, MaxPostsPerWeek);
+        var need = postsPerWeek - alreadyPlanned;
         if (need <= 0) return [];
+        var perDay = PerDay(postsPerWeek);
+        var waves = Waves(perDay);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, BusinessTime.Zone).DateTime);
-        var free = Enumerable.Range(1, HorizonDays).Select(today.AddDays).Where(d => !busyDays.Contains(d)).ToList();
+
+        // Places libres, jour par jour : (jour, rang de la publication dans la journée).
+        var free = Enumerable.Range(1, HorizonDays).Select(today.AddDays)
+            .SelectMany(d => Enumerable.Range(busyCount.GetValueOrDefault(d), Math.Max(0, perDay - busyCount.GetValueOrDefault(d))).Select(rank => (Day: d, Rank: rank)))
+            .ToList();
         if (free.Count == 0) return [];
         need = Math.Min(need, free.Count);
         return Enumerable.Range(0, need)
             .Select(k => free[(int)Math.Floor((k + 0.5) * free.Count / need)])
             .Distinct()
-            .Select(d => BusinessTime.FromLocal(d.ToDateTime(TimeOnly.MinValue)))
+            .Select(s => BusinessTime.FromLocal(s.Day.ToDateTime(perDay == 1 ? TimeOnly.MinValue : new TimeOnly(waves[Math.Min(s.Rank, waves.Length - 1)], 0))))
             .ToList();
     }
 
@@ -108,9 +128,9 @@ internal sealed class AutopilotRunner(
             .Where(p => p.Status != PostStatus.Cancelled && (p.ScheduledAt ?? p.PublishedAt) >= now.AddHours(-12) && (p.ScheduledAt ?? p.PublishedAt) < horizonEnd)
             .Select(p => new { p.FromAutopilot, At = p.ScheduledAt ?? p.PublishedAt, p.Status })
             .ToListAsync(ct);
-        var busy = upcoming.Where(p => p.At is not null).Select(p => AutopilotSchedule.LocalDay(p.At!.Value)).ToHashSet();
+        var busy = upcoming.Where(p => p.At is not null).GroupBy(p => AutopilotSchedule.LocalDay(p.At!.Value)).ToDictionary(g => g.Key, g => g.Count());
         var planned = upcoming.Count(p => p.FromAutopilot && p.At > now);
-        var slots = AutopilotSchedule.FreeDays(now, settings.PostsPerWeek, planned, busy);
+        var slots = AutopilotSchedule.FreeSlots(now, settings.PostsPerWeek, planned, busy);
 
         var created = 0;
         var problems = new List<string>();

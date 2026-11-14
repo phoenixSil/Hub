@@ -398,3 +398,13 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 .plan-week-note { margin: 12px 0 0; font-size: .9rem; }
 .plan-week-empty { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 560px) { .plan-week-numbers { grid-template-columns: repeat(2, 1fr); } .plan-week-link { margin-left: 0; } }
+
+/* Plusieurs plans : liste, réserve, arrêt */
+.plan-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-list-head h2 { margin: 0; }
+.plan-list-table tr.is-selected td { background: #eef7fb; }
+.plan-reserve p { margin: 0 0 8px; }
+.plan-reserve .check { margin: 0; }
+.plan-stop { border-left: 4px solid #b42318; }
+.plan-stop-choice { border: 0; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
+.plan-stop-choice legend { font-weight: 600; margin-bottom: 6px; }

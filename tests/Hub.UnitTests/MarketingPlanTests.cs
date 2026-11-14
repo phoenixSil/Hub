@@ -258,4 +258,20 @@ public class MarketingPlanTests
             MarketingPlanService.NameFor(name, new DateOnly(2026, 11, 13), new DateOnly(2027, 2, 7)));
         Assert.Equal("Mon plan", MarketingPlanService.NameFor("Mon plan", new DateOnly(2026, 11, 13), new DateOnly(2027, 2, 7)));
     }
+
+    [Fact]
+    public void Un_plan_decale_garde_ses_durees_et_ses_etapes()
+    {
+        var (phases, pillars, end) = PlanTemplates.Visibility(Start);
+        var plan = new MarketingPlan { StartsOn = Start, EndsOn = end, PhasesJson = PlanLogic.Write(phases), PillarsJson = PlanLogic.Write(pillars) };
+
+        PlanLogic.ShiftTo(plan, new DateOnly(2027, 2, 8)); // le lendemain de la fin d'un plan de 13 semaines
+
+        Assert.Equal(new DateOnly(2027, 2, 8), plan.StartsOn);
+        Assert.Equal(end.AddDays(91), plan.EndsOn);
+        var shifted = PlanLogic.Phases(plan.PhasesJson);
+        Assert.Equal(plan.StartsOn, shifted[0].From);
+        Assert.Equal(plan.EndsOn, shifted[^1].To);
+        Assert.Equal(phases.Select(p => p.To.DayNumber - p.From.DayNumber), shifted.Select(p => p.To.DayNumber - p.From.DayNumber));
+    }
 }

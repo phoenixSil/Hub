@@ -38,6 +38,32 @@ public class AutopilotScheduleTests
         Assert.DoesNotContain(new DateOnly(2026, 11, 10), days);
         Assert.Empty(AutopilotSchedule.FreeDays(Now, 3, 3, []));
     }
+
+    [Fact]
+    public void Une_communication_intensive_publie_jusqu_a_trois_fois_par_jour_a_des_heures_differentes()
+    {
+        var slots = AutopilotSchedule.FreeSlots(Now, 21, 0, new Dictionary<DateOnly, int>());
+        Assert.Equal(21, slots.Count);
+        var local = slots.Select(s => TimeZoneInfo.ConvertTime(s, BusinessTime.Zone)).ToList();
+        Assert.All(local.GroupBy(l => l.Date), g => Assert.Equal(new[] { 8, 12, 19 }, g.Select(l => l.Hour).OrderBy(h => h)));
+
+        var twice = AutopilotSchedule.FreeSlots(Now, 14, 0, new Dictionary<DateOnly, int>())
+            .Select(s => TimeZoneInfo.ConvertTime(s, BusinessTime.Zone)).ToList();
+        Assert.Equal(14, twice.Count);
+        Assert.All(twice.GroupBy(l => l.Date), g => Assert.Equal(new[] { 9, 18 }, g.Select(l => l.Hour).OrderBy(h => h)));
+
+        // Un jour qui a déjà deux publications ne reçoit plus que la troisième, le soir.
+        var busy = new Dictionary<DateOnly, int> { [new DateOnly(2026, 11, 7)] = 2 };
+        var withBusy = AutopilotSchedule.FreeSlots(Now, 21, 0, busy).Select(s => TimeZoneInfo.ConvertTime(s, BusinessTime.Zone)).ToList();
+        Assert.Equal(19, withBusy.Count);
+        Assert.Equal(new[] { 19 }, withBusy.Where(l => l.Date == new DateTime(2026, 11, 7)).Select(l => l.Hour));
+
+        // L'heure préférée du public ne s'applique qu'aux créneaux d'une seule publication par jour.
+        Assert.Equal(slots[0], AutopilotPlanner.AtHour(slots[0], 17));
+        Assert.Equal(17, TimeZoneInfo.ConvertTime(AutopilotPlanner.AtHour(AutopilotSchedule.FreeDays(Now, 3, 0, [])[0], 17), BusinessTime.Zone).Hour);
+        Assert.Equal(3, AutopilotSchedule.PerDay(15));
+        Assert.Equal(1, AutopilotSchedule.PerDay(7));
+    }
 }
 
 public class AutopilotPlannerTests

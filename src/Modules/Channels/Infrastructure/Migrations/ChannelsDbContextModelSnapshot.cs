@@ -266,6 +266,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("StartsAutomatically")
+                        .HasColumnType("bit");
+
                     b.Property<DateOnly>("StartsOn")
                         .HasColumnType("date");
 
@@ -273,6 +276,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateOnly?>("StoppedOn")
+                        .HasColumnType("date");
 
                     b.Property<string>("TargetsJson")
                         .HasMaxLength(500)
