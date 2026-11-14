@@ -356,7 +356,7 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
     border: 1.5px solid var(--blue); border-radius: 99px; background: #fff; color: var(--blue-dark, #007aa8); cursor: pointer; }
 
 /* Tableaux en fiches sur téléphone : chaque ligne devient une carte « Colonne : valeur » (étiquettes et classe as-cards posées par admin.js,
-   pour les tableaux de plus de 3 colonnes ; les petits tableaux restent des tableaux). */
+   pour les tableaux de plus de 2 colonnes ; les tableaux à 2 colonnes restent des tableaux). */
 @media (max-width: 700px) {
     .admin-table.as-cards, .admin-table.as-cards > tbody,
     .admin-table.as-cards > tbody > tr { display: block; width: 100%; }
