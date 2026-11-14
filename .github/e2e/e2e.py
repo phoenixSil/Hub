@@ -8,7 +8,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 5. Le formulaire de devis public refuse un envoi vide et affiche les erreurs.
 6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
-8. Le plan marketing se crée, se lance (le pilote passe au rythme du plan) et relève les chiffres.
+8. Le plan marketing se crée, se lance (le pilote passe au rythme du plan), relève les chiffres ; un plan en réserve ne se lance pas tant qu'un plan tourne.
 9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
 
 Usage : python3 e2e.py http://localhost:5080
@@ -150,6 +150,19 @@ def marketing_plan(page):
     expect(page.locator(".plan-mix tbody tr")).to_have_count(4)
     page.locator("button", has_text="Relever les chiffres").click()
     expect(page.locator(".alert-success, .alert-error").first).to_be_visible(timeout=30000)
+
+    # Plan en réserve : créé pendant le plan en cours, il ne peut pas être lancé, puis il est supprimé.
+    page.locator("button", has_text="Nouveau plan").click()
+    page.locator("button", has_text="Créer le plan").click()
+    expect(page.locator("text=Plan créé en réserve")).to_be_visible(timeout=15000)
+    expect(page.locator(".plan-status .status-approval")).to_have_text("En réserve")
+    expect(page.locator(".plan-reserve")).to_be_visible()
+    expect(page.locator("button", has_text="Lancer le plan")).to_have_count(0)
+    expect(page.locator(".plan-list-table tbody tr")).to_have_count(2)
+    page.locator(".plan-status-actions button", has_text="Supprimer").click()
+    expect(page.locator("text=Plan supprimé")).to_be_visible(timeout=15000)
+    expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
+
     page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
     expect(page.locator("select").first).to_have_value("7")
 

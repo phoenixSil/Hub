@@ -141,11 +141,15 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
     private static string? SlotPillar(AutopilotPlanRequest r, int i) =>
         r.Plan is { SlotPillars.Count: > 0 } plan ? plan.SlotPillars[i % plan.SlotPillars.Count] : null;
 
-    /// <summary>Le créneau (un jour) à l'heure locale préférée du public.</summary>
-    internal static DateTimeOffset AtHour(DateTimeOffset day, int hour)
+    /// <summary>
+    /// Le créneau à l'heure locale préférée du public. Un créneau qui a déjà son heure (plusieurs publications
+    /// le même jour : matin, midi, soir) la garde, pour ne pas les faire partir en même temps.
+    /// </summary>
+    internal static DateTimeOffset AtHour(DateTimeOffset slot, int hour)
     {
-        var local = TimeZoneInfo.ConvertTime(day, BusinessTime.Zone).Date.AddHours(Math.Clamp(hour, 6, 21));
-        return BusinessTime.FromLocal(local);
+        var local = TimeZoneInfo.ConvertTime(slot, BusinessTime.Zone);
+        if (local.TimeOfDay != TimeSpan.Zero) return slot;
+        return BusinessTime.FromLocal(local.Date.AddHours(Math.Clamp(hour, 6, 21)));
     }
 
     internal static string SystemPrompt(AutopilotPlanRequest r) => $"""

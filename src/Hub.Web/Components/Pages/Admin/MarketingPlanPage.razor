@@ -33,33 +33,91 @@ else if (feedback is not null)
 {
     <p class="muted">Chargement…</p>
 }
-else if (view is null || view.Status == PlanStatus.Completed && creating)
-{
-    <div class="admin-card plan-create">
-        <h2>Créer le plan « Visibilité sur les réseaux »</h2>
-        <p>Trois étapes sur 13 semaines : <strong>se faire connaître</strong>, <strong>accélérer</strong>, <strong>amplifier</strong>.
-           Les thèmes suivent la saison et quatre piliers de contenu se partagent les publications :
-           conseiller 35 %, montrer 25 %, rassurer 20 % et proposer 20 %. Tout reste modifiable.</p>
-        <div class="field-row">
-            <div class="field">
-                <label for="plan-start">Début</label>
-                <input id="plan-start" type="date" @bind="startsOn" />
-            </div>
-            <div class="field">
-                <label for="plan-rythm">Publications par semaine</label>
-                <select id="plan-rythm" @bind="postsPerWeek">
-                    @for (var n = 3; n <= 7; n++) { var v = n; <option value="@v">@v</option> }
-                </select>
-            </div>
-        </div>
-        <BusyButton OnClick="CreateAsync" IsBusy="@(action == "create")" BusyText="Création…">Créer le plan</BusyButton>
-    </div>
-}
 else
 {
-    var v = view;
+    @if (plans.Count > 0)
+    {
+        <div class="admin-card plan-list">
+            <div class="plan-list-head">
+                <h2>Mes plans</h2>
+                @if (!creating)
+                {
+                    <button class="btn btn-outline btn-sm" @onclick="StartCreating" disabled="@busy">Nouveau plan</button>
+                }
+            </div>
+            <p class="muted small">Un seul plan tourne à la fois. Les autres attendent en réserve : lancez-en un quand aucun plan n'est en cours, ou programmez-le pour qu'il démarre tout seul à la fin du plan en cours.</p>
+            <table class="admin-table plan-list-table">
+                <thead><tr><th>Plan</th><th>Statut</th><th>Période</th><th class="num">Par semaine</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in plans)
+                    {
+                        <tr class="@(view?.Id == p.Id ? "is-selected" : null)">
+                            <td><strong>@p.Name</strong></td>
+                            <td>
+                                <span class="status status-@StatusClass(p.Status)">@StatusLabel(p.Status)</span>
+                                @if (p.StartsAutomatically) { <br /><span class="muted small">Démarre tout seul le @AdminFormat.Day(p.StartsOn)</span> }
+                                @if (p.StoppedOn is { } stopped) { <br /><span class="muted small">Arrêté le @AdminFormat.Day(stopped)</span> }
+                            </td>
+                            <td>@AdminFormat.Day(p.StartsOn) → @AdminFormat.Day(p.EndsOn)</td>
+                            <td class="num">@p.PostsPerWeek</td>
+                            <td class="actions">
+                                @if (view?.Id != p.Id)
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick="() => SelectAsync(p.Id)" disabled="@busy">Ouvrir</button>
+                                }
+                                else
+                                {
+                                    <span class="muted small">Affiché ci-dessous</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (plans.Count == 0 || creating)
+    {
+        <div class="admin-card plan-create">
+            <h2>Créer le plan « Visibilité sur les réseaux »</h2>
+            <p>Trois étapes sur 13 semaines : <strong>se faire connaître</strong>, <strong>accélérer</strong>, <strong>amplifier</strong>.
+               Les thèmes suivent la saison et quatre piliers de contenu se partagent les publications :
+               conseiller 35 %, montrer 25 %, rassurer 20 % et proposer 20 %. Tout reste modifiable.</p>
+            @if (activePlan is not null)
+            {
+                <p class="muted">Le plan « @activePlan.Name » est en cours jusqu'au @AdminFormat.Day(activePlan.EndsOn) : ce nouveau plan sera mis <strong>en réserve</strong>.</p>
+                <label class="check"><input type="checkbox" @bind="afterCurrent" /> Le démarrer automatiquement à la fin du plan en cours (le @AdminFormat.Day(activePlan.EndsOn.AddDays(1)))</label>
+            }
+            <div class="field-row">
+                @if (activePlan is null || !afterCurrent)
+                {
+                    <div class="field">
+                        <label for="plan-start">Début</label>
+                        <input id="plan-start" type="date" @bind="startsOn" />
+                    </div>
+                }
+                <div class="field">
+                    <label for="plan-rythm">Publications par semaine</label>
+                    <select id="plan-rythm" @bind="postsPerWeek">
+                        @for (var n = 3; n <= AutopilotSchedule.MaxPostsPerWeek; n++) { var x = n; <option value="@x">@RythmLabel(x)</option> }
+                    </select>
+                </div>
+            </div>
+            <div class="actions">
+                <BusyButton OnClick="CreateAsync" IsBusy="@(action == "create")" BusyText="Création…">Créer le plan</BusyButton>
+                @if (plans.Count > 0)
+                {
+                    <button class="btn btn-ghost btn-sm" @onclick="() => creating = false" disabled="@busy">Annuler</button>
+                }
+            </div>
+        </div>
+    }
+
+    @if (view is { } v)
+    {
     <div class="plan-status">
-        <span class="status status-@(v.Status == PlanStatus.Active ? "active" : v.Status == PlanStatus.Draft ? "approval" : "lost")">@StatusLabel(v.Status)</span>
+        <span class="status status-@StatusClass(v.Status)">@StatusLabel(v.Status)</span>
         <strong>@v.Name</strong>
         <span class="muted">
             @AdminFormat.Day(v.StartsOn) → @AdminFormat.Day(v.EndsOn) · @v.PostsPerWeek publications par semaine
@@ -68,21 +126,58 @@ else
         @if (v.Status == PlanStatus.Draft)
         {
             <span class="plan-status-actions">
-                <BusyButton OnClick="ActivateAsync" IsBusy="@(action == "activate")" BusyText="Lancement…">Lancer le plan</BusyButton>
-                <button class="btn btn-ghost btn-sm" @onclick="DeleteDraftAsync" disabled="@busy">Supprimer le brouillon</button>
+                @if (activePlan is null)
+                {
+                    <BusyButton OnClick="ActivateAsync" IsBusy="@(action == "activate")" BusyText="Lancement…">Lancer le plan</BusyButton>
+                }
+                <button class="btn btn-ghost btn-sm" @onclick="DeleteDraftAsync" disabled="@busy">Supprimer</button>
             </span>
         }
-        else if (v.Status == PlanStatus.Completed)
+        else if (v.Status == PlanStatus.Active && !stopping)
         {
-            <span class="plan-status-actions"><button class="btn btn-outline btn-sm" @onclick="() => creating = true">Préparer un nouveau plan</button></span>
+            <span class="plan-status-actions"><button class="btn btn-ghost btn-sm" @onclick="() => stopping = true" disabled="@busy">Arrêter le plan</button></span>
         }
     </div>
 
     @if (v.Status == PlanStatus.Draft)
     {
-        <div class="alert alert-info">
-            En lançant le plan, le pilote automatique est activé au rythme du plan. Facebook et Instagram sont utilisés s'ils sont connectés.
-            Pendant le premier mois, chaque publication attend votre accord.
+        var selected = plans.FirstOrDefault(p => p.Id == v.Id);
+        <div class="alert alert-info plan-reserve">
+            @if (activePlan is not null)
+            {
+                <p><strong>Plan en réserve.</strong> Le plan « @activePlan.Name » est en cours jusqu'au @AdminFormat.Day(activePlan.EndsOn) :
+                   celui-ci ne peut pas être lancé tant qu'il tourne (jamais deux plans en même temps). Arrêtez le plan en cours,
+                   ou programmez celui-ci pour qu'il prenne le relais tout seul.</p>
+            }
+            else
+            {
+                <p>En lançant le plan, le pilote automatique est activé au rythme du plan. Facebook et Instagram sont utilisés s'ils sont connectés.
+                   Pendant le premier mois, chaque publication attend votre accord.</p>
+            }
+            <label class="check">
+                <input type="checkbox" checked="@(selected?.StartsAutomatically == true)" disabled="@busy" @onchange="ToggleAutoStartAsync" />
+                @(activePlan is not null
+                    ? $"Démarrer automatiquement à la fin du plan en cours (le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))})"
+                    : $"Démarrer automatiquement à sa date de début (le {AdminFormat.Day(v.StartsOn)})")
+            </label>
+        </div>
+    }
+
+    @if (v.Status == PlanStatus.Active && stopping)
+    {
+        <div class="admin-card plan-stop">
+            <h2>Arrêter le plan ?</h2>
+            <p>Le plan passe dans l'historique avec ses chiffres. Les publications du pilote <strong>pas encore parues</strong> (à valider ou programmées) sont annulées.
+               Les publications déjà parues et celles écrites à la main ne sont pas touchées. Un plan arrêté ne se relance pas : vous pourrez en lancer un autre.</p>
+            <fieldset class="plan-stop-choice">
+                <legend>Ensuite, le pilote automatique :</legend>
+                <label class="check"><input type="radio" name="after-stop" checked="@pauseAutopilot" @onchange="() => pauseAutopilot = true" /> se met en pause (plus aucune publication automatique)</label>
+                <label class="check"><input type="radio" name="after-stop" checked="@(!pauseAutopilot)" @onchange="() => pauseAutopilot = false" /> continue sans plan, à son rythme actuel</label>
+            </fieldset>
+            <div class="actions">
+                <BusyButton Class="btn btn-danger" OnClick="StopAsync" IsBusy="@(action == "stop")" BusyText="Arrêt…">Oui, arrêter le plan</BusyButton>
+                <button class="btn btn-ghost btn-sm" @onclick="() => stopping = false" disabled="@busy">Annuler</button>
+            </div>
         </div>
     }
 
@@ -212,7 +307,7 @@ else
         </div>
     </div>
 
-    @if (form is not null && v.Status != PlanStatus.Completed)
+    @if (form is not null && v.Status is PlanStatus.Draft or PlanStatus.Active)
     {
         <details class="admin-card plan-edit" open="@(v.Status == PlanStatus.Draft)">
             <summary><h2>Modifier le plan</h2></summary>
@@ -225,7 +320,7 @@ else
                 <div class="field">
                     <label for="plan-posts">Publications par semaine</label>
                     <select id="plan-posts" @bind="form.PostsPerWeek">
-                        @for (var n = 1; n <= 7; n++) { var x = n; <option value="@x">@x</option> }
+                        @for (var n = 1; n <= AutopilotSchedule.MaxPostsPerWeek; n++) { var x = n; <option value="@x">@RythmLabel(x)</option> }
                     </select>
                     <FieldError Errors="errors" For="PostsPerWeek" />
                 </div>
@@ -261,12 +356,19 @@ else
             </div>
         </details>
     }
+    }
 }
 
 @code {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
     private MarketingPlanView? view;
     private MarketingPlanForm? form;
+    private IReadOnlyList<PlanSummary> plans = [];
+    private PlanSummary? activePlan;
+    private Guid? selectedId;
+    private bool afterCurrent;
+    private bool stopping;
+    private bool pauseAutopilot = true;
     private IReadOnlyDictionary<string, string>? errors;
     private bool loaded;
     private bool creating;
@@ -287,29 +389,74 @@ else
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool reloadForm = true)
     {
-        view = await Plans.GetAsync();
-        form = await Plans.GetFormAsync();
+        plans = await Plans.ListAsync();
+        activePlan = plans.FirstOrDefault(p => p.Status == PlanStatus.Active);
+        if (selectedId is { } id && plans.All(p => p.Id != id)) selectedId = null;
+        view = selectedId is { } sel ? await Plans.GetAsync(sel) : await Plans.GetAsync();
+        if (reloadForm) form = view is null ? null : await Plans.GetFormAsync(view.Id);
+        if (view?.Status != PlanStatus.Active) stopping = false;
         loaded = true;
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        selectedId = id;
+        feedback = null;
+        errors = null;
+        await LoadAsync();
+    }
+
+    private void StartCreating()
+    {
+        creating = true;
+        afterCurrent = activePlan is not null;
+        feedback = null;
     }
 
     private Task CreateAsync() => RunAsync("create", "Création du plan…", async () =>
     {
-        var r = await Plans.CreateAsync(startsOn, postsPerWeek);
-        if (r.IsSuccess) creating = false;
-        return (r, "Plan créé en brouillon : relisez-le, ajustez-le au besoin, puis lancez-le.");
+        var r = await Plans.CreateAsync(startsOn, postsPerWeek, activePlan is not null && afterCurrent);
+        if (r.IsSuccess) { creating = false; selectedId = r.Value; }
+        return (r, activePlan is null
+            ? "Plan créé en brouillon : relisez-le, ajustez-le au besoin, puis lancez-le."
+            : afterCurrent
+                ? $"Plan créé en réserve : il démarrera tout seul le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))}, à la fin du plan en cours."
+                : "Plan créé en réserve : vous pourrez le lancer quand le plan en cours sera terminé ou arrêté.");
     });
 
     private Task ActivateAsync() => RunAsync("activate", "Lancement du plan…", async () =>
-        (await Plans.ActivateAsync(), "Plan lancé : le pilote automatique le suit dès sa prochaine préparation. Les publications vous attendent dans « Publications »."));
+        (await Plans.ActivateAsync(view!.Id), "Plan lancé : le pilote automatique le suit dès sa prochaine préparation. Les publications vous attendent dans « Publications »."));
 
-    private Task DeleteDraftAsync() => RunAsync("delete", "Suppression du brouillon…", async () =>
-        (await Plans.DeleteDraftAsync(), "Brouillon supprimé."));
+    private Task StopAsync() => RunAsync("stop", "Arrêt du plan…", async () =>
+    {
+        var r = await Plans.StopAsync(view!.Id, pauseAutopilot);
+        if (r.IsSuccess) stopping = false;
+        return (r, pauseAutopilot
+            ? "Plan arrêté : il est dans l'historique, ses publications à venir sont annulées et le pilote automatique est en pause."
+            : "Plan arrêté : il est dans l'historique, ses publications à venir sont annulées. Le pilote continue sans plan.");
+    });
+
+    private async Task ToggleAutoStartAsync(ChangeEventArgs e)
+    {
+        var on = e.Value is true || string.Equals(e.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        await RunAsync("autostart", "Enregistrement…", async () =>
+            (await Plans.SetAutoStartAsync(view!.Id, on), on
+                ? "Ce plan démarrera tout seul" + (activePlan is null ? " à sa date de début." : $" le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))}, à la fin du plan en cours.")
+                : "Démarrage automatique annulé : le plan reste en réserve."));
+    }
+
+    private Task DeleteDraftAsync() => RunAsync("delete", "Suppression du plan…", async () =>
+    {
+        var r = await Plans.DeleteDraftAsync(view!.Id);
+        if (r.IsSuccess) selectedId = null;
+        return (r, "Plan supprimé.");
+    });
 
     private Task SaveAsync() => RunAsync("save", "Enregistrement du plan…", async () =>
     {
-        var r = await Plans.SaveAsync(form!);
+        var r = await Plans.SaveAsync(view!.Id, form!);
         errors = r.FieldErrors;
         return (r, "Plan enregistré.");
     }, reloadForm: false);
@@ -342,11 +489,7 @@ else
             var (result, success) = await work();
             feedbackIsError = result.IsFailure;
             feedback = result.IsSuccess ? success : result.Error ?? "Vérifiez les champs signalés.";
-            if (result.IsSuccess)
-            {
-                view = await Plans.GetAsync();
-                if (reloadForm) form = await Plans.GetFormAsync();
-            }
+            if (result.IsSuccess) await LoadAsync(reloadForm);
         }
         finally
         {
@@ -361,12 +504,22 @@ else
 
     private static string Pct(double v) => v.ToString("0.#", Fr) + " %";
 
-    private static string StatusLabel(PlanStatus s) => s switch
+    private string StatusLabel(PlanStatus s) => s switch
     {
         PlanStatus.Active => "En cours",
-        PlanStatus.Draft => "Brouillon",
+        PlanStatus.Draft => activePlan is null ? "Brouillon" : "En réserve",
+        PlanStatus.Stopped => "Arrêté",
         _ => "Terminé",
     };
+
+    private static string StatusClass(PlanStatus s) => s switch
+    {
+        PlanStatus.Active => "active",
+        PlanStatus.Draft => "approval",
+        _ => "lost",
+    };
+
+    private static string RythmLabel(int n) => n > 7 ? $"{n} (jusqu'à {AutopilotSchedule.PerDay(n)} par jour)" : n.ToString();
 
     private static RenderFragment Kpi(string label, string value, string? baseline, string? target, bool? onTrack) => __builder =>
     {

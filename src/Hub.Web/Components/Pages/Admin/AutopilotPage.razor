@@ -41,9 +41,9 @@ else
                 <div class="field">
                     <label>Publications par semaine</label>
                     <select @bind="form.PostsPerWeek">
-                        @for (var n = 1; n <= 7; n++) { var v = n; <option value="@v">@v</option> }
+                        @for (var n = 1; n <= AutopilotSchedule.MaxPostsPerWeek; n++) { var v = n; <option value="@v">@RythmLabel(v)</option> }
                     </select>
-                    <span class="muted small">3 à 5 par semaine pour entretenir la présence ; jusqu'à une par jour pour un objectif de visibilité (voir le Plan marketing, qui règle ce rythme).</span>
+                    <span class="muted small">3 à 5 par semaine pour entretenir la présence ; 7 pour un objectif de visibilité ; jusqu'à 21 (3 par jour : matin, midi et soir) pour une communication intensive. Le Plan marketing règle ce rythme.</span>
                     <FieldError Errors="errors" For="PostsPerWeek" />
                 </div>
                 <div class="field">
@@ -198,4 +198,6 @@ else
         action = null;
         working = null;
     }
+
+    private static string RythmLabel(int n) => n > 7 ? $"{n} (jusqu'à {AutopilotSchedule.PerDay(n)} par jour)" : n.ToString();
 }

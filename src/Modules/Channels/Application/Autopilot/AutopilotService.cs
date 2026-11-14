@@ -104,7 +104,8 @@ internal sealed class AutopilotService(
             .Select(a => new AutopilotAudience(a.Name.Trim().Truncate(60), (a.Description ?? "").Trim().Truncate(300), Math.Clamp(a.Hour, 6, 21)))
             .ToList();
         var errors = new Dictionary<string, string>();
-        if (f.PostsPerWeek is < 1 or > 7) errors["PostsPerWeek"] = "Entre 1 et 7 publications par semaine.";
+        if (f.PostsPerWeek is < 1 or > AutopilotSchedule.MaxPostsPerWeek)
+            errors["PostsPerWeek"] = $"Entre 1 et {AutopilotSchedule.MaxPostsPerWeek} publications par semaine.";
         if (audiences.Count == 0) errors["Audiences"] = "Décrivez au moins un public.";
         if (audiences.Count > 6) errors["Audiences"] = "6 publics au plus.";
         if (f.Channels.Count == 0) errors["Channels"] = "Choisissez au moins un réseau.";

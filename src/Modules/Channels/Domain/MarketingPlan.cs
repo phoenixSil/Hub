@@ -12,9 +12,12 @@ public enum PlanObjective
 
 public enum PlanStatus
 {
+    /// <summary>Brouillon ou plan en réserve : modifiable, pas encore lancé.</summary>
     Draft = 0,
     Active = 1,
     Completed = 2,
+    /// <summary>Arrêté avant sa date de fin par l'administrateur (gardé dans l'historique).</summary>
+    Stopped = 3,
 }
 
 /// <summary>Une étape du plan (souvent un mois) : ce qu'on cherche à faire, et le thème de saison.</summary>
@@ -39,6 +42,15 @@ public sealed class MarketingPlan : TenantEntity
     public DateOnly StartsOn { get; set; }
     public DateOnly EndsOn { get; set; }
     public int PostsPerWeek { get; set; } = 5;
+
+    /// <summary>
+    /// Plan en réserve qui démarre tout seul : à la fin du plan en cours, ou à sa date de début s'il n'y a pas de plan en cours.
+    /// Un seul plan à la fois peut l'être.
+    /// </summary>
+    public bool StartsAutomatically { get; set; }
+
+    /// <summary>Jour où le plan a été arrêté (statut <see cref="PlanStatus.Stopped"/>).</summary>
+    public DateOnly? StoppedOn { get; set; }
 
     /// <summary>Étapes, en JSON (liste de <see cref="PlanPhase"/>).</summary>
     public string PhasesJson { get; set; } = "[]";

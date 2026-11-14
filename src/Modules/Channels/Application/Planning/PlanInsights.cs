@@ -182,8 +182,8 @@ internal sealed class PlanInsightsCollector(
         await db.SaveChangesAsync(ct);
 
         var note = problems.Count == 0 ? null : string.Join(" ", problems.Distinct()).Truncate(1000);
-        var plan = await MarketingPlanService.CurrentAsync(db, tracking: true, ct);
-        if (plan is not null && plan.Status == PlanStatus.Active)
+        var plan = await MarketingPlanService.ActiveAsync(db, tracking: true, ct);
+        if (plan is not null)
         {
             var posts = await PlanMeasures.PublishedAsync(db, BusinessTime.FromLocal(plan.StartsOn.AddDays(-28).ToDateTime(TimeOnly.MinValue)), ct);
             PlanReviewer.Review(plan, posts, await PlanMeasures.FollowersAsync(db, ct), today, now);
@@ -191,6 +191,10 @@ internal sealed class PlanInsightsCollector(
             plan.InsightsNote = note;
             await db.SaveChangesAsync(ct);
         }
+
+        // Plan suivant programmé : il démarre dès que le précédent est terminé et que sa date est arrivée.
+        if (await MarketingPlanService.StartQueuedAsync(db, today, ct) is { } started)
+            logger.LogInformation("Plan marketing « {Name} » démarré automatiquement", started.Name);
         if (note is not null) logger.LogWarning("Chiffres des réseaux incomplets : {Note}", note);
         return note;
     }
@@ -268,7 +272,7 @@ internal sealed class PlanInsightsWorker(IServiceScopeFactory scopes, TimeProvid
         {
             var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ChannelsDbContext>>();
             await using var db = await factory.CreateDbContextAsync(ct);
-            var withPlan = await db.MarketingPlans.IgnoreQueryFilters().Where(p => p.Status == PlanStatus.Active).Select(p => p.TenantId).ToListAsync(ct);
+            var withPlan = await db.MarketingPlans.IgnoreQueryFilters().Where(p => p.Status == PlanStatus.Active || (p.Status == PlanStatus.Draft && p.StartsAutomatically)).Select(p => p.TenantId).ToListAsync(ct);
             var connected = await db.Channels.IgnoreQueryFilters().Where(c => c.SettingsJson != null).Select(c => c.TenantId).ToListAsync(ct);
             tenants = withPlan.Union(connected).Distinct().ToList();
         }

@@ -71,6 +71,16 @@ public static class PlanLogic
     public static PlanNumbers? Numbers(string? json) => Read<PlanNumbers>(json);
     public static string Write<T>(T value) => JsonSerializer.Serialize(value, Json);
 
+    /// <summary>Décale tout le plan (dates et étapes) pour qu'il commence le jour donné, en gardant ses durées.</summary>
+    public static void ShiftTo(MarketingPlan plan, DateOnly start)
+    {
+        var delta = start.DayNumber - plan.StartsOn.DayNumber;
+        if (delta == 0) return;
+        plan.PhasesJson = Write(Phases(plan.PhasesJson).Select(p => p with { From = p.From.AddDays(delta), To = p.To.AddDays(delta) }).ToList());
+        plan.StartsOn = plan.StartsOn.AddDays(delta);
+        plan.EndsOn = plan.EndsOn.AddDays(delta);
+    }
+
     private static T? Read<T>(string? json) where T : class
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
