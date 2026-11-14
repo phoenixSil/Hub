@@ -1,6 +1,7 @@
 using Hub.Modules.Channels.Application.Autopilot;
 using Hub.Modules.Channels.Domain;
 using Hub.SharedKernel;
+using Hub.SharedKernel.Tenancy;
 using Hub.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -117,6 +118,8 @@ public interface IMarketingPlanService
 internal sealed class MarketingPlanService(
     IDbContextFactory<ChannelsDbContext> factory,
     PlanInsightsCollector collector,
+    AutopilotTrigger trigger,
+    ITenantContext tenant,
     TimeProvider clock) : IMarketingPlanService
 {
     private static readonly System.Globalization.CultureInfo Fr = System.Globalization.CultureInfo.GetCultureInfo("fr-CA");
@@ -264,6 +267,8 @@ internal sealed class MarketingPlanService(
                                   "arrêtez-le d'abord, ou programmez celui-ci pour qu'il démarre automatiquement à sa fin.");
         await StartAsync(db, plan, BusinessTime.Today(clock), ct);
         await db.SaveChangesAsync(ct);
+        // Le pilote prépare tout de suite les publications du plan, sans attendre son passage habituel (toutes les 20 h).
+        trigger.Request(tenant.TenantId);
         return Result.Success();
     }
 
