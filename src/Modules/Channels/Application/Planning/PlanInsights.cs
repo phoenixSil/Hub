@@ -105,7 +105,7 @@ public static class PlanMeasures
         var totalWeeks = Math.Max(1, (plan.EndsOn.DayNumber - plan.StartsOn.DayNumber + 1 + 6) / 7);
         var week = Math.Clamp((today.DayNumber - plan.StartsOn.DayNumber) / 7 + 1, 0, totalWeeks);
         return new MarketingPlanView(
-            plan.Id, plan.Name, plan.Objective, plan.Status, plan.StartsOn, plan.EndsOn, plan.PostsPerWeek,
+            plan.Id, MarketingPlanService.NameFor(plan.Name, plan.StartsOn, plan.EndsOn), plan.Objective, plan.Status, plan.StartsOn, plan.EndsOn, plan.PostsPerWeek,
             phases, pillars, PlanLogic.PhaseAt(phases, today), today < plan.StartsOn ? 0 : week, totalWeeks,
             current, baseline, plan.BaselineOn, targets, expected,
             Weeks(posts.Where(p => p.PublishedAt >= startAt).ToList(), plan.StartsOn, plan.EndsOn, today),

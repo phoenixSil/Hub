@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Hub.Modules.Channels.Application;
 using Hub.Modules.Channels.Application.Autopilot;
 using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
@@ -211,5 +212,50 @@ public class MarketingPlanTests
         Assert.Contains("cible 2", html);
         Assert.Contains("dans les temps", html);
         Assert.Contains("/admin/plan-marketing", html);
+    }
+
+    [Fact]
+    public void Le_tableau_de_bord_resume_la_semaine_du_plan()
+    {
+        var (phases, pillars, end) = PlanTemplates.Visibility(Start);
+        var view = new MarketingPlanView(Guid.NewGuid(), "Visibilité", PlanObjective.Visibility, PlanStatus.Active, Start, end, 7,
+            phases, pillars, phases[0], 2, 13,
+            Current: new PlanNumbers(0, 0, 0), Baseline: null, BaselineOn: null, Targets: null, Expected: null,
+            Weeks: [], Mix: [], ProposedTargets: null, ProposedPillars: null, ProposalNote: null,
+            SuggestAutoPublish: false, InsightsAt: null, InsightsNote: null);
+        // Semaine 2 : du lundi 16 au dimanche 22 novembre. On est le jeudi 19 à midi.
+        var now = BusinessTime.FromLocal(new DateTime(2026, 11, 19, 12, 0, 0));
+        DateTimeOffset At(int day, int hour = 10) => BusinessTime.FromLocal(new DateTime(2026, 11, day, hour, 0, 0));
+        PostView P(PostStatus s, DateTimeOffset at, bool published = false) =>
+            new(new Post { Status = s, ScheduledAt = at, PublishedAt = published ? at : null, FromAutopilot = true }, []);
+        var posts = new[]
+        {
+            P(PostStatus.Published, At(16), true), P(PostStatus.Published, At(17), true),
+            P(PostStatus.Cancelled, At(18)),
+            P(PostStatus.Scheduled, At(20)), P(PostStatus.AwaitingApproval, At(21)), P(PostStatus.AwaitingApproval, At(22)),
+            P(PostStatus.AwaitingApproval, At(24)), // semaine suivante : compte seulement dans « à valider »
+            P(PostStatus.Published, At(12), true),  // semaine précédente : ignorée
+        };
+
+        var w = PlanWeekSummary.For(view, posts, new DateOnly(2026, 11, 19), now)!;
+
+        Assert.Equal(2, w.Week);
+        Assert.Equal(new DateOnly(2026, 11, 16), w.From);
+        Assert.Equal(new DateOnly(2026, 11, 22), w.To);
+        Assert.Equal(7, w.Planned);
+        Assert.Equal(2, w.Published);
+        Assert.Equal(3, w.Upcoming);
+        Assert.Equal(3, w.ToApprove);
+        Assert.Equal(1, w.Missed);
+        Assert.Null(PlanWeekSummary.For(view with { Status = PlanStatus.Draft }, posts, new DateOnly(2026, 11, 19), now));
+    }
+
+    [Fact]
+    public void Le_nom_propose_suit_les_dates_reelles_du_plan()
+    {
+        var name = MarketingPlanService.DefaultName(Start, new DateOnly(2027, 2, 7));
+        Assert.Equal("Visibilité sur les réseaux, du 13 novembre 2026 au 7 février 2027",
+            MarketingPlanService.NameFor(name, new DateOnly(2026, 11, 13), new DateOnly(2027, 2, 7)));
+        Assert.Equal("Mon plan", MarketingPlanService.NameFor("Mon plan", new DateOnly(2026, 11, 13), new DateOnly(2027, 2, 7)));
     }
 }
