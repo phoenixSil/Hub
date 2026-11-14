@@ -144,9 +144,10 @@ CHECKS = r"""
   const bar = document.querySelector('.admin-sidebar');
   if (bar && vw <= 900 && !document.getElementById('admin-menu')?.checked && bar.getBoundingClientRect().height > 110)
     issues.push(`barre du back-office trop haute (${Math.round(bar.getBoundingClientRect().height)}px)`);
-  if (vw <= 700) for (const t of document.querySelectorAll('table.admin-table:not(.quote-lines):not(.plan-mix)')) {
+  if (vw <= 700) for (const t of document.querySelectorAll('table.admin-table')) {
     if (!shown(t)) continue;
-    if (t.querySelector('tbody td:not([data-label])')) issues.push('tableau non converti en fiches sur téléphone (admin.js absent ?)');
+    if ((t.tHead && !t.hasAttribute('data-labelled')) || (t.matches('.as-cards') && t.querySelector('tbody td:not([data-label])')))
+      issues.push('tableau non converti en fiches sur téléphone (admin.js absent ?)');
     if (t.getBoundingClientRect().width > t.parentElement.getBoundingClientRect().width + 1) issues.push('tableau plus large que sa carte');
   }
 

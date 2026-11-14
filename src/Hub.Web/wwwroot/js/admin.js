@@ -5,6 +5,10 @@
     const label = table => {
         const heads = [...table.querySelectorAll(':scope > thead th')].map(th => th.innerText.trim());
         if (!heads.length) return;
+        // Plus de 3 colonnes (hors tableaux de saisie) : présenté en fiches sur téléphone.
+        const cards = heads.length > 3 && !table.matches('.quote-lines, .plan-mix');
+        if (table.classList.contains('as-cards') !== cards) table.classList.toggle('as-cards', cards);
+        if (!table.hasAttribute('data-labelled')) table.setAttribute('data-labelled', '');
         for (const row of table.querySelectorAll(':scope > tbody > tr')) {
             let col = 0;
             for (const cell of row.children) {
