@@ -66,6 +66,10 @@ else
                                 {
                                     <button class="btn btn-ghost btn-sm" @onclick="() => SelectAsync(p.Id)" disabled="@busy">Ouvrir</button>
                                 }
+                                else if (p.Status == PlanStatus.Active && !stopping)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button>
+                                }
                                 else
                                 {
                                     <span class="muted small">Affiché ci-dessous</span>
@@ -423,8 +427,10 @@ else
     private async Task StartStopping()
     {
         stopping = true;
-        // La confirmation s'affiche en haut de la page : on y remonte (utile sur téléphone).
-        await Js.InvokeVoidAsync("scrollTo", 0, 0);
+        // La confirmation s'affiche sous la liste des plans : on y va (utile sur téléphone).
+        StateHasChanged();
+        await Task.Yield();
+        await Js.InvokeVoidAsync("eval", "document.querySelector('.plan-stop')?.scrollIntoView({behavior:'smooth',block:'start'})");
     }
 
     private void StartCreating()
