@@ -91,14 +91,29 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
         var token = Uri.EscapeDataString(c.AccessToken);
         try
         {
+            // Deux lectures indépendantes : les interactions (réactions, commentaires, partages) et les vues (read_insights).
+            // L'une peut être refusée sans l'autre : on garde ce qui est lisible et on ne signale un problème que si rien ne l'est.
             using var counts = await http.GetAsync(Url(
                 $"{externalId}?fields=reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares&access_token={token}"), ct);
             var countsJson = JsonNode.Parse(await counts.Content.ReadAsStringAsync(ct));
-            if (!counts.IsSuccessStatusCode) return Result<PostInsight>.Failure(InsightsError(countsJson) ?? $"Facebook a répondu {(int)counts.StatusCode}.");
+            if (!counts.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Interactions Facebook illisibles pour {Post} : {Error}", externalId, countsJson?["error"]?.ToJsonString());
+                // Sans la permission de lire les commentaires, on retente avec les seuls partages et réactions.
+                using var light = await http.GetAsync(Url($"{externalId}?fields=reactions.summary(total_count).limit(0),shares&access_token={token}"), ct);
+                var lightJson = JsonNode.Parse(await light.Content.ReadAsStringAsync(ct));
+                countsJson = light.IsSuccessStatusCode ? lightJson : countsJson;
+            }
 
-            // Les vues demandent la permission read_insights : sans elle, on garde au moins les interactions.
             using var insights = await http.GetAsync(Url($"{externalId}/insights?metric={ReachMetric}&access_token={token}"), ct);
-            var insightsJson = insights.IsSuccessStatusCode ? JsonNode.Parse(await insights.Content.ReadAsStringAsync(ct)) : null;
+            var insightsJson = JsonNode.Parse(await insights.Content.ReadAsStringAsync(ct));
+            if (!insights.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Vues Facebook illisibles pour {Post} : {Error}", externalId, insightsJson?["error"]?.ToJsonString());
+                if (countsJson?["error"] is not null)
+                    return Result<PostInsight>.Failure(InsightsError(insightsJson) ?? $"Facebook a répondu {(int)insights.StatusCode}.");
+                insightsJson = null;
+            }
             return Result<PostInsight>.Success(new PostInsight(MetricValue(insightsJson, ReachMetric), Interactions(countsJson)));
         }
         catch (HttpRequestException ex)
@@ -147,9 +162,11 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
         return int.TryParse(v.ToString(), out var p) ? p : null;
     }
 
-    private static string? InsightsError(JsonNode? json) =>
+    /// <summary>Refus de Meta, avec son propre message pour savoir exactement quelle autorisation manque.</summary>
+    internal static string? InsightsError(JsonNode? json) =>
         json?["error"]?["code"]?.ToString() is "10" or "200"
-            ? "Permission read_insights manquante : régénérez le jeton de la page avec read_insights, puis reconnectez Facebook."
+            ? $"Facebook refuse la lecture des chiffres (autorisation manquante) : « {json["error"]?["message"]?.GetValue<string>()} »."
+              + " Vérifiez read_insights et pages_read_engagement sur le jeton de la page, puis reconnectez Facebook."
             : ErrorOf(json);
 
     internal static string? ErrorOf(JsonNode? json)
