@@ -372,11 +372,12 @@ h1:focus, h1:focus-visible { outline: none; }
 @keyframes bat-fly { from { transform: translate3d(-60vw, 40px, 0) scale(.6); opacity: 0; } 30% { opacity: .85; } to { transform: none; } }
 
 @media (max-width: 760px) {
-    .season-slide .hero-content { padding-right: 0; padding-top: 150px; }
+    .season-slide .hero-content { padding-right: 20px; padding-top: 150px; }
     .season-mascot { width: 104px; top: 34px; right: 22px; transform: none; }
     .bat-1 { left: 12%; top: 6%; } .bat-2 { left: 34%; top: 12%; } .bat-3 { display: none; }
     .season-bar { font-size: .82rem; }
-    .snow-toggle { bottom: 12px; right: 12px; }
+    /* En haut à gauche : en bas, il cachait les points du carrousel sur les petits téléphones. */
+    .snow-toggle { top: 14px; left: 14px; right: auto; bottom: auto; }
 }
 
 /* ===== Carte-cadeau ===== */
@@ -400,9 +401,19 @@ h1:focus, h1:focus-visible { outline: none; }
 .steps-list { margin: 0 0 24px; padding-left: 1.2em; }
 .steps-list li { margin-bottom: 6px; }
 .balance-form { display: flex; gap: 8px; }
-.balance-form input { flex: 1; min-width: 0; text-transform: uppercase; font-family: Consolas, Menlo, monospace; font-size: .95rem;
+.balance-form input { flex: 1; min-width: 0; width: 100%; text-transform: uppercase; font-family: Consolas, Menlo, monospace; font-size: .95rem;
     padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
 .balance-form input:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 4px rgba(0,151,206,.15); }
 .topbar-gift { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; font-weight: 600; color: var(--lime) !important; text-decoration: none; }
 .topbar-gift:hover { text-decoration: underline; }
 .giftcard-hero .hl { color: var(--lime); }
+
+/* ===== Petits téléphones (360 px) ===== */
+.form-layout > *, .content-with-aside > * { min-width: 0; }
+@media (max-width: 400px) {
+    .btn-lg, .hero-actions .btn { font-size: .92rem; padding-left: 1em; padding-right: 1em; }
+    .balance-form { flex-wrap: wrap; }
+    .balance-form .btn { width: 100%; }
+    .aside-card { padding: 20px; }
+    .aside-card .btn { font-size: .92rem; padding-left: .9em; padding-right: .9em; }
+}
