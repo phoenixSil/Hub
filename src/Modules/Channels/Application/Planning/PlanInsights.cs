@@ -124,6 +124,8 @@ public static class PlanMeasures
 /// </summary>
 internal sealed class PlanInsightsCollector(
     IDbContextFactory<ChannelsDbContext> factory,
+    AutopilotTrigger trigger,
+    ITenantContext tenant,
     IChannelConnections connections,
     IPublisherResolver resolver,
     TimeProvider clock,
@@ -194,7 +196,10 @@ internal sealed class PlanInsightsCollector(
 
         // Plan suivant programmé : il démarre dès que le précédent est terminé et que sa date est arrivée.
         if (await MarketingPlanService.StartQueuedAsync(db, today, ct) is { } started)
+        {
             logger.LogInformation("Plan marketing « {Name} » démarré automatiquement", started.Name);
+            trigger.Request(tenant.TenantId);
+        }
         if (note is not null) logger.LogWarning("Chiffres des réseaux incomplets : {Note}", note);
         return note;
     }
