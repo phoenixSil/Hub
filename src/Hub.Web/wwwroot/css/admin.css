@@ -408,3 +408,8 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 .plan-stop { border-left: 4px solid #b42318; }
 .plan-stop-choice { border: 0; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
 .plan-stop-choice legend { font-weight: 600; margin-bottom: 6px; }
+.btn-outline-danger { background: #fff; color: #b42318; border: 1.5px solid #b42318; }
+.btn-outline-danger:hover { background: #fdecea; color: #912018; }
+.plan-danger { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-left: 4px solid #f3b4ae; }
+.plan-danger h2 { margin: 0 0 4px; }
+.plan-danger p { margin: 0; }
