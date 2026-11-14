@@ -12,7 +12,11 @@
     {
         <link rel="stylesheet" href="@Assets["css/admin.css"]" />
     }
-    <link rel="icon" type="image/png" href="images/site/favicon.png" />
+    @* Icône de l'onglet : le « S » de ScintiNet (adresse empreintée pour que les navigateurs oublient l'ancienne icône). *@
+    <link rel="icon" type="image/png" sizes="64x64" href="@Assets["images/site/favicon.png"]" />
+    <link rel="icon" type="image/png" sizes="32x32" href="@Assets["images/site/favicon-32.png"]" />
+    <link rel="icon" href="@Assets["favicon.ico"]" sizes="any" />
+    <link rel="apple-touch-icon" href="@Assets["images/site/apple-touch-icon.png"]" />
     <ImportMap />
     <HeadOutlet @rendermode="HeadRenderMode" />
 </head>
