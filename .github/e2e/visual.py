@@ -25,6 +25,7 @@ VIEWPORTS = [
     ("bureau", {"width": 1366, "height": 900}, False),
     ("tablette", {"width": 820, "height": 1180}, True),
     ("mobile", {"width": 390, "height": 844}, True),
+    ("petit-mobile", {"width": 360, "height": 740}, True),
 ]
 
 PUBLIC = [
@@ -78,9 +79,9 @@ CHECKS = r"""
   const issues = [];
   const doc = document.documentElement;
   const vw = doc.clientWidth;
-  if (doc.scrollWidth > vw + 1) {
+  if (doc.scrollWidth > vw) {
     const wide = [...document.querySelectorAll('body *')]
-      .filter(e => e.getBoundingClientRect().right > vw + 1 && getComputedStyle(e).position !== 'fixed')
+      .filter(e => e.getBoundingClientRect().right > vw + 0.5 && getComputedStyle(e).position !== 'fixed')
       .slice(-1).map(e => e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''));
     issues.push(`page plus large que l'écran (${doc.scrollWidth}px pour ${vw}px) : ${wide.join(', ')}`);
   }
@@ -139,6 +140,16 @@ CHECKS = r"""
     }
   }
 
+  // Back-office sur téléphone et tablette : la barre du haut garde une hauteur normale, et les tableaux deviennent des fiches.
+  const bar = document.querySelector('.admin-sidebar');
+  if (bar && vw <= 900 && !document.getElementById('admin-menu')?.checked && bar.getBoundingClientRect().height > 110)
+    issues.push(`barre du back-office trop haute (${Math.round(bar.getBoundingClientRect().height)}px)`);
+  if (vw <= 700) for (const t of document.querySelectorAll('table.admin-table:not(.quote-lines):not(.plan-mix)')) {
+    if (!shown(t)) continue;
+    if (t.querySelector('tbody td:not([data-label])')) issues.push('tableau non converti en fiches sur téléphone (admin.js absent ?)');
+    if (t.getBoundingClientRect().width > t.parentElement.getBoundingClientRect().width + 1) issues.push('tableau plus large que sa carte');
+  }
+
   const raw = document.body.innerText.match(/\{\{[^}]{1,40}\}\}/);
   if (raw && !location.pathname.startsWith("/admin")) issues.push(`champ non remplacé affiché : ${raw[0]}`);
   if (/\b(undefined|NaN)\b/.test(document.body.innerText)) issues.push('texte « undefined » ou « NaN » affiché');
@@ -193,6 +204,28 @@ def audit(page, state, label, name, url, problems):
     print(("OK   " if not found else "!!   ") + f"{label:8} {name}" + ("" if not found else f" ({len(found)})"))
 
 
+def menu(page, label, problems):
+    """Menu du back-office sur téléphone et tablette : il s'ouvre, se lit, et se referme quand on choisit une page."""
+    try:
+        page.goto(BASE + "/admin", wait_until="networkidle")
+        page.wait_for_timeout(800)
+        page.locator(".admin-menu-button").click()
+        page.wait_for_timeout(300)
+        nav = page.locator(".admin-sidebar nav")
+        if not nav.is_visible():
+            problems.append((label, "admin-menu", "le menu ne s'ouvre pas"))
+            return
+        page.screenshot(path=f"{OUT}/{label}-admin-menu-ouvert.png")
+        page.locator(".admin-sidebar nav a[href='/admin/demandes']").click()
+        page.wait_for_url("**/admin/demandes")
+        page.wait_for_timeout(600)
+        if nav.is_visible():
+            problems.append((label, "admin-menu", "le menu reste ouvert après avoir choisi une page"))
+        print(f"OK   {label:8} admin-menu")
+    except Exception as ex:
+        problems.append((label, "admin-menu", f"menu non testable : {str(ex).splitlines()[0][:200]}"))
+
+
 def watch(page):
     state = {"errors": [], "bad": []}
     page.on("console", lambda m: state["errors"].append(m.text) if m.type == "error" else None)
@@ -213,6 +246,8 @@ with sync_playwright() as p:
         # Le bandeau de consentement est vérifié une fois, puis refusé : les captures montrent les pages telles quelles.
         audit(page, state, label, "consentement", BASE + "/", problems)
         page.locator("[data-consent='no']").first.click()
+        if mobile:
+            menu(page, label, problems)
         for name, path in PUBLIC + ADMIN:
             try:
                 url = resolve(page, path)
