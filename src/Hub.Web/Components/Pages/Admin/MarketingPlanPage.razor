@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject IMarketingPlanService Plans
 @inject TimeProvider Clock
+@inject IJSRuntime Js
 
 <PageTitle>Plan marketing</PageTitle>
 
@@ -135,7 +136,7 @@ else
         }
         else if (v.Status == PlanStatus.Active && !stopping)
         {
-            <span class="plan-status-actions"><button class="btn btn-ghost btn-sm" @onclick="() => stopping = true" disabled="@busy">Arrêter le plan</button></span>
+            <span class="plan-status-actions"><button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button></span>
         }
     </div>
 
@@ -356,6 +357,17 @@ else
             </div>
         </details>
     }
+
+    @if (v.Status == PlanStatus.Active && !stopping)
+    {
+        <div class="admin-card plan-danger">
+            <div>
+                <h2>Arrêter ce plan</h2>
+                <p class="muted small">Le plan passe dans l'historique et ses publications à venir sont annulées. Vous choisissez ensuite si le pilote se met en pause ou continue.</p>
+            </div>
+            <button class="btn btn-outline-danger" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button>
+        </div>
+    }
     }
 }
 
@@ -406,6 +418,13 @@ else
         feedback = null;
         errors = null;
         await LoadAsync();
+    }
+
+    private async Task StartStopping()
+    {
+        stopping = true;
+        // La confirmation s'affiche en haut de la page : on y remonte (utile sur téléphone).
+        await Js.InvokeVoidAsync("scrollTo", 0, 0);
     }
 
     private void StartCreating()
