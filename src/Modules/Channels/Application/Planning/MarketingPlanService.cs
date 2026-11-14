@@ -118,7 +118,7 @@ internal sealed class MarketingPlanService(
         var (phases, pillars, end) = PlanTemplates.Visibility(startsOn);
         db.MarketingPlans.Add(new MarketingPlan
         {
-            Name = string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-CA"), $"Visibilité sur les réseaux, du {startsOn:d MMMM yyyy} au {end:d MMMM yyyy}"),
+            Name = DefaultName(startsOn, end),
             Objective = PlanObjective.Visibility,
             StartsOn = startsOn,
             EndsOn = end,
@@ -167,6 +167,7 @@ internal sealed class MarketingPlanService(
         plan.PillarsJson = PlanLogic.Write(pillars);
         plan.StartsOn = phases[0].From;
         plan.EndsOn = phases[^1].To;
+        plan.Name = NameFor(plan.Name, plan.StartsOn, plan.EndsOn);
         if (plan.Status == PlanStatus.Active)
         {
             var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
@@ -175,6 +176,15 @@ internal sealed class MarketingPlanService(
         await db.SaveChangesAsync(ct);
         return Result.Success();
     }
+
+    private const string DefaultNamePrefix = "Visibilité sur les réseaux, du ";
+
+    public static string DefaultName(DateOnly startsOn, DateOnly endsOn) =>
+        string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-CA"), $"{DefaultNamePrefix}{startsOn:d MMMM yyyy} au {endsOn:d MMMM yyyy}");
+
+    /// <summary>Le nom proposé contient les dates : il suit les dates réelles du plan. Un nom choisi par l'utilisateur est gardé tel quel.</summary>
+    public static string NameFor(string name, DateOnly startsOn, DateOnly endsOn) =>
+        name.StartsWith(DefaultNamePrefix, StringComparison.Ordinal) ? DefaultName(startsOn, endsOn) : name;
 
     public async Task<Result> ActivateAsync(CancellationToken ct = default)
     {

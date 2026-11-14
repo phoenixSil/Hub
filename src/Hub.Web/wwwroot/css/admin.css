@@ -385,3 +385,16 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 
 /* Choix du statut d'une demande : étiquette au-dessus de la liste, alignée à gauche. */
 .admin-head > div.status-picker { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 4px; }
+
+/* Résumé de la semaine du plan marketing (tableau de bord) */
+.plan-week-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.plan-week-link { margin-left: auto; font-weight: 600; }
+.plan-week-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.plan-week-numbers > div { background: #f4f8fb; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; }
+.plan-week-numbers strong { font-size: 1.6rem; line-height: 1.1; color: var(--ink, #0f2533); }
+.plan-week-numbers span { font-size: .85rem; color: var(--muted); }
+.plan-week-numbers .is-alert { background: #fff6e0; }
+.plan-week-numbers .is-alert strong { color: #8a5a00; }
+.plan-week-note { margin: 12px 0 0; font-size: .9rem; }
+.plan-week-empty { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+@media (max-width: 560px) { .plan-week-numbers { grid-template-columns: repeat(2, 1fr); } .plan-week-link { margin-left: 0; } }

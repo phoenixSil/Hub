@@ -2,6 +2,11 @@
 @rendermode InteractiveServer
 @inject IDashboardQueries DashboardData
 @inject ILeadInbox Leads
+@inject IMarketingPlanService Plans
+@inject IPostService Posts
+@inject TimeProvider Clock
+@using Hub.Modules.Channels.Application
+@using Hub.Modules.Channels.Application.Planning
 
 <PageTitle>Tableau de bord</PageTitle>
 
@@ -24,6 +29,39 @@
 }
 else
 {
+    @if (planWeek is { } w)
+    {
+        <div class="admin-card plan-week">
+            <div class="plan-week-head">
+                <span class="status status-active">Plan en cours</span>
+                <strong>Semaine @w.Week sur @w.TotalWeeks</strong>
+                <span class="muted small">du @AdminFormat.Day(w.From) au @AdminFormat.Day(w.To)</span>
+                <a class="plan-week-link" href="/admin/plan-marketing">Voir le plan</a>
+            </div>
+            <div class="plan-week-numbers">
+                <div><strong>@w.Planned</strong><span>publications prévues</span></div>
+                <div><strong>@w.Published</strong><span>publiées</span></div>
+                <div><strong>@w.Upcoming</strong><span>à venir</span></div>
+                <div class="@(w.ToApprove > 0 ? "is-alert" : null)"><strong>@w.ToApprove</strong><span>à valider</span></div>
+            </div>
+            @if (w.ToApprove > 0)
+            {
+                <p class="plan-week-note">@w.ToApprove publication(s) attendent votre accord : sans accord, elles ne partent pas et sont annulées 24 h après l'heure prévue.
+                    <a href="/admin/publications">Les valider</a></p>
+            }
+            @if (w.Missed > 0)
+            {
+                <p class="muted small">@w.Missed publication(s) de la semaine n'ont pas pu partir (refusées, expirées ou en échec).</p>
+            }
+        </div>
+    }
+    else if (planChecked)
+    {
+        <div class="admin-card plan-week plan-week-empty">
+            <span>Aucun plan marketing en cours.</span> <a href="/admin/plan-marketing">Créer ou lancer un plan</a>
+        </div>
+    }
+
     <div class="kpi-grid">
         <div class="kpi kpi-accent"><span>Nouvelles demandes à traiter</span><strong>@newLeads</strong><a href="/admin/demandes?statut=New">Voir</a></div>
         <div class="kpi"><span>Demandes reçues</span><strong>@stats.Leads</strong></div>
@@ -107,6 +145,8 @@ else
     private DashboardStats? stats;
     private int newLeads;
     private List<Lead> recent = [];
+    private PlanWeekSummary? planWeek;
+    private bool planChecked;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -122,5 +162,12 @@ else
         var counts = await Leads.CountByStatusAsync();
         newLeads = counts.GetValueOrDefault(LeadStatus.New);
         recent = await Leads.ListAsync(new LeadListFilter(Take: 8));
+        if (!planChecked)
+        {
+            // Résumé de la semaine du plan marketing (indépendant de la période choisie).
+            var plan = await Plans.GetAsync();
+            planWeek = PlanWeekSummary.For(plan, await Posts.ListAsync(), Hub.SharedKernel.Time.BusinessTime.Today(Clock), Clock.GetUtcNow());
+            planChecked = true;
+        }
     }
 }
