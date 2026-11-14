@@ -323,3 +323,65 @@ code.break { word-break: break-all; }
     background: #f4f7fa; border: 1px solid var(--line); border-radius: 8px; }
 .attachment-list li > span { min-width: 0; overflow-wrap: anywhere; }
 .timeline-note { white-space: pre-line; }
+
+/* ---- Téléphone et tablette (relecture de la responsivité) ---- */
+@media (max-width: 900px) {
+    /* La barre du haut garde sa hauteur naturelle (elle s'étirait sur les pages courtes) et reste accessible en défilant. */
+    .admin-shell { grid-template-rows: auto 1fr; align-content: start; }
+    .admin-sidebar { position: sticky; top: 0; z-index: 30; box-shadow: 0 2px 12px rgba(15,37,51,.18); }
+    .admin-menu-toggle:checked ~ nav { max-height: calc(100vh - 140px); overflow-y: auto; }
+    .admin-sidebar nav a { padding: 11px 12px; font-size: 1rem; }
+    .admin-card { padding: 16px; }
+    .admin-main h1 { font-size: 1.4rem; overflow-wrap: anywhere; }
+    /* Champs plus hauts au doigt et en 16 px : iOS ne zoome plus la page quand on touche un champ. */
+    .admin-form .field input, .admin-form .field select, .admin-form .field textarea,
+    .admin-card .field input, .admin-card .field select, .admin-card .field textarea,
+    .filters select, .filters input, .status-picker select, .image-picker-controls input { font-size: 16px; min-height: 44px; }
+    .admin-card .field textarea, .admin-form .field textarea { min-height: 120px; }
+    .filters > * { min-width: 0; flex-basis: 100%; }
+    .status-picker { min-width: 0; width: 100%; }
+    .sticky-actions { flex-wrap: wrap; }
+}
+
+/* Champ image : l'adresse prend toute la largeur, le bouton passe dessous. */
+@media (max-width: 640px) {
+    .image-picker { flex-direction: column; }
+    .image-picker-controls { flex-wrap: wrap; width: 100%; }
+    .image-picker-controls input { flex: 1 1 100%; min-width: 0; }
+}
+
+/* Sélecteur de fichiers aux couleurs du back-office (le reste du texte vient du navigateur, dans sa langue). */
+input[type=file] { max-width: 100%; font: inherit; font-size: .9rem; }
+input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-size: .88rem; margin-right: 10px; padding: 8px 14px;
+    border: 1.5px solid var(--blue); border-radius: 99px; background: #fff; color: var(--blue-dark, #007aa8); cursor: pointer; }
+
+/* Tableaux en fiches sur téléphone : chaque ligne devient une carte « Colonne : valeur » (étiquettes et classe as-cards posées par admin.js,
+   pour les tableaux de plus de 2 colonnes ; les tableaux à 2 colonnes restent des tableaux). */
+@media (max-width: 700px) {
+    .admin-table.as-cards, .admin-table.as-cards > tbody,
+    .admin-table.as-cards > tbody > tr { display: block; width: 100%; }
+    .admin-table.as-cards { table-layout: auto; }
+    .admin-table.as-cards > thead { display: none; }
+    .admin-table.as-cards > tbody > tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .admin-table.as-cards > tbody > tr:last-child { border-bottom: 0; }
+    .admin-table.as-cards > tbody > tr > td {
+        display: grid; grid-template-columns: minmax(90px, 38%) 1fr; gap: 10px; align-items: start; justify-items: start;
+        padding: 4px 2px; border: 0; text-align: left; width: auto; white-space: normal; overflow-wrap: anywhere; }
+    .admin-table.as-cards > tbody > tr > td::before {
+        content: attr(data-label); font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 2px; }
+    /* Cellule sans titre de colonne (actions, détails) : sur toute la largeur. */
+    .admin-table.as-cards > tbody > tr > td[data-label=""],
+    .admin-table.as-cards > tbody > tr > td:not([data-label]) { display: block; }
+    .admin-table.as-cards > tbody > tr > td[data-label=""]::before,
+    .admin-table.as-cards > tbody > tr > td:not([data-label])::before { content: none; }
+    .admin-table.as-cards td.actions, .admin-table.as-cards td.actions-col { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+    .admin-table.as-cards td.actions::before, .admin-table.as-cards td.actions-col::before { content: none; }
+    .admin-table.as-cards .truncate { max-width: none; white-space: normal; }
+    .admin-table.as-cards .row-new { background: #f2fbf1; border-radius: 8px; padding-left: 8px; padding-right: 8px; }
+    .admin-table .sub-row { padding-top: 0 !important; margin-top: -6px; }
+    .compare-table .meter { max-width: 220px; }
+    .admin-table.as-cards code { overflow-wrap: anywhere; }
+}
+
+/* Choix du statut d'une demande : étiquette au-dessus de la liste, alignée à gauche. */
+.admin-head > div.status-picker { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 4px; }
