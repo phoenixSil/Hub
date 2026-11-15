@@ -15,7 +15,7 @@ internal sealed partial class MarketingPlanService
         var errors = new Dictionary<string, string>();
         if (r.PostsPerWeek is < 1 or > AutopilotSchedule.MaxPostsPerWeek) errors["PostsPerWeek"] = "Choisissez une intensité.";
         if (r.Weeks is < 4 or > 52) errors["Weeks"] = "Choisissez une durée.";
-        var channels = r.Channels.Where(c => c is ChannelType.Facebook or ChannelType.Instagram).Distinct().ToList();
+        var channels = r.Channels.Where(c => c is ChannelType.Facebook or ChannelType.Instagram or ChannelType.GoogleBusiness).Distinct().ToList();
         if (channels.Count == 0) errors["Channels"] = "Choisissez au moins un réseau.";
         if (errors.Count > 0) return Result<Guid>.Invalid(errors);
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Hub.SharedKernel;
 using Microsoft.Extensions.Logging;
@@ -180,8 +181,37 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
 }
 
 /// <summary>Réseau simulé, pour le développement et les tests : rien ne part, la publication est notée dans le journal.</summary>
-internal sealed class SimulatedPublisher(ChannelType channel, ILogger logger) : ISocialPublisher, ISocialInsights
+internal sealed class SimulatedPublisher(ChannelType channel, ILogger logger) : ISocialPublisher, ISocialInsights, IReviewSource, ILocationInsights
 {
+    // Avis simulés (fiche Google) : deux avis, dont un sans réponse ; les réponses envoyées sont gardées en mémoire.
+    private static readonly ConcurrentDictionary<string, (string Text, DateTimeOffset At)> Replies = new();
+
+    public Task<Result<IReadOnlyList<ExternalReview>>> ListReviewsAsync(ChannelCredentials c, CancellationToken ct = default)
+    {
+        IReadOnlyList<ExternalReview> list =
+        [
+            Review("simule-avis-1", "Marie Tremblay", 5, "Équipe ponctuelle et minutieuse, la maison n'a jamais été aussi propre. Merci !", new DateTimeOffset(2026, 11, 10, 15, 0, 0, TimeSpan.Zero)),
+            Review("simule-avis-2", "Jean-François L.", 4, "Très bon travail, petit retard à l'arrivée mais résultat impeccable.", new DateTimeOffset(2026, 11, 12, 18, 30, 0, TimeSpan.Zero)),
+        ];
+        return Task.FromResult(Result<IReadOnlyList<ExternalReview>>.Success(list));
+    }
+
+    private static ExternalReview Review(string id, string author, int rating, string comment, DateTimeOffset at) =>
+        Replies.TryGetValue(id, out var r) ? new ExternalReview(id, author, rating, comment, at, r.Text, r.At) : new ExternalReview(id, author, rating, comment, at, null, null);
+
+    public Task<Result> ReplyAsync(ChannelCredentials c, string reviewId, string reply, CancellationToken ct = default)
+    {
+        Replies[reviewId] = (reply, DateTimeOffset.UtcNow);
+        logger.LogInformation("Réponse simulée à l'avis {Review} : {Reply}", reviewId, reply);
+        return Task.FromResult(Result.Success());
+    }
+
+    public Task<Result<LocationMetrics>> GetLocationAsync(ChannelCredentials c, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var days = to.DayNumber - from.DayNumber + 1;
+        return Task.FromResult(Result<LocationMetrics>.Success(new LocationMetrics(42 * days, days / 2, days / 3, days)));
+    }
+
     /// <summary>Chiffres simulés, stables pour une même publication (tirés de son identifiant).</summary>
     public Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials c, CancellationToken ct = default)
     {

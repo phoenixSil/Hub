@@ -4,6 +4,7 @@
 @using Hub.Web.Infrastructure
 @inject IMarketingResults Results
 @inject ICurrentTenant Tenant
+@inject Hub.Modules.Channels.Application.Reviews.IReviewService Reviews
 
 <PageTitle>Résultats du marketing</PageTitle>
 
@@ -36,6 +37,27 @@ else
         <div class="kpi"><span>Clients gagnés</span><strong>@report.Won</strong></div>
         <div class="kpi"><span>Photos IA ce mois</span><strong>@report.PhotosThisMonth</strong><small class="muted">≈ @report.PhotoCostThisMonth.ToString("0.00", Fr) $</small></div>
     </div>
+
+    @if (google is not null)
+    {
+        <div class="admin-card" id="google-metrics">
+            <h2>Fiche Google (@days derniers jours)</h2>
+            @if (google.IsSuccess)
+            {
+                <div class="kpi-grid">
+                    <div class="kpi"><span>Vues de la fiche</span><strong>@google.Value!.Views.ToString("N0", Fr)</strong></div>
+                    <div class="kpi kpi-accent"><span>Appels</span><strong>@google.Value.Calls.ToString("N0", Fr)</strong></div>
+                    <div class="kpi"><span>Itinéraires demandés</span><strong>@google.Value.Directions.ToString("N0", Fr)</strong></div>
+                    <div class="kpi"><span>Clics vers le site</span><strong>@google.Value.WebsiteClicks.ToString("N0", Fr)</strong></div>
+                </div>
+                <p class="muted small">Google publie ces chiffres avec 2 ou 3 jours de retard.</p>
+            }
+            else
+            {
+                <p class="muted">@google.Error</p>
+            }
+        </div>
+    }
 
     <div class="admin-card">
         <h2>Le parcours</h2>
@@ -123,6 +145,7 @@ else
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
     private int days = 30;
     private MarketingReport? report;
+    private Result<Hub.Modules.Channels.Publishers.LocationMetrics>? google;
     private string BioLink = "";
 
     protected override async Task OnInitializedAsync()
@@ -130,6 +153,13 @@ else
         var company = await Tenant.GetAsync();
         BioLink = $"{(company.SiteUrl ?? "https://votre-site").TrimEnd('/')}/devis?utm_source=instagram&utm_medium=social&utm_campaign={MarketingResults.BioCampaign}";
         report = await Results.GetAsync(days);
+        await LoadGoogleAsync();
+    }
+
+    private async Task LoadGoogleAsync()
+    {
+        try { google = await Reviews.LocationMetricsAsync(days); }
+        catch (Exception) { google = null; }
     }
 
     private async Task ChangeAsync(int d)
@@ -137,6 +167,7 @@ else
         days = d;
         report = null;
         report = await Results.GetAsync(days);
+        await LoadGoogleAsync();
     }
 
     private static string Details(PostResult r) => string.Join(" · ", new[]
