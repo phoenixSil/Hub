@@ -14,6 +14,7 @@ public static class PostLabels
         PostStatus.PartiallyPublished => "Publiée en partie",
         PostStatus.Failed => "Échec",
         PostStatus.AwaitingApproval => "À valider",
+        PostStatus.Expired => "Non publiée (pas validée)",
         _ => "Annulée",
     };
 
@@ -24,7 +25,7 @@ public static class PostLabels
         PostStatus.Failed => "lost",
         PostStatus.Publishing => "contacted",
         PostStatus.AwaitingApproval => "approval",
-        PostStatus.Cancelled => "lost",
+        PostStatus.Cancelled or PostStatus.Expired => "lost",
         _ => "new",
     };
 

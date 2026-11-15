@@ -36,7 +36,7 @@ else
                 <span class="status status-active">Plan en cours</span>
                 <strong>Semaine @w.Week sur @w.TotalWeeks</strong>
                 <span class="muted small">du @AdminFormat.Day(w.From) au @AdminFormat.Day(w.To)</span>
-                <a class="plan-week-link" href="/admin/plan-marketing">Voir le plan</a>
+                <a class="plan-week-link" href="/admin/marketing">Ouvrir le calendrier</a>
             </div>
             <div class="plan-week-numbers">
                 <div><strong>@w.Planned</strong><span>publications prévues</span></div>
@@ -47,7 +47,7 @@ else
             @if (w.ToApprove > 0)
             {
                 <p class="plan-week-note">@w.ToApprove publication(s) attendent votre accord : sans accord, elles ne partent pas et sont annulées 24 h après l'heure prévue.
-                    <a href="/admin/publications">Les valider</a></p>
+                    <a href="/admin/marketing">Les valider dans le calendrier</a></p>
             }
             @if (w.Missed > 0)
             {

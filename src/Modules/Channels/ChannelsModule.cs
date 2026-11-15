@@ -194,6 +194,8 @@ public static class ChannelsModule
         services.AddScoped<AutopilotRunner>();
         services.AddScoped<IAutopilotService, AutopilotService>();
         services.AddSingleton<AutopilotTrigger>();
+        services.AddSingleton<Application.Marketing.AutopilotProgress>();
+        services.AddScoped<Application.Marketing.IMarketingCalendar, Application.Marketing.MarketingCalendar>();
         services.AddHostedService<AutopilotWorker>();
 
         // Plan marketing : le pilote le suit ; les chiffres des réseaux sont relevés chaque jour.

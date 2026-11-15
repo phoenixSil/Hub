@@ -1,0 +1,298 @@
+@page "/admin/marketing"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Hub.Modules.Channels.Application.Marketing
+@using Hub.Modules.Channels.Application.Autopilot
+@using Hub.Modules.Channels.Domain
+@inject IMarketingCalendar Calendar
+@inject IAutopilotService Autopilot
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+
+<PageTitle>Calendrier marketing</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <h1>Calendrier</h1>
+        <p class="muted">Tout ce qui va partir sur vos réseaux, jour par jour. Approuvez, modifiez ou remplacez en un clic.</p>
+    </div>
+    <div class="cal-head-actions">
+        <BusyButton Class="btn btn-outline btn-sm" OnClick="PrepareAsync" IsBusy="@(Preparing)" AnyBusy="busy" BusyText="Préparation…">Préparer les publications</BusyButton>
+        <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">+ Nouvelle publication</a>
+    </div>
+</div>
+
+@* Voyant d'état : vert quand tout fonctionne, sinon chaque problème avec le bouton qui le règle. *@
+<div class="cal-health" role="status">
+    @if (issues.Count == 0)
+    {
+        <span class="cal-health-ok"><span class="dot" aria-hidden="true"></span> Tout fonctionne</span>
+    }
+    else
+    {
+        @foreach (var issue in issues)
+        {
+            <div class="cal-issue cal-issue-@issue.Level.ToString().ToLowerInvariant()">
+                <span>@issue.Message</span>
+                @if (issue.Action != HealthAction.None)
+                {
+                    <button class="btn btn-sm @(issue.Level == HealthLevel.Error ? "btn-primary" : "btn-outline")" @onclick="() => FixAsync(issue.Action)" disabled="@busy">@issue.ActionLabel</button>
+                }
+            </div>
+        }
+    }
+</div>
+
+@if (preparation is { } prep && (!prep.Finished || showSummary))
+{
+    <div class="cal-progress @(prep.Finished ? (prep.Failed ? "is-failed" : "is-done") : null)" aria-live="polite">
+        @if (!prep.Finished)
+        {
+            <div class="cal-progress-text">
+                <span class="spinner" aria-hidden="true"></span>
+                @(prep.Target == 0 ? "Préparation en cours : choix des sujets…" : $"Préparation en cours : {prep.Done} sur {prep.Target} publication(s) prête(s)…")
+                <span class="muted small">Texte et image pour chacune : comptez environ une minute par publication.</span>
+            </div>
+            <div class="cal-bar"><span style="width:@(prep.Target == 0 ? 5 : Math.Max(5, 100 * prep.Done / prep.Target))%"></span></div>
+        }
+        else
+        {
+            <div class="cal-progress-text">
+                <strong>@(prep.Failed ? "La préparation a échoué." : "Préparation terminée.")</strong> @prep.Summary
+                @if (prep.Failed) { <button class="btn btn-primary btn-sm" @onclick="PrepareAsync" disabled="@busy">Réessayer</button> }
+                <button class="btn btn-ghost btn-sm" @onclick="() => showSummary = false">Fermer</button>
+            </div>
+        }
+    </div>
+}
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")" role="status">@feedback</div>
+}
+
+<div class="cal-nav">
+    <button class="btn btn-ghost btn-sm" @onclick="() => MoveAsync(-7)" disabled="@busy" aria-label="Semaine précédente">‹ Précédente</button>
+    <h2>Semaine du @Day(monday) au @Day(monday.AddDays(6))</h2>
+    <button class="btn btn-ghost btn-sm" @onclick="() => MoveAsync(7)" disabled="@busy" aria-label="Semaine suivante">Suivante ›</button>
+    @if (monday != CalendarLogic.Monday(Today))
+    {
+        <button class="btn btn-ghost btn-sm" @onclick="() => GoToAsync(CalendarLogic.Monday(Today))" disabled="@busy">Cette semaine</button>
+    }
+</div>
+
+@if (week is { } w)
+{
+    @if (w.ToApprove > 0)
+    {
+        <div class="cal-approve">
+            <span><strong>@w.ToApprove publication(s)</strong> attendent votre accord cette semaine. Sans accord, elles ne partent pas.</span>
+            <span class="cal-approve-actions">
+                <BusyButton Class="btn btn-primary" OnClick="ApproveWeekAsync" IsBusy="@(action == "approve-week")" AnyBusy="busy" BusyText="Approbation…">Tout approuver</BusyButton>
+                <button class="btn btn-ghost btn-sm" @onclick="() => onlyPending = !onlyPending" disabled="@busy">@(onlyPending ? "Tout afficher" : "Revoir une par une")</button>
+            </span>
+        </div>
+    }
+
+    <div class="cal-grid">
+        @foreach (var d in w.Days)
+        {
+            var posts = onlyPending ? d.Posts.Where(p => p.Status == PostStatus.AwaitingApproval).ToList() : d.Posts.ToList();
+            <section class="cal-day @(d.Date == Today ? "is-today" : null) @(d.Date < Today ? "is-past" : null)">
+                <h3><span>@DayName(d.Date)</span> <span class="cal-date">@d.Date.Day</span></h3>
+                @if (posts.Count == 0)
+                {
+                    <p class="cal-empty">—</p>
+                }
+                @foreach (var p in posts)
+                {
+                    <article class="cal-card cal-@StateClass(p)">
+                        @if (p.ImageUrl is not null)
+                        {
+                            <a href="/admin/publications/@p.Id" class="cal-thumb"><img src="@p.ImageUrl" alt="" loading="lazy" /></a>
+                        }
+                        <div class="cal-card-body">
+                            <div class="cal-meta">
+                                <strong>@Hour(p.At)</strong>
+                                @foreach (var c in p.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()" title="@PostLabels.Of(c)">@Short(c)</span> }
+                            </div>
+                            <a href="/admin/publications/@p.Id" class="cal-title">@p.Title</a>
+                            <span class="cal-state">@StateLabel(p)</span>
+                            @if (p.Status == PostStatus.Failed && p.Error is not null) { <span class="cal-error">@p.Error</span> }
+                            <div class="cal-actions">
+                                @if (p.Status == PostStatus.AwaitingApproval)
+                                {
+                                    <BusyButton Class="btn btn-primary btn-sm" OnClick="() => ApproveAsync(p.Id)" IsBusy="@(action == $"approve-{p.Id}")" AnyBusy="busy" BusyText="…">Approuver</BusyButton>
+                                }
+                                @if (IsUpcoming(p))
+                                {
+                                    <a class="btn btn-ghost btn-sm" href="/admin/publications/@p.Id">Modifier</a>
+                                    @if (p.FromAutopilot)
+                                    {
+                                        <BusyButton Class="btn btn-ghost btn-sm" OnClick="() => ReplaceAsync(p.Id)" IsBusy="@(action == $"replace-{p.Id}")" AnyBusy="busy" BusyText="Nouvelle en préparation…">Remplacer</BusyButton>
+                                    }
+                                    @if (confirmRemove == p.Id)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => RemoveAsync(p.Id)" disabled="@busy">Oui, retirer</button>
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => confirmRemove = null">Non</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => confirmRemove = p.Id" disabled="@busy">Retirer</button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+    </div>
+    <p class="muted small cal-foot"><a href="/admin/publications">Toutes les publications</a> · <a href="/admin/plan-marketing">Campagne</a> · <a href="/admin/resultats">Résultats</a></p>
+}
+
+@code {
+    private DateOnly monday;
+    private CalendarWeek? week;
+    private IReadOnlyList<HealthIssue> issues = [];
+    private PreparationState? preparation;
+    private bool showSummary;
+    private bool onlyPending;
+    private Guid? confirmRemove;
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+    private Timer? poll;
+
+    private DateOnly Today => Hub.SharedKernel.Time.BusinessTime.Today(Clock);
+    private bool Preparing => preparation is { Finished: false };
+
+    protected override async Task OnInitializedAsync()
+    {
+        monday = CalendarLogic.Monday(Today);
+        await LoadAsync();
+        poll = new Timer(_ => InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+    }
+
+    private async Task LoadAsync()
+    {
+        week = await Calendar.WeekAsync(monday);
+        issues = await Calendar.HealthAsync();
+        preparation = await Calendar.PreparationAsync();
+    }
+
+    /// <summary>Pendant une préparation : la barre avance et les nouvelles publications apparaissent au fur et à mesure.</summary>
+    private async Task PollAsync()
+    {
+        var before = preparation;
+        var now = await Calendar.PreparationAsync();
+        if (now is null || (before is { Finished: true } && now == before)) return;
+        var changed = now != before;
+        preparation = now;
+        if (changed)
+        {
+            if (now.Finished && before is { Finished: false }) showSummary = true;
+            week = await Calendar.WeekAsync(monday);
+            issues = await Calendar.HealthAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task MoveAsync(int days) => await GoToAsync(monday.AddDays(days));
+
+    private async Task GoToAsync(DateOnly target)
+    {
+        monday = target;
+        confirmRemove = null;
+        week = await Calendar.WeekAsync(monday);
+    }
+
+    private async Task PrepareAsync()
+    {
+        var r = await Calendar.PrepareAsync();
+        if (r.IsFailure) { Show(r.Error!, true); return; }
+        showSummary = true;
+        preparation = await Calendar.PreparationAsync();
+        feedback = null;
+    }
+
+    private Task ApproveWeekAsync() => RunAsync("approve-week", async () =>
+    {
+        var r = await Calendar.ApproveWeekAsync(monday);
+        return (r, r.IsSuccess ? $"{r.Value} publication(s) approuvée(s) : elles partiront à leur heure." : "");
+    });
+
+    private Task ApproveAsync(Guid id) => RunAsync($"approve-{id}", async () => (await Autopilot.ApproveAsync(id), "Publication approuvée : elle partira à son heure."));
+
+    private Task ReplaceAsync(Guid id) => RunAsync($"replace-{id}", async () => (await Calendar.ReplaceAsync(id), "Publication remplacée : la nouvelle est au même créneau, à valider."));
+
+    private Task RemoveAsync(Guid id) => RunAsync($"remove-{id}", async () =>
+    {
+        confirmRemove = null;
+        return (await Calendar.RemoveAsync(id), "Publication retirée : elle ne partira pas.");
+    });
+
+    private async Task FixAsync(HealthAction a)
+    {
+        switch (a)
+        {
+            case HealthAction.Retry: await PrepareAsync(); break;
+            case HealthAction.OpenChannels: Nav.NavigateTo("/admin/canaux"); break;
+            case HealthAction.CreateCampaign: Nav.NavigateTo("/admin/plan-marketing"); break;
+            case HealthAction.OpenPosts: Nav.NavigateTo("/admin/publications"); break;
+            case HealthAction.ResumeAutopilot: Nav.NavigateTo("/admin/pilote-automatique"); break;
+        }
+    }
+
+    private async Task RunAsync(string name, Func<Task<(Result Result, string Success)>> work)
+    {
+        if (busy) return;
+        busy = true;
+        action = name;
+        try
+        {
+            var (result, success) = await work();
+            Show(result.IsSuccess ? success : result.Error!, result.IsFailure);
+            await LoadAsync();
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private void Show(string message, bool error) { feedback = message; feedbackIsError = error; }
+
+    private bool IsUpcoming(CalendarPost p) => p.Status is PostStatus.AwaitingApproval or PostStatus.Scheduled or PostStatus.Draft or PostStatus.Expired;
+
+    private string StateLabel(CalendarPost p) => p.Status switch
+    {
+        PostStatus.AwaitingApproval when p.At < Clock.GetUtcNow() => "En retard : à valider",
+        PostStatus.AwaitingApproval => "À valider",
+        PostStatus.Scheduled => "Prête",
+        PostStatus.Expired => "Non publiée : pas validée",
+        _ => PostLabels.Of(p.Status),
+    };
+
+    private static string StateClass(CalendarPost p) => p.Status switch
+    {
+        PostStatus.AwaitingApproval => "pending",
+        PostStatus.Scheduled or PostStatus.Publishing => "ready",
+        PostStatus.Published or PostStatus.PartiallyPublished => "done",
+        PostStatus.Failed or PostStatus.Expired => "failed",
+        _ => "draft",
+    };
+
+    private static string Short(ChannelType c) => c switch
+    {
+        ChannelType.Facebook => "FB",
+        ChannelType.Instagram => "IG",
+        ChannelType.GoogleBusiness => "G",
+        _ => c.ToString()[..2],
+    };
+
+    private static readonly System.Globalization.CultureInfo Fr = System.Globalization.CultureInfo.GetCultureInfo("fr-CA");
+    private static string Day(DateOnly d) => d.ToString("d MMMM", Fr);
+    private static string DayName(DateOnly d) => d.ToString("ddd", Fr).TrimEnd('.');
+    private static string Hour(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Hub.SharedKernel.Time.BusinessTime.Zone).ToString("H'h'mm", Fr).Replace("h00", "h");
+
+    public void Dispose() => poll?.Dispose();
+}

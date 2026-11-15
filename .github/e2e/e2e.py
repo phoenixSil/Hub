@@ -8,7 +8,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 5. Le formulaire de devis public refuse un envoi vide et affiche les erreurs.
 6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
-8. Le plan marketing se crée, se lance (le pilote passe au rythme du plan), relève les chiffres ; un plan en réserve ne se lance pas tant qu'un plan tourne.
+8. Le plan marketing se crée, ses publications apparaissent dans le calendrier et s'approuvent d'un clic, se lance (le pilote passe au rythme du plan), relève les chiffres ; un plan en réserve ne se lance pas tant qu'un plan tourne.
 9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
 
 Usage : python3 e2e.py http://localhost:5080
@@ -165,6 +165,32 @@ def marketing_plan(page):
 
     page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
     expect(page.locator("select").first).to_have_value("7")
+
+
+@step("Calendrier : le lancement du plan prépare les publications, visibles jour par jour, approuvées d'un clic")
+def marketing_calendar(page):
+    page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    expect(page.locator(".cal-health")).to_be_visible()
+    expect(page.locator(".cal-day")).to_have_count(7)
+    # Le lancement du plan a demandé la préparation : on attend qu'elle se termine (barre de progression).
+    page.wait_for_function(
+        "() => document.querySelector('.cal-progress.is-done, .cal-progress.is-failed') || document.querySelectorAll('.cal-card').length > 0",
+        timeout=240000)
+    page.wait_for_timeout(1500)
+    expect(page.locator(".cal-progress.is-failed")).to_have_count(0)
+    # Les créneaux commencent demain : un dimanche, ils sont tous dans la semaine suivante.
+    if page.locator(".cal-card").count() == 0:
+        page.locator("button", has_text="Suivante").click()
+        page.wait_for_timeout(1000)
+    expect(page.locator(".cal-card").first).to_be_visible(timeout=60000)
+    expect(page.locator(".cal-card .cal-thumb img").first).to_be_visible()
+    if page.locator(".cal-approve").count() == 0:
+        page.locator("button", has_text="Suivante").click()
+        page.wait_for_timeout(1000)
+    page.locator(".cal-approve button", has_text="Tout approuver").click()
+    expect(page.locator(".alert-success")).to_contain_text("approuvée(s)", timeout=15000)
+    expect(page.locator(".cal-approve")).to_have_count(0)
+    expect(page.locator(".cal-card.cal-ready").first).to_be_visible()
 
 
 @step("Carte-cadeau : demandée sur le site, payée, envoyée puis utilisée")

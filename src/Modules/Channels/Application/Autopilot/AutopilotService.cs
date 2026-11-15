@@ -203,7 +203,7 @@ internal sealed class AutopilotTrigger
 /// Tourne en arrière-plan : une fois par jour pour chaque entreprise dont le pilote est activé
 /// (il complète la semaine à venir), et immédiatement sur demande de l'administrateur.
 /// </summary>
-internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrigger trigger, TimeProvider clock, ILogger<AutopilotWorker> logger)
+internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrigger trigger, Marketing.AutopilotProgress progress, TimeProvider clock, ILogger<AutopilotWorker> logger)
     : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(30);
@@ -292,6 +292,7 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Pilote automatique de l'entreprise {TenantId}", tenantId);
+            progress.Finish(tenantId, "0 publication(s) préparée(s). Problèmes : erreur inattendue pendant la préparation.", failed: true);
         }
     }
 }
