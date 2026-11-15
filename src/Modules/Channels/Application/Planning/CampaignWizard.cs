@@ -10,8 +10,6 @@ namespace Hub.Modules.Channels.Application.Planning;
 /// <summary>Assistant « Nouvelle campagne » : création, aperçu de la première semaine, abandon.</summary>
 internal sealed partial class MarketingPlanService
 {
-    public static readonly int[] CampaignWeeks = [6, 13, 26];
-
     public async Task<Result<Guid>> CreateCampaignAsync(CampaignRequest r, CancellationToken ct = default)
     {
         var errors = new Dictionary<string, string>();

@@ -8,6 +8,9 @@ public static class PlanTemplates
 {
     public const int DefaultWeeks = 13;
 
+    /// <summary>Durées proposées par l'assistant « Nouvelle campagne » (en semaines).</summary>
+    public static readonly int[] CampaignWeeks = [6, 13, 26];
+
     /// <summary>Thème de saison (Québec) pour une entreprise de services à domicile, mois par mois.</summary>
     public static string SeasonTheme(int month) => month switch
     {

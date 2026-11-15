@@ -52,7 +52,7 @@ else if (step == 1)
 
         <h2>Pendant combien de temps ?</h2>
         <div class="wiz-choices wiz-choices-3">
-            @foreach (var w in MarketingPlanService.CampaignWeeks)
+            @foreach (var w in PlanTemplates.CampaignWeeks)
             {
                 var x = w;
                 <button type="button" class="wiz-choice @(weeks == x ? "is-selected" : null)" @onclick="() => weeks = x">
