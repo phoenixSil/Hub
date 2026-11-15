@@ -22,6 +22,15 @@ public interface IPublisherResolver
     IReadOnlyCollection<ChannelType> Supported { get; }
     bool IsSimulated { get; }
 
+    /// <summary>Le connecteur réel du réseau s'il se connecte par OAuth (ex. Google), sinon null.</summary>
+    IOAuthChannel? OAuthFor(ChannelType channel);
+
+    /// <summary>Lecteur des avis du réseau (le simulé si Channels:Simulate), ou null si le réseau n'en a pas.</summary>
+    IReviewSource? ReviewsFor(ChannelType channel);
+
+    /// <summary>Chiffres de la fiche du réseau (le simulé si Channels:Simulate), ou null.</summary>
+    ILocationInsights? LocationFor(ChannelType channel);
+
     /// <summary>Le connecteur réel du réseau s'il se connecte à partir d'un autre (ex. Instagram depuis Facebook).</summary>
     ILinkedChannel? LinkedFor(ChannelType channel);
 
@@ -40,6 +49,14 @@ internal sealed class PublisherResolver(
     public bool IsSimulated => options.Value.Simulate;
 
     public ILinkedChannel? LinkedFor(ChannelType channel) => _byChannel.GetValueOrDefault(channel) as ILinkedChannel;
+
+    public IOAuthChannel? OAuthFor(ChannelType channel) => _byChannel.GetValueOrDefault(channel) as IOAuthChannel;
+
+    public IReviewSource? ReviewsFor(ChannelType channel) =>
+        _byChannel.GetValueOrDefault(channel) is IReviewSource ? For(channel) as IReviewSource : null;
+
+    public ILocationInsights? LocationFor(ChannelType channel) =>
+        _byChannel.GetValueOrDefault(channel) is ILocationInsights ? For(channel) as ILocationInsights : null;
 
     public ISocialInsights? InsightsFor(ChannelType channel) =>
         _byChannel.ContainsKey(channel) ? For(channel) as ISocialInsights : null;

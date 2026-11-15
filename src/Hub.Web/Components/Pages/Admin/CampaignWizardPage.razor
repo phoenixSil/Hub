@@ -84,13 +84,13 @@ else if (step == 2)
 
         <h2>Sur quels réseaux ?</h2>
         <div class="wiz-networks">
-            @foreach (var c in new[] { ChannelType.Facebook, ChannelType.Instagram })
+            @foreach (var c in new[] { ChannelType.Facebook, ChannelType.Instagram, ChannelType.GoogleBusiness })
             {
                 var x = c;
                 var on = connected.Contains(x);
                 <label class="check @(on ? null : "is-disabled")">
                     <input type="checkbox" checked="@(on && channels.Contains(x))" disabled="@(!on)" @onchange="e => Toggle(x, e.Value is true)" />
-                    @x
+                    @PostLabels.Of(x)
                     @if (!on) { <a href="/admin/canaux" class="small">(non connecté : connecter)</a> }
                 </label>
             }
@@ -162,7 +162,7 @@ else
                             @if (post.ImageUrl is not null) { <a href="/admin/publications/@post.Id" class="cal-thumb"><img src="@post.ImageUrl" alt="" loading="lazy" /></a> }
                             <div class="cal-card-body">
                                 <div class="cal-meta"><strong>@When(post.At)</strong>
-                                    @foreach (var c in post.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()">@(c == ChannelType.Facebook ? "FB" : "IG")</span> }
+                                    @foreach (var c in post.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()">@(c switch { ChannelType.Facebook => "FB", ChannelType.Instagram => "IG", _ => "G" })</span> }
                                 </div>
                                 <a href="/admin/publications/@post.Id" class="cal-title">@post.Title</a>
                             </div>

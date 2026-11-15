@@ -53,3 +53,45 @@ public interface ISocialInsights
     Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials credentials, CancellationToken ct = default);
     Task<Result<int>> GetFollowersAsync(ChannelCredentials credentials, CancellationToken ct = default);
 }
+
+/// <summary>Une cible de publication proposée par le réseau (ex. une fiche Google parmi celles du compte).</summary>
+public sealed record ChannelTarget(string Id, string Name, string? Detail);
+
+/// <summary>
+/// Réseau qui se connecte par le bouton « Se connecter avec… » (OAuth) : l'administrateur choisit son compte
+/// chez le réseau, aucun jeton à copier. Le jeton de renouvellement est conservé chiffré.
+/// </summary>
+public interface IOAuthChannel
+{
+    /// <summary>Faux tant que l'application n'est pas configurée (identifiant et secret absents).</summary>
+    bool IsConfigured { get; }
+
+    string AuthorizeUrl(string redirectUri, string state);
+
+    /// <summary>Échange le code reçu au retour, puis choisit la meilleure cible (ex. la fiche dont le nom ressemble à l'entreprise).</summary>
+    Task<Result<ChannelCredentials>> CompleteAsync(string code, string redirectUri, string? preferredName, CancellationToken ct = default);
+
+    /// <summary>Toutes les cibles possibles pour ces identifiants (pour en changer).</summary>
+    Task<Result<IReadOnlyList<ChannelTarget>>> ListTargetsAsync(ChannelCredentials credentials, CancellationToken ct = default);
+}
+
+/// <summary>Un avis client lu sur le réseau.</summary>
+public sealed record ExternalReview(string Id, string Author, int Rating, string? Comment, DateTimeOffset CreatedAt, string? Reply, DateTimeOffset? RepliedAt);
+
+/// <summary>Réseau qui porte des avis clients (Google) : les lire et y répondre.</summary>
+public interface IReviewSource
+{
+    ChannelType Channel { get; }
+    Task<Result<IReadOnlyList<ExternalReview>>> ListReviewsAsync(ChannelCredentials credentials, CancellationToken ct = default);
+    Task<Result> ReplyAsync(ChannelCredentials credentials, string reviewId, string reply, CancellationToken ct = default);
+}
+
+/// <summary>Chiffres d'une fiche d'établissement sur une période.</summary>
+public sealed record LocationMetrics(int Views, int Calls, int Directions, int WebsiteClicks);
+
+/// <summary>Réseau qui fournit les chiffres d'une fiche (vues, appels, itinéraires, clics vers le site).</summary>
+public interface ILocationInsights
+{
+    ChannelType Channel { get; }
+    Task<Result<LocationMetrics>> GetLocationAsync(ChannelCredentials credentials, DateOnly from, DateOnly to, CancellationToken ct = default);
+}

@@ -64,6 +64,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<PostStats> PostStats => Set<PostStats>();
     public DbSet<AudienceSnapshot> AudienceSnapshots => Set<AudienceSnapshot>();
     public DbSet<MaintenanceEntry> MaintenanceEntries => Set<MaintenanceEntry>();
+    public DbSet<GoogleReview> Reviews => Set<GoogleReview>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -119,6 +120,17 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.LastRunSummary).HasMaxLength(1000);
             e.Property(x => x.DisabledStyles).HasMaxLength(1000);
             e.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        b.Entity<GoogleReview>(e =>
+        {
+            e.ToTable("GoogleReviews");
+            e.Property(x => x.ExternalId).HasMaxLength(300);
+            e.Property(x => x.Author).HasMaxLength(200);
+            e.Property(x => x.Comment).HasMaxLength(4000);
+            e.Property(x => x.DraftReply).HasMaxLength(4000);
+            e.Property(x => x.Reply).HasMaxLength(4000);
+            e.HasIndex(x => new { x.TenantId, x.Channel, x.ExternalId }).IsUnique();
         });
 
         b.Entity<MaintenanceEntry>(e =>
@@ -188,6 +200,8 @@ public static class ChannelsModule
         // Un connecteur par réseau : ajouter Instagram ou Google Business = une ligne ici.
         services.AddHttpClient<ISocialPublisher, FacebookPagePublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
         services.AddHttpClient<ISocialPublisher, InstagramPublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
+        services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.Section));
+        services.AddHttpClient<ISocialPublisher, GoogleBusinessPublisher>(c => c.Timeout = TimeSpan.FromSeconds(60));
 
         services.AddScoped<IPublisherResolver, PublisherResolver>();
         services.AddScoped<IChannelConnections, ChannelConnections>();
@@ -210,6 +224,7 @@ public static class ChannelsModule
         // Plan marketing : le pilote le suit ; les chiffres des réseaux sont relevés chaque jour.
         services.AddScoped<PlanInsightsCollector>();
         services.AddScoped<Application.Marketing.MarketingGuardian>();
+        services.AddScoped<Application.Reviews.IReviewService, Application.Reviews.ReviewService>();
         services.AddHostedService<Application.Marketing.MarketingGuardianWorker>();
         services.AddScoped<IMarketingPlanService, MarketingPlanService>();
         services.AddHostedService<PlanInsightsWorker>();

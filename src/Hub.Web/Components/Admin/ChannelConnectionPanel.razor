@@ -24,7 +24,38 @@
         <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")">@feedback</div>
     }
 
-    @if (Linked is not null && !(status?.IsConnected == true && !editing))
+    @if (Connections.UsesOAuth(Channel))
+    {
+        var connectUrl = $"/admin/canaux/oauth/{Channel}/connecter";
+        @if (status?.IsConnected == true)
+        {
+            <p>Fiche : <strong>@status.AccountName</strong> <span class="muted small">(connectée le @AdminFormat.Local(status.ConnectedAt!.Value, "d MMMM yyyy"), autorisation chiffrée, jamais réaffichée)</span></p>
+            @if (targets is { Count: > 1 })
+            {
+                <div class="field-row">
+                    <div class="field">
+                        <label for="target-@Channel">Fiche utilisée</label>
+                        <select id="target-@Channel" @bind="selectedTarget">
+                            @foreach (var t in targets) { <option value="@t.Id">@t.Name@(t.Detail is null ? "" : " — " + t.Detail)</option> }
+                        </select>
+                    </div>
+                </div>
+                <div class="actions"><BusyButton Class="btn btn-outline btn-sm" OnClick="SelectTargetAsync" IsBusy="busy" BusyText="Enregistrement…">Utiliser cette fiche</BusyButton></div>
+            }
+            <div class="actions">
+                @if (targets is null) { <button class="btn btn-outline btn-sm" @onclick="LoadTargetsAsync" disabled="@busy">Changer de fiche</button> }
+                <a class="btn btn-ghost btn-sm" href="@connectUrl" data-enhance-nav="false">Reconnecter</a>
+                <button class="btn btn-ghost btn-sm" @onclick="DisconnectAsync">Déconnecter</button>
+            </div>
+        }
+        else
+        {
+            <p>Un clic : vous choisissez votre compte Google, vous acceptez, et le Hub trouve votre fiche tout seul. Aucun jeton à copier.</p>
+            <div class="actions"><a class="btn btn-primary" href="@connectUrl" data-enhance-nav="false">Connecter avec Google</a></div>
+            <p class="muted small">Il faut avoir créé l'identifiant OAuth dans le projet Google Cloud et l'avoir placé dans les réglages du site (Google__ClientId, Google__ClientSecret).</p>
+        }
+    }
+    else if (Linked is not null && !(status?.IsConnected == true && !editing))
     {
         <details class="assistant-notes" open="@(status?.IsConnected != true)">
             <summary>Avant de connecter @PostLabels.Of(Channel)</summary>
@@ -84,6 +115,31 @@
     private bool feedbackIsError;
 
     private Hub.Modules.Channels.Publishers.ILinkedChannel? Linked => Publishers.LinkedFor(Channel);
+    private IReadOnlyList<Hub.Modules.Channels.Publishers.ChannelTarget>? targets;
+    private string? selectedTarget;
+
+    private async Task LoadTargetsAsync()
+    {
+        busy = true;
+        var r = await Connections.TargetsAsync(Channel);
+        busy = false;
+        if (r.IsFailure) { feedback = r.Error; feedbackIsError = true; return; }
+        targets = r.Value;
+        selectedTarget = status?.AccountId ?? targets!.FirstOrDefault()?.Id;
+        if (targets!.Count <= 1) { feedback = "Ce compte Google n'a qu'une seule fiche."; feedbackIsError = false; }
+    }
+
+    private async Task SelectTargetAsync()
+    {
+        if (selectedTarget is null) return;
+        busy = true;
+        var r = await Connections.SelectTargetAsync(Channel, selectedTarget);
+        busy = false;
+        feedback = r.IsSuccess ? $"Fiche « {r.Value} » utilisée pour les publications et les avis." : r.Error;
+        feedbackIsError = r.IsFailure;
+        targets = null;
+        status = await Connections.GetStatusAsync(Channel);
+    }
 
     protected override async Task OnInitializedAsync() => status = await Connections.GetStatusAsync(Channel);
 

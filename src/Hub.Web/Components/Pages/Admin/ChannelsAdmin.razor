@@ -3,6 +3,7 @@
 @using Hub.Modules.Channels
 
 @inject IPublisherResolver Publishers
+@inject NavigationManager Nav
 
 <PageTitle>Canaux</PageTitle>
 
@@ -13,13 +14,18 @@
     </div>
 </div>
 
+@if (oauthMessage is not null)
+{
+    <div class="alert @(oauthError ? "alert-error" : "alert-success")" role="status">@oauthMessage</div>
+}
+
 @foreach (var c in Publishers.Supported)
 {
     <ChannelConnectionPanel Channel="c" />
 }
 
 <CrudEditor T="Channel" Title="Canaux de présence en ligne" Context="c" AllowDelete="false"
-            Help="Liste de vos présences en ligne (adresse, état). Facebook et Instagram se publient depuis le back-office ; Google Business arrivera ensuite."
+            Help="Liste de vos présences en ligne (adresse, état). Facebook, Instagram et Google Business se publient depuis le back-office."
             Query="@(q => q.OrderBy(x => x.Phase).ThenBy(x => x.Type))">
     <Header><th>Canal</th><th>État</th><th>Phase</th><th>Adresse</th></Header>
     <Row>
@@ -62,4 +68,14 @@
         ChannelStatus.Paused => "En pause",
         _ => "Prévu",
     };
+
+    private string? oauthMessage;
+    private bool oauthError;
+
+    protected override void OnInitialized()
+    {
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
+        if (q.TryGetValue("connecte", out var ok)) oauthMessage = $"Google Business connecté : fiche « {ok} ».";
+        else if (q.TryGetValue("erreur", out var ko)) { oauthMessage = ko.ToString(); oauthError = true; }
+    }
 }

@@ -21,6 +21,20 @@ public interface IChannelConnections
     /// <summary>Connecte un réseau lié (ex. Instagram) avec le compte source déjà connecté (la page Facebook).</summary>
     Task<Result<string>> ConnectLinkedAsync(ChannelType channel, CancellationToken ct = default);
     Task DisconnectAsync(ChannelType channel, CancellationToken ct = default);
+
+    /// <summary>Vrai si le réseau se connecte par « Se connecter avec… » (OAuth), ex. Google.</summary>
+    bool UsesOAuth(ChannelType channel);
+
+    /// <summary>Adresse de la page d'autorisation du réseau ; null si l'application n'est pas configurée (identifiant, secret).</summary>
+    string? AuthorizeUrl(ChannelType channel, string redirectUri, string state);
+
+    /// <summary>Retour d'autorisation : échange le code, choisit la fiche qui ressemble à l'entreprise, enregistre la connexion.</summary>
+    Task<Result<string>> ConnectOAuthAsync(ChannelType channel, string? code, string redirectUri, string? preferredName, CancellationToken ct = default);
+
+    /// <summary>Les cibles possibles (ex. les fiches Google du compte), pour en changer.</summary>
+    Task<Result<IReadOnlyList<ChannelTarget>>> TargetsAsync(ChannelType channel, CancellationToken ct = default);
+
+    Task<Result<string>> SelectTargetAsync(ChannelType channel, string targetId, CancellationToken ct = default);
     Task<ChannelCredentials?> GetCredentialsAsync(ChannelType channel, CancellationToken ct = default);
 }
 
@@ -89,6 +103,59 @@ internal sealed class ChannelConnections(
         row.SettingsJson = JsonSerializer.Serialize(new Stored(accountId, _protector.Protect(accessToken), accountName, DateTimeOffset.UtcNow));
         row.Status = ChannelStatus.Active;
         await db.SaveChangesAsync(ct);
+    }
+
+    public bool UsesOAuth(ChannelType channel) => publishers.OAuthFor(channel) is not null;
+
+    public string? AuthorizeUrl(ChannelType channel, string redirectUri, string state) =>
+        publishers.OAuthFor(channel) is { IsConfigured: true } oauth ? oauth.AuthorizeUrl(redirectUri, state) : null;
+
+    private static readonly IReadOnlyList<ChannelTarget> SimulatedTargets =
+    [
+        new("accounts/simule/locations/1", "Entretien Scintinet (simulée)", "12 rue Boucher, Québec"),
+        new("accounts/simule/locations/2", "Autre fiche (simulée)", "Ailleurs"),
+    ];
+
+    public async Task<Result<string>> ConnectOAuthAsync(ChannelType channel, string? code, string redirectUri, string? preferredName, CancellationToken ct = default)
+    {
+        var oauth = publishers.OAuthFor(channel);
+        if (oauth is null) return Result<string>.Failure($"{channel} ne se connecte pas de cette façon.");
+        ChannelCredentials credentials;
+        if (publishers.IsSimulated)
+        {
+            credentials = new ChannelCredentials(SimulatedTargets[0].Id, "simulé", SimulatedTargets[0].Name);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(code)) return Result<string>.Failure("Connexion annulée : aucune autorisation reçue.");
+            var done = await oauth.CompleteAsync(code, redirectUri, preferredName, ct);
+            if (done.IsFailure) return Result<string>.Failure(done.Error!);
+            credentials = done.Value!;
+        }
+        var name = credentials.AccountName ?? credentials.AccountId;
+        await SaveAsync(channel, credentials.AccountId, credentials.AccessToken, name, ct);
+        return Result<string>.Success(name);
+    }
+
+    public async Task<Result<IReadOnlyList<ChannelTarget>>> TargetsAsync(ChannelType channel, CancellationToken ct = default)
+    {
+        if (publishers.IsSimulated) return Result<IReadOnlyList<ChannelTarget>>.Success(SimulatedTargets);
+        var oauth = publishers.OAuthFor(channel);
+        var credentials = await GetCredentialsAsync(channel, ct);
+        if (oauth is null || credentials is null) return Result<IReadOnlyList<ChannelTarget>>.Failure("Connectez d'abord le réseau.");
+        return await oauth.ListTargetsAsync(credentials, ct);
+    }
+
+    public async Task<Result<string>> SelectTargetAsync(ChannelType channel, string targetId, CancellationToken ct = default)
+    {
+        var credentials = await GetCredentialsAsync(channel, ct);
+        if (credentials is null) return Result<string>.Failure("Connectez d'abord le réseau.");
+        var targets = await TargetsAsync(channel, ct);
+        if (targets.IsFailure) return Result<string>.Failure(targets.Error!);
+        var target = targets.Value!.FirstOrDefault(t => t.Id == targetId);
+        if (target is null) return Result<string>.Failure("Fiche introuvable.");
+        await SaveAsync(channel, target.Id, credentials.AccessToken, target.Name, ct);
+        return Result<string>.Success(target.Name);
     }
 
     public async Task DisconnectAsync(ChannelType channel, CancellationToken ct = default)

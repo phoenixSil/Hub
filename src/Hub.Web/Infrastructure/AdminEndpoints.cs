@@ -11,6 +11,66 @@ namespace Hub.Web.Infrastructure;
 
 public static class AdminEndpoints
 {
+    private const string OAuthStateCookie = "hub_oauth_state";
+
+    /// <summary>
+    /// Connexion d'un réseau par OAuth (ex. Google Business) : /admin/canaux/oauth/{réseau}/connecter envoie vers la page
+    /// d'autorisation du réseau ; /retour échange le code et enregistre la connexion (jeton chiffré), puis revient sur Canaux.
+    /// Un jeton anti-falsification (state) lie l'aller et le retour.
+    /// </summary>
+    public static void MapChannelOAuth(this IEndpointRouteBuilder app)
+    {
+        static string Redirect(HttpContext ctx, string channel) =>
+            $"{ctx.Request.Scheme}://{ctx.Request.Host}/admin/canaux/oauth/{channel}/retour";
+
+        static void UseTenant(HttpContext ctx, ITenantContext tenant)
+        {
+            if (Guid.TryParse(ctx.User.FindFirst(HubClaims.TenantId)?.Value, out var tenantId)) tenant.Set(tenantId);
+        }
+
+        app.MapGet("/admin/canaux/oauth/{channel}/connecter", async (string channel, HttpContext ctx, ITenantContext tenant,
+            Hub.Modules.Channels.Application.IChannelConnections connections, Hub.Modules.Channels.Application.IPublisherResolver publishers,
+            Hub.Modules.Channels.Application.Autopilot.IAutopilotContextSource context) =>
+        {
+            UseTenant(ctx, tenant);
+            if (!Enum.TryParse<Hub.Modules.Channels.ChannelType>(channel, ignoreCase: true, out var type) || !connections.UsesOAuth(type))
+                return Results.Redirect("/admin/canaux?erreur=" + Uri.EscapeDataString("Réseau inconnu."));
+            if (publishers.IsSimulated)
+            {
+                var simulated = await connections.ConnectOAuthAsync(type, null, Redirect(ctx, channel), null, ctx.RequestAborted);
+                return Results.Redirect("/admin/canaux?" + (simulated.IsSuccess ? "connecte=" : "erreur=") + Uri.EscapeDataString(simulated.Value ?? simulated.Error ?? ""));
+            }
+            var state = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+            var url = connections.AuthorizeUrl(type, Redirect(ctx, channel), state);
+            if (url is null)
+                return Results.Redirect("/admin/canaux?erreur=" + Uri.EscapeDataString(
+                    "L'application Google n'est pas encore configurée : ajoutez Google__ClientId et Google__ClientSecret dans les réglages du site."));
+            ctx.Response.Cookies.Append(OAuthStateCookie, state, new CookieOptions
+            {
+                HttpOnly = true, Secure = true, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromMinutes(15), Path = "/admin/canaux/oauth",
+            });
+            return Results.Redirect(url);
+        }).RequireAuthorization();
+
+        app.MapGet("/admin/canaux/oauth/{channel}/retour", async (string channel, string? code, string? state, string? error, HttpContext ctx,
+            ITenantContext tenant, Hub.Modules.Channels.Application.IChannelConnections connections,
+            Hub.Modules.Channels.Application.Autopilot.IAutopilotContextSource context) =>
+        {
+            UseTenant(ctx, tenant);
+            var expected = ctx.Request.Cookies[OAuthStateCookie];
+            ctx.Response.Cookies.Delete(OAuthStateCookie, new CookieOptions { Path = "/admin/canaux/oauth" });
+            if (!Enum.TryParse<Hub.Modules.Channels.ChannelType>(channel, ignoreCase: true, out var type))
+                return Results.Redirect("/admin/canaux?erreur=" + Uri.EscapeDataString("Réseau inconnu."));
+            if (error is not null)
+                return Results.Redirect("/admin/canaux?erreur=" + Uri.EscapeDataString("Connexion refusée ou annulée chez Google (" + error + ")."));
+            if (string.IsNullOrEmpty(expected) || !string.Equals(expected, state, StringComparison.Ordinal))
+                return Results.Redirect("/admin/canaux?erreur=" + Uri.EscapeDataString("La connexion a expiré : recommencez."));
+            var company = (await context.GetAsync(ctx.RequestAborted)).CompanyName;
+            var result = await connections.ConnectOAuthAsync(type, code, Redirect(ctx, channel), company, ctx.RequestAborted);
+            return Results.Redirect("/admin/canaux?" + (result.IsSuccess ? "connecte=" : "erreur=") + Uri.EscapeDataString(result.Value ?? result.Error ?? ""));
+        }).RequireAuthorization();
+    }
+
     /// <summary>GET /admin/demandes/export.csv : toutes les demandes, ouvrable dans Excel (séparateur « ; », UTF-8).</summary>
     public static void MapAdminExports(this IEndpointRouteBuilder app)
     {

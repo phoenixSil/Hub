@@ -514,3 +514,18 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 .cal-journal ul { list-style: none; padding: 8px 0 0; margin: 0; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
 .cal-journal li { color: var(--ink, #0f2533); }
 .cal-journal li.ko { color: #8a1b12; }
+.cal-net-googlebusiness { background: #e8f5e9; color: #1d6b2c; }
+
+/* Avis Google */
+.rv-summary { display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: baseline; }
+.rv-summary strong { font-size: 1.6rem; }
+.rv-stars { color: #f0a400; letter-spacing: 1px; white-space: nowrap; }
+.rv-list { display: grid; gap: 12px; }
+.rv-card { border: 1px solid var(--line); border-left: 4px solid #cbd5dd; border-radius: 12px; padding: 14px; background: #fff; }
+.rv-card.is-unanswered { border-left-color: #f0a400; }
+.rv-card.is-low { border-left-color: #b42318; }
+.rv-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin-bottom: 6px; }
+.rv-comment { margin: 0 0 10px; white-space: pre-line; }
+.rv-reply { background: #f4f8fb; border-radius: 10px; padding: 10px 12px; white-space: pre-line; }
+.rv-reply .muted { display: block; margin-bottom: 4px; }
+.rv-card textarea { width: 100%; min-height: 110px; }

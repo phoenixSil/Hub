@@ -1,0 +1,152 @@
+@page "/admin/avis-google"
+@rendermode InteractiveServer
+@using Hub.Modules.Channels.Application.Reviews
+@inject IReviewService Reviews
+
+<PageTitle>Avis Google</PageTitle>
+
+<MarketingTabs />
+
+<div class="admin-head">
+    <div>
+        <h1>Avis Google</h1>
+        <p class="muted">Les avis de votre fiche Google, relevés toutes les 30 minutes. L'IA vous propose une réponse : vous la relisez, la modifiez au besoin, puis la publiez. Rien ne part sans votre accord.</p>
+    </div>
+    @if (connected)
+    {
+        <BusyButton Class="btn btn-outline btn-sm" OnClick="SyncAsync" IsBusy="@(action == "sync")" AnyBusy="busy" BusyText="Relevé…">Relever les avis</BusyButton>
+    }
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")" role="status">@feedback</div>
+}
+
+@if (!loaded)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (!connected && items.Count == 0)
+{
+    <div class="admin-card">
+        <h2>Fiche Google pas encore connectée</h2>
+        <p>Connectez votre fiche Google Business pour voir vos avis ici et y répondre en un clic.</p>
+        <a class="btn btn-primary" href="/admin/canaux">Connecter Google Business</a>
+    </div>
+}
+else
+{
+    <div class="admin-card rv-summary">
+        <span><strong>@summary.Average.ToString("0.0", AdminFormat.Fr)</strong> <span class="rv-stars">@Stars((int)Math.Round(summary.Average))</span></span>
+        <span>@summary.Count avis</span>
+        <span>@(summary.Unanswered == 0 ? "Tous ont une réponse" : $"{summary.Unanswered} sans réponse")</span>
+    </div>
+
+    <div class="rv-list">
+        @foreach (var r in items)
+        {
+            <article class="rv-card @(r.Reply is null ? "is-unanswered" : null) @(r.Rating is > 0 and <= 2 ? "is-low" : null)">
+                <div class="rv-head">
+                    <span class="rv-stars" aria-label="@r.Rating étoiles sur 5">@Stars(r.Rating)</span>
+                    <strong>@r.Author</strong>
+                    <span class="muted small">@AdminFormat.Local(r.WrittenAt, "d MMMM yyyy")</span>
+                </div>
+                <p class="rv-comment">@(string.IsNullOrWhiteSpace(r.Comment) ? "(note sans commentaire)" : r.Comment)</p>
+
+                @if (r.Reply is not null)
+                {
+                    <div class="rv-reply"><span class="muted small">Votre réponse@(r.RepliedAt is { } at ? $", le {AdminFormat.Local(at, "d MMMM yyyy")}" : "")</span>@r.Reply</div>
+                }
+                else
+                {
+                    var draft = Draft(r);
+                    @if (draft is null)
+                    {
+                        <div class="actions">
+                            <BusyButton OnClick="() => ProposeAsync(r.Id)" IsBusy="@(action == $"propose-{r.Id}")" AnyBusy="busy" BusyText="L'IA rédige…">Proposer une réponse</BusyButton>
+                            <button class="btn btn-ghost btn-sm" @onclick="() => drafts[r.Id] = string.Empty" disabled="@busy">Écrire moi-même</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <label class="sr-only" for="reply-@r.Id">Réponse</label>
+                        <textarea id="reply-@r.Id" @bind="drafts[r.Id]" @bind:event="oninput" maxlength="4000"></textarea>
+                        <div class="actions">
+                            <BusyButton OnClick="() => ReplyAsync(r.Id)" IsBusy="@(action == $"reply-{r.Id}")" AnyBusy="busy" Disabled="@string.IsNullOrWhiteSpace(drafts[r.Id])" BusyText="Publication…">Publier la réponse</BusyButton>
+                            <BusyButton Class="btn btn-ghost btn-sm" OnClick="() => ProposeAsync(r.Id)" IsBusy="@(action == $"propose-{r.Id}")" AnyBusy="busy" BusyText="L'IA rédige…">Autre proposition</BusyButton>
+                        </div>
+                    }
+                }
+            </article>
+        }
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private bool connected;
+    private IReadOnlyList<ReviewView> items = [];
+    private ReviewSummary summary = new(0, 0, 0);
+    private readonly Dictionary<Guid, string> drafts = [];
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+
+    protected override async Task OnInitializedAsync()
+    {
+        connected = await Reviews.IsConnectedAsync();
+        // Première visite : on relève tout de suite (sans attendre le passage des 30 minutes).
+        if (connected && (await Reviews.SummaryAsync()).Count == 0) await Reviews.SyncAsync();
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        items = await Reviews.ListAsync();
+        summary = await Reviews.SummaryAsync();
+        foreach (var r in items.Where(r => r.Reply is null && r.DraftReply is not null && !drafts.ContainsKey(r.Id)))
+            drafts[r.Id] = r.DraftReply!;
+    }
+
+    private string? Draft(ReviewView r) => drafts.TryGetValue(r.Id, out var d) ? d : null;
+
+    private Task SyncAsync() => RunAsync("sync", async () =>
+    {
+        var r = await Reviews.SyncAsync();
+        return (r, r.IsSuccess ? (r.Value!.Count == 0 ? "Avis à jour : rien de nouveau." : $"{r.Value.Count} nouvel(s) avis.") : "");
+    });
+
+    private Task ProposeAsync(Guid id) => RunAsync($"propose-{id}", async () =>
+    {
+        var r = await Reviews.ProposeReplyAsync(id);
+        if (r.IsSuccess) drafts[id] = r.Value!;
+        return (r, "Réponse proposée : relisez-la, modifiez-la au besoin, puis publiez-la.");
+    });
+
+    private Task ReplyAsync(Guid id) => RunAsync($"reply-{id}", async () =>
+    {
+        var r = await Reviews.ReplyAsync(id, drafts.GetValueOrDefault(id) ?? "");
+        if (r.IsSuccess) drafts.Remove(id);
+        return (r, "Réponse publiée sur votre fiche Google.");
+    });
+
+    private async Task RunAsync(string name, Func<Task<(Result Result, string Success)>> work)
+    {
+        if (busy) return;
+        busy = true;
+        action = name;
+        try
+        {
+            var (result, success) = await work();
+            feedback = result.IsSuccess ? success : result.Error;
+            feedbackIsError = result.IsFailure;
+            await LoadAsync();
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private static string Stars(int n) => new string('★', Math.Clamp(n, 0, 5)) + new string('☆', 5 - Math.Clamp(n, 0, 5));
+}

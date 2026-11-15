@@ -55,6 +55,7 @@ internal sealed class MarketingGuardian(
     AutopilotTrigger trigger,
     AutopilotProgress progress,
     PlanInsightsCollector insights,
+    Reviews.IReviewService reviews,
     IAutopilotContextSource source,
     IEmailSender email,
     ITenantContext tenant,
@@ -159,6 +160,21 @@ internal sealed class MarketingGuardian(
         {
             var note = await insights.CollectAsync(ct);
             Log("Chiffres", note is null ? "Chiffres des réseaux relevés (le relevé quotidien n'avait pas abouti)." : "Relevé des chiffres incomplet : " + note, note is null);
+        }
+
+        // 6. Avis Google : relevés à chaque passage (les nouveaux sont signalés par courriel).
+        if (await reviews.IsConnectedAsync(ct))
+        {
+            var synced = await reviews.SyncAsync(ct);
+            if (synced.IsFailure)
+            {
+                if (!await db.MaintenanceEntries.AnyAsync(e => e.Kind == "Avis" && !e.Success && e.At >= now.AddHours(-6), ct))
+                    Log("Avis", "Avis Google non relevés : " + synced.Error, RetryPolicy.IsPermanent(synced.Error) ? false : true);
+            }
+            else if (synced.Value!.Count > 0)
+            {
+                Log("Avis", $"{synced.Value.Count} nouvel(s) avis Google relevé(s).", true);
+            }
         }
 
         var needsAction = entries.Count(e => !e.Success);

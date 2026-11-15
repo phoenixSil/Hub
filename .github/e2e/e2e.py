@@ -10,6 +10,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
 8. Marketing : assistant de campagne avec aperçu, calendrier (remplacer, retirer, tout approuver), campagne en réserve, pause, arrêt, campagne intensive.
 9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
+10. Google Business : connexion en un clic, avis relevés, réponse proposée par l'IA puis publiée, chiffres de la fiche.
 
 Usage : python3 e2e.py http://localhost:5080
 """
@@ -295,6 +296,29 @@ def gift_card(page):
     expect(page.locator(".giftcard-aside .alert-success")).to_contain_text("50 $")
 
 
+@step("Google Business : connecté en un clic, avis relevés, réponse proposée puis publiée")
+def google_business(page):
+    page.goto(BASE + "/admin/canaux", wait_until="networkidle")
+    page.locator("a", has_text="Connecter avec Google").first.click()
+    page.wait_for_url("**/admin/canaux?connecte=**", timeout=20000)
+    expect(page.locator("text=Google Business connecté").first).to_be_visible(timeout=15000)
+
+    page.goto(BASE + "/admin/avis-google", wait_until="networkidle")
+    card = page.locator(".rv-card", has_text="Jean-François").first
+    expect(card).to_be_visible(timeout=20000)
+    card.locator("button", has_text="Proposer une réponse").click()
+    expect(page.locator(".alert-success")).to_contain_text("Réponse proposée", timeout=120000)
+    box = card.locator("textarea")
+    expect(box).not_to_have_value("")
+    box.fill("Merci Jean-François pour votre avis ! L'équipe Scintinet")
+    card.locator("button", has_text="Publier la réponse").click()
+    expect(page.locator(".alert-success")).to_contain_text("Réponse publiée", timeout=20000)
+    expect(page.locator(".rv-card", has_text="Jean-François").first.locator(".rv-reply")).to_contain_text("Merci Jean-François")
+
+    page.goto(BASE + "/admin/resultats", wait_until="networkidle")
+    expect(page.locator("#google-metrics")).to_contain_text("Vues de la fiche", timeout=20000)
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -314,6 +338,7 @@ with sync_playwright() as p:
     campaign_wizard(page)
     guardian(page)
     gift_card(page)
+    google_business(page)
     browser.close()
 
 if failures:

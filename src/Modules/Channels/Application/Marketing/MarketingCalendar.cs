@@ -188,7 +188,7 @@ internal sealed class MarketingCalendar(
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         return await db.Channels.AsNoTracking()
-            .Where(c => c.SettingsJson != null && (c.Type == ChannelType.Facebook || c.Type == ChannelType.Instagram))
+            .Where(c => c.SettingsJson != null && (c.Type == ChannelType.Facebook || c.Type == ChannelType.Instagram || c.Type == ChannelType.GoogleBusiness))
             .Select(c => c.Type).ToListAsync(ct);
     }
 
@@ -228,8 +228,8 @@ public static class MarketingHealth
     public static IReadOnlyList<HealthIssue> Evaluate(MarketingHealthInput i)
     {
         var issues = new List<HealthIssue>();
-        if (!i.ConnectedChannels.Contains(ChannelType.Facebook) && !i.ConnectedChannels.Contains(ChannelType.Instagram))
-            issues.Add(new(HealthLevel.Error, "Aucun réseau social n'est connecté : rien ne peut partir.", "Connecter Facebook ou Instagram", HealthAction.OpenChannels));
+        if (!i.ConnectedChannels.Any(c => c is ChannelType.Facebook or ChannelType.Instagram or ChannelType.GoogleBusiness))
+            issues.Add(new(HealthLevel.Error, "Aucun réseau social n'est connecté : rien ne peut partir.", "Connecter un réseau", HealthAction.OpenChannels));
         if (i.LastRunSummary is { } run && run.StartsWith("0 publication", StringComparison.Ordinal) && run.Contains("Problèmes", StringComparison.Ordinal))
             issues.Add(new(HealthLevel.Error, "La dernière préparation a échoué : " + run[(run.IndexOf("Problèmes", StringComparison.Ordinal) + 12)..].Trim(),
                 "Réessayer", HealthAction.Retry));
