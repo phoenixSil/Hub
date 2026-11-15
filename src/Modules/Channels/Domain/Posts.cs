@@ -14,6 +14,8 @@ public enum PostStatus
     Cancelled = 6,
     /// <summary>Proposée par le pilote automatique : attend l'accord de l'administrateur.</summary>
     AwaitingApproval = 7,
+    /// <summary>Proposée par le pilote, jamais validée : son heure est passée, elle n'est pas partie (reste visible).</summary>
+    Expired = 8,
 }
 
 public enum PostTargetStatus

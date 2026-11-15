@@ -38,7 +38,7 @@ public sealed record PlanWeekSummary(
         var published = inWeek.Count(p => p.Status is PostStatus.Published or PostStatus.PartiallyPublished);
         var upcoming = inWeek.Count(p => (p.Status is PostStatus.Scheduled or PostStatus.Publishing or PostStatus.AwaitingApproval)
                                          && (p.ScheduledAt is null || p.ScheduledAt >= now.AddDays(-1)));
-        var missed = inWeek.Count(p => p.Status is PostStatus.Failed
+        var missed = inWeek.Count(p => p.Status is PostStatus.Failed or PostStatus.Expired
                                        || (p.Status is PostStatus.Cancelled && p.FromAutopilot));
         // À valider : toutes les publications du pilote qui attendent encore (pas seulement celles de la semaine).
         var toApprove = posts.Count(p => p.Post.Status == PostStatus.AwaitingApproval);

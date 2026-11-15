@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text.Json;
+using Hub.Modules.Channels.Application.Marketing;
 using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
 using Hub.SharedKernel;
 using Hub.SharedKernel.Email;
+using Hub.SharedKernel.Tenancy;
 using Hub.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -70,9 +72,21 @@ internal sealed class AutopilotRunner(
     IVisualRenderer renderer,
     IVisualStore store,
     IEmailSender email,
+    AutopilotProgress progress,
+    ITenantContext tenant,
     TimeProvider clock,
     ILogger<AutopilotRunner> logger)
 {
+    /// <summary>Délai de grâce : une proposition non validée 2 h après son heure est marquée « Non publiée ».</summary>
+    public static readonly TimeSpan ApprovalGrace = TimeSpan.FromHours(2);
+
+    /// <summary>Propositions jamais validées dont l'heure est passée : marquées « Non publiée » (visibles), jamais effacées en silence.</summary>
+    internal static async Task<int> ExpireAsync(ChannelsDbContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var stale = await db.Posts.Where(p => p.Status == PostStatus.AwaitingApproval && p.ScheduledAt < now - ApprovalGrace).ToListAsync(ct);
+        foreach (var post in stale) post.Status = PostStatus.Expired;
+        return stale.Count;
+    }
     public const string Author = "Pilote automatique";
 
     /// <summary>
@@ -115,26 +129,85 @@ internal sealed class AutopilotRunner(
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
-        if (settings is null || (!settings.Enabled && !force)) return Result<int>.Success(0);
+        if (settings is null || (!settings.Enabled && !force))
+        {
+            progress.Finish(tenant.TenantId, "La préparation automatique est en pause.", failed: false);
+            return Result<int>.Success(0);
+        }
 
         var now = clock.GetUtcNow();
         var horizonEnd = now.AddDays(AutopilotSchedule.HorizonDays + 1);
-
-        // Les propositions jamais validées et dépassées depuis un jour sont abandonnées.
-        foreach (var stale in await db.Posts.Where(p => p.Status == PostStatus.AwaitingApproval && p.ScheduledAt < now.AddDays(-1)).ToListAsync(ct))
-            stale.Status = PostStatus.Cancelled;
+        await ExpireAsync(db, now, ct);
 
         var upcoming = await db.Posts.AsNoTracking()
-            .Where(p => p.Status != PostStatus.Cancelled && (p.ScheduledAt ?? p.PublishedAt) >= now.AddHours(-12) && (p.ScheduledAt ?? p.PublishedAt) < horizonEnd)
+            .Where(p => p.Status != PostStatus.Cancelled && p.Status != PostStatus.Expired
+                        && (p.ScheduledAt ?? p.PublishedAt) >= now.AddHours(-12) && (p.ScheduledAt ?? p.PublishedAt) < horizonEnd)
             .Select(p => new { p.FromAutopilot, At = p.ScheduledAt ?? p.PublishedAt, p.Status })
             .ToListAsync(ct);
         var busy = upcoming.Where(p => p.At is not null).GroupBy(p => AutopilotSchedule.LocalDay(p.At!.Value)).ToDictionary(g => g.Key, g => g.Count());
         var planned = upcoming.Count(p => p.FromAutopilot && p.At > now);
         var slots = AutopilotSchedule.FreeSlots(now, settings.PostsPerWeek, planned, busy);
 
+        var (created, problems) = await FillAsync(db, settings, slots, now, ct);
+
+        settings.LastRunAt = now;
+        settings.LastRunSummary = Summary(created, problems);
+        await db.SaveChangesAsync(ct);
+        if (slots.Count == 0) progress.Finish(tenant.TenantId, settings.LastRunSummary, failed: false);
+        logger.LogInformation("Pilote automatique : {Summary}", settings.LastRunSummary);
+
+        if (created > 0 && !settings.PublishWithoutApproval) await NotifyAsync(created, ct);
+        return problems.Count > 0 && created == 0 ? Result<int>.Failure(settings.LastRunSummary) : Result<int>.Success(created);
+    }
+
+    internal static string Summary(int created, IReadOnlyCollection<string> problems) =>
+        (created == 0 && problems.Count == 0
+            ? "La semaine est déjà couverte : rien à ajouter."
+            : $"{created} publication(s) préparée(s)." + (problems.Count > 0 ? " Problèmes : " + string.Join(" ; ", problems.Distinct()) : ""))
+        .Truncate(1000);
+
+    /// <summary>
+    /// Remplace une publication du pilote pas encore parue par une nouvelle, au même créneau
+    /// (autre sujet, autre texte, autre image).
+    /// </summary>
+    public async Task<Result> ReplaceAsync(Guid postId, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
+        if (settings is null) return Result.Failure("Le pilote automatique n'est pas encore réglé.");
+        var post = await db.Posts.FirstOrDefaultAsync(p => p.Id == postId, ct);
+        if (post is null || post.Status is not (PostStatus.AwaitingApproval or PostStatus.Scheduled or PostStatus.Draft or PostStatus.Expired))
+            return Result.Failure("Seule une publication pas encore parue peut être remplacée.");
+        var now = clock.GetUtcNow();
+        var at = post.ScheduledAt is { } when && when > now.AddMinutes(30) ? when : now.AddHours(2);
+        // Créneau à son heure exacte (pas minuit), pour que la nouvelle parte au même moment.
+        if (TimeZoneInfo.ConvertTime(at, BusinessTime.Zone).TimeOfDay == TimeSpan.Zero) at = at.AddMinutes(1);
+        var previous = post.Status;
+        post.Status = PostStatus.Cancelled;
+        await db.SaveChangesAsync(ct);
+
+        var (created, problems) = await FillAsync(db, settings, [at], now, ct);
+        if (created == 0)
+        {
+            post.Status = previous; // rien de neuf : l'ancienne publication reste en place
+            await db.SaveChangesAsync(ct);
+            return Result.Failure("Impossible de préparer une nouvelle publication : " + string.Join(" ; ", problems.Distinct()));
+        }
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Prépare une publication par créneau : sujets, textes, images. Chaque publication est enregistrée dès qu'elle est prête
+    /// (une panne en cours de route garde les précédentes), et l'avancement est visible dans le calendrier.
+    /// </summary>
+    private async Task<(int Created, List<string> Problems)> FillAsync(
+        ChannelsDbContext db, AutopilotSettings settings, IReadOnlyList<DateTimeOffset> slots, DateTimeOffset now, CancellationToken ct)
+    {
         var created = 0;
         var problems = new List<string>();
-        if (slots.Count > 0)
+        if (slots.Count == 0) return (0, problems);
+        progress.Start(tenant.TenantId, slots.Count, now);
+        try
         {
             var context = await source.GetAsync(ct);
             var history = await HistoryAsync(db, ct);
@@ -159,35 +232,31 @@ internal sealed class AutopilotRunner(
             if (plan.IsFailure)
             {
                 problems.Add(plan.Error!);
+                return (0, problems);
             }
-            else
+            var channels = AutopilotService.ReadChannels(settings.Channels);
+            foreach (var item in plan.Value!)
             {
-                var channels = AutopilotService.ReadChannels(settings.Channels);
-                foreach (var item in plan.Value!)
+                var post = await PrepareAsync(item, context, settings, channels, recentScenes,
+                    memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
+                if (post is not null)
                 {
-                    var post = await PrepareAsync(item, context, settings, channels, recentScenes,
-                        memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
-                    if (post is null) continue;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
                     db.Posts.Add(post.Value.Post);
                     db.PostTargets.AddRange(post.Value.Targets);
+                    await db.SaveChangesAsync(ct);
                     created++;
                 }
+                progress.Step(tenant.TenantId, created);
             }
+            return (created, problems);
         }
-
-        settings.LastRunAt = now;
-        settings.LastRunSummary = (created == 0 && problems.Count == 0
-                ? "La semaine est déjà couverte : rien à ajouter."
-                : $"{created} publication(s) préparée(s)." + (problems.Count > 0 ? " Problèmes : " + string.Join(" ; ", problems.Distinct()) : ""))
-            .Truncate(1000);
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Pilote automatique : {Summary}", settings.LastRunSummary);
-
-        if (created > 0 && !settings.PublishWithoutApproval) await NotifyAsync(created, ct);
-        return problems.Count > 0 && created == 0 ? Result<int>.Failure(settings.LastRunSummary) : Result<int>.Success(created);
+        finally
+        {
+            progress.Finish(tenant.TenantId, Summary(created, problems), failed: created == 0 && problems.Count > 0);
+        }
     }
 
     private async Task<(Post Post, List<PostTarget> Targets)?> PrepareAsync(
@@ -255,7 +324,7 @@ internal sealed class AutopilotRunner(
     internal static async Task<CreativeMemory> CreativeMemoryAsync(ChannelsDbContext db, AutopilotSettings? settings, CancellationToken ct)
     {
         var recent = await db.Posts.AsNoTracking()
-            .Where(p => p.Status != PostStatus.Cancelled && p.ImageUrl != null)
+            .Where(p => p.Status != PostStatus.Cancelled && p.Status != PostStatus.Expired && p.ImageUrl != null)
             .OrderByDescending(p => p.ScheduledAt ?? p.PublishedAt ?? p.CreatedAt)
             .Take(10)
             .Select(p => new { p.ImageUrl, p.ArtStyle })
@@ -316,12 +385,12 @@ internal sealed class AutopilotRunner(
     {
         var context = await source.GetAsync(ct);
         if (string.IsNullOrWhiteSpace(context.AdminEmail)) return;
-        var link = $"{(context.SiteUrl ?? "").TrimEnd('/')}/admin/publications";
+        var link = $"{(context.SiteUrl ?? "").TrimEnd('/')}/admin/marketing";
         var html = $"""
             <p>Bonjour,</p>
             <p>Le pilote automatique a préparé <strong>{count} publication(s)</strong> pour {WebUtility.HtmlEncode(context.CompanyName)} cette semaine.</p>
-            <p>Elles attendent votre accord : relisez-les, modifiez-les au besoin, puis approuvez ou refusez-les.</p>
-            <p><a href="{WebUtility.HtmlEncode(link)}">Voir les publications à valider</a></p>
+            <p>Elles attendent votre accord : ouvrez le calendrier, relisez-les, puis cliquez « Tout approuver » (ou approuvez-les une par une).</p>
+            <p><a href="{WebUtility.HtmlEncode(link)}">Ouvrir le calendrier</a></p>
             <p style="color:#666;font-size:13px">Sans votre accord, aucune ne sera publiée.</p>
             """;
         var sent = await email.SendAsync(new EmailMessage(context.AdminEmail, $"{count} publication(s) à valider", html), ct);
