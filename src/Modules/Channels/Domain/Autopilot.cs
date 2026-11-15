@@ -31,6 +31,9 @@ public sealed class AutopilotSettings : TenantEntity
     public string? DisabledStyles { get; set; }
 
     public DateTimeOffset? LastRunAt { get; set; }
+
+    /// <summary>Jour du dernier rappel « des publications partent demain et attendent votre accord » (un par jour au plus).</summary>
+    public DateOnly? LastReminderOn { get; set; }
     public string? LastRunSummary { get; set; }
 }
 

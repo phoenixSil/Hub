@@ -56,6 +56,9 @@ public sealed class Post : TenantEntity
     /// <summary>Préparée par le pilote automatique.</summary>
     public bool FromAutopilot { get; set; }
 
+    /// <summary>Campagne (plan marketing) pour laquelle le pilote l'a préparée.</summary>
+    public Guid? PlanId { get; set; }
+
     /// <summary>Type de visuel : « Photo », « Illustration », « Importée » (vide : sans image). Sert aux résultats.</summary>
     public string? VisualKind { get; set; }
 

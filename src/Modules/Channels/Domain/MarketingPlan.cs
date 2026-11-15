@@ -49,6 +49,9 @@ public sealed class MarketingPlan : TenantEntity
     /// </summary>
     public bool StartsAutomatically { get; set; }
 
+    /// <summary>Créée avec l'assistant « Nouvelle campagne » : ses réseaux et son mode de validation sont ceux choisis.</summary>
+    public bool FromWizard { get; set; }
+
     /// <summary>Jour où le plan a été arrêté (statut <see cref="PlanStatus.Stopped"/>).</summary>
     public DateOnly? StoppedOn { get; set; }
 

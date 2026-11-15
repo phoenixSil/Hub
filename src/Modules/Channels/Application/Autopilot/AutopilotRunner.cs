@@ -125,7 +125,8 @@ internal sealed class AutopilotRunner(
         return onlyOldFormat ? query.Where(p => p.Format == null) : query;
     }
 
-    public async Task<Result<int>> RunAsync(bool force, CancellationToken ct = default)
+    /// <param name="planId">Aperçu d'une campagne pas encore démarrée : ses thèmes et piliers sont utilisés à la place du plan en cours.</param>
+    public async Task<Result<int>> RunAsync(bool force, CancellationToken ct = default, Guid? planId = null)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
@@ -148,7 +149,7 @@ internal sealed class AutopilotRunner(
         var planned = upcoming.Count(p => p.FromAutopilot && p.At > now);
         var slots = AutopilotSchedule.FreeSlots(now, settings.PostsPerWeek, planned, busy);
 
-        var (created, problems) = await FillAsync(db, settings, slots, now, ct);
+        var (created, problems) = await FillAsync(db, settings, slots, now, ct, planId);
 
         settings.LastRunAt = now;
         settings.LastRunSummary = Summary(created, problems);
@@ -158,6 +159,36 @@ internal sealed class AutopilotRunner(
 
         if (created > 0 && !settings.PublishWithoutApproval) await NotifyAsync(created, ct);
         return problems.Count > 0 && created == 0 ? Result<int>.Failure(settings.LastRunSummary) : Result<int>.Success(created);
+    }
+
+    /// <summary>
+    /// Rappel de fin de journée : les publications de demain qui attendent encore l'accord (un courriel par jour au plus).
+    /// </summary>
+    public async Task<int> RemindAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
+        var today = BusinessTime.Today(clock);
+        if (settings is null || settings.LastReminderOn == today) return 0;
+        var from = BusinessTime.FromLocal(today.AddDays(1).ToDateTime(TimeOnly.MinValue));
+        var to = BusinessTime.FromLocal(today.AddDays(2).ToDateTime(TimeOnly.MinValue));
+        var count = await db.Posts.CountAsync(p => p.Status == PostStatus.AwaitingApproval && p.ScheduledAt >= from && p.ScheduledAt < to, ct);
+        settings.LastReminderOn = today;
+        await db.SaveChangesAsync(ct);
+        if (count == 0) return 0;
+
+        var context = await source.GetAsync(ct);
+        if (string.IsNullOrWhiteSpace(context.AdminEmail)) return count;
+        var link = $"{(context.SiteUrl ?? "").TrimEnd('/')}/admin/marketing";
+        var html = $"""
+            <p>Bonjour,</p>
+            <p><strong>{count} publication(s)</strong> de {WebUtility.HtmlEncode(context.CompanyName)} doivent partir <strong>demain</strong> et attendent encore votre accord.</p>
+            <p>Sans accord, elles ne partiront pas.</p>
+            <p><a href="{WebUtility.HtmlEncode(link)}">Ouvrir le calendrier et tout approuver</a></p>
+            """;
+        var sent = await email.SendAsync(new EmailMessage(context.AdminEmail, $"Demain : {count} publication(s) attendent votre accord", html), ct);
+        if (sent.IsFailure) logger.LogWarning("Rappel de validation non envoyé : {Error}", sent.Error);
+        return count;
     }
 
     internal static string Summary(int created, IReadOnlyCollection<string> problems) =>
@@ -201,18 +232,20 @@ internal sealed class AutopilotRunner(
     /// (une panne en cours de route garde les précédentes), et l'avancement est visible dans le calendrier.
     /// </summary>
     private async Task<(int Created, List<string> Problems)> FillAsync(
-        ChannelsDbContext db, AutopilotSettings settings, IReadOnlyList<DateTimeOffset> slots, DateTimeOffset now, CancellationToken ct)
+        ChannelsDbContext db, AutopilotSettings settings, IReadOnlyList<DateTimeOffset> slots, DateTimeOffset now, CancellationToken ct, Guid? planId = null)
     {
         var created = 0;
         var problems = new List<string>();
         if (slots.Count == 0) return (0, problems);
-        progress.Start(tenant.TenantId, slots.Count, now);
+        // Campagne servie : l'aperçu demandé, sinon la campagne en cours.
+        var campaignId = planId ?? await db.MarketingPlans.AsNoTracking().Where(p => p.Status == PlanStatus.Active).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct);
+        progress.Start(tenant.TenantId, slots.Count, now, campaignId);
         try
         {
             var context = await source.GetAsync(ct);
             var history = await HistoryAsync(db, ct);
             var audiences = AutopilotService.ReadAudiences(settings.AudiencesJson);
-            var brief = await BriefAsync(db, slots, ct);
+            var brief = await BriefAsync(db, slots, ct, planId);
 
             // Variété : formats et scènes des dernières publications (même pas encore parues), à ne pas répéter.
             var recent = await db.Posts.AsNoTracking()
@@ -237,10 +270,20 @@ internal sealed class AutopilotRunner(
             var channels = AutopilotService.ReadChannels(settings.Channels);
             foreach (var item in plan.Value!)
             {
+                // Campagne arrêtée ou abandonnée pendant la préparation : on s'arrête là.
+                if (campaignId is { } cid && !await db.MarketingPlans.AsNoTracking().AnyAsync(
+                        p => p.Id == cid && (p.Status == PlanStatus.Active || (planId != null && p.Status == PlanStatus.Draft)), ct))
+                {
+                    problems.Add("campagne arrêtée pendant la préparation");
+                    break;
+                }
                 var post = await PrepareAsync(item, context, settings, channels, recentScenes,
                     memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
                 if (post is not null)
                 {
+                    // Aperçu d'une campagne pas encore démarrée : rien ne part avant le démarrage.
+                    if (planId is not null) post.Value.Post.Status = PostStatus.AwaitingApproval;
+                    post.Value.Post.PlanId = campaignId;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
@@ -339,9 +382,11 @@ internal sealed class AutopilotRunner(
     /// Plan marketing actif à cette date : l'étape en cours et le pilier de chaque créneau,
     /// choisi pour se rapprocher de la répartition visée sur l'étape.
     /// </summary>
-    private async Task<PlanBrief?> BriefAsync(ChannelsDbContext db, IReadOnlyList<DateTimeOffset> slots, CancellationToken ct)
+    private async Task<PlanBrief?> BriefAsync(ChannelsDbContext db, IReadOnlyList<DateTimeOffset> slots, CancellationToken ct, Guid? planId = null)
     {
-        var plan = await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Status == PlanStatus.Active, ct);
+        var plan = planId is { } id
+            ? await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct)
+            : await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Status == PlanStatus.Active, ct);
         if (plan is null || slots.Count == 0) return null;
         var day = AutopilotSchedule.LocalDay(slots[0]);
         var phase = PlanLogic.PhaseAt(PlanLogic.Phases(plan.PhasesJson), day);

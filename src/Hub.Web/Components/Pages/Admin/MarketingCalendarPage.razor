@@ -17,8 +17,9 @@
         <p class="muted">Tout ce qui va partir sur vos réseaux, jour par jour. Approuvez, modifiez ou remplacez en un clic.</p>
     </div>
     <div class="cal-head-actions">
-        <BusyButton Class="btn btn-outline btn-sm" OnClick="PrepareAsync" IsBusy="@(Preparing)" AnyBusy="busy" BusyText="Préparation…">Préparer les publications</BusyButton>
-        <a class="btn btn-primary btn-sm" href="/admin/publications/nouvelle">+ Nouvelle publication</a>
+        <a class="btn btn-primary btn-sm" href="/admin/marketing/nouvelle-campagne">Nouvelle campagne</a>
+        <a class="btn btn-outline btn-sm" href="/admin/publications/nouvelle">+ Publication à la main</a>
+        <BusyButton Class="btn btn-ghost btn-sm" OnClick="PrepareAsync" IsBusy="@(Preparing)" AnyBusy="busy" BusyText="Préparation…">Compléter la semaine</BusyButton>
     </div>
 </div>
 
@@ -176,6 +177,8 @@
     {
         monday = DefaultMonday(Today);
         await LoadAsync();
+        if (new Uri(Nav.Uri).Query.Contains("demarree=1"))
+            Show("Campagne démarrée : ses publications sont dans le calendrier. La semaine suivante sera préparée automatiquement.", false);
         poll = new Timer(_ => InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
     }
 
@@ -243,7 +246,7 @@
         {
             case HealthAction.Retry: await PrepareAsync(); break;
             case HealthAction.OpenChannels: Nav.NavigateTo("/admin/canaux"); break;
-            case HealthAction.CreateCampaign: Nav.NavigateTo("/admin/plan-marketing"); break;
+            case HealthAction.CreateCampaign: Nav.NavigateTo("/admin/marketing/nouvelle-campagne"); break;
             case HealthAction.OpenPosts: Nav.NavigateTo("/admin/publications"); break;
             case HealthAction.ResumeAutopilot: Nav.NavigateTo("/admin/pilote-automatique"); break;
         }

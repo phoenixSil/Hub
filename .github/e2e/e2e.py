@@ -193,6 +193,35 @@ def marketing_calendar(page):
     expect(page.locator(".cal-card.cal-ready").first).to_be_visible()
 
 
+@step("Nouvelle campagne : arrêt de l'ancienne, assistant en 3 écrans, aperçu de la semaine, démarrage avec tout approuvé")
+def campaign_wizard(page):
+    # Arrêter la campagne en cours (pilote en pause).
+    page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
+    page.locator(".plan-list-table button", has_text="Arrêter le plan").click()
+    page.locator("button", has_text="Oui, arrêter le plan").click()
+    expect(page.locator("text=Plan arrêté")).to_be_visible(timeout=15000)
+
+    page.goto(BASE + "/admin/marketing/nouvelle-campagne", wait_until="networkidle")
+    page.locator(".wiz-choice", has_text="Obtenir des demandes de devis").click()
+    page.locator(".wiz-choice", has_text="Six mois").click()
+    page.locator("button", has_text="Continuer").click()
+    page.locator(".wiz-choice", has_text="Intensif").click()
+    page.locator("button", has_text="Voir la première semaine").click()
+    # L'aperçu se prépare avec une barre de progression, puis les boutons de démarrage apparaissent.
+    expect(page.locator("button", has_text="Démarrer et tout approuver")).to_be_visible(timeout=300000)
+    expect(page.locator(".wiz-preview .cal-card").first).to_be_visible()
+    assert page.locator(".wiz-preview .cal-card").count() >= 7, "l'aperçu d'une semaine intensive doit compter au moins 7 publications"
+    page.locator("button", has_text="Démarrer et tout approuver").click()
+    page.wait_for_url("**/admin/marketing?demarree=1", timeout=30000)
+    expect(page.locator(".alert-success")).to_contain_text("Campagne démarrée")
+    expect(page.locator(".cal-approve")).to_have_count(0)
+
+    page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
+    expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
+    expect(page.locator(".plan-status")).to_contain_text("Demandes de devis")
+    expect(page.locator(".plan-status")).to_contain_text("14 publications par semaine")
+
+
 @step("Carte-cadeau : demandée sur le site, payée, envoyée puis utilisée")
 def gift_card(page):
     page.goto(BASE + "/carte-cadeau", wait_until="networkidle")
@@ -237,6 +266,8 @@ with sync_playwright() as p:
     legacy_redirects(page)
     anchor_offset(page)
     marketing_plan(page)
+    marketing_calendar(page)
+    campaign_wizard(page)
     gift_card(page)
     browser.close()
 
@@ -244,4 +275,4 @@ if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, carte-cadeau")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, calendrier, nouvelle campagne, carte-cadeau")

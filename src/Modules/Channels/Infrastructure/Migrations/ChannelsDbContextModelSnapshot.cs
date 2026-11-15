@@ -138,6 +138,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<DateOnly?>("LastReminderOn")
+                        .HasColumnType("date");
+
                     b.Property<DateTimeOffset?>("LastRunAt")
                         .HasColumnType("datetimeoffset");
 
@@ -219,6 +222,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
 
                     b.Property<DateOnly>("EndsOn")
                         .HasColumnType("date");
+
+                    b.Property<bool>("FromWizard")
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("InsightsAt")
                         .HasColumnType("datetimeoffset");
@@ -352,6 +358,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<string>("Pillar")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid?>("PlanId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("datetimeoffset");
