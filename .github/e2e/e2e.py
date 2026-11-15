@@ -266,6 +266,8 @@ with sync_playwright() as p:
     legacy_redirects(page)
     anchor_offset(page)
     marketing_plan(page)
+    marketing_calendar(page)
+    campaign_wizard(page)
     gift_card(page)
     browser.close()
 
@@ -273,4 +275,4 @@ if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, carte-cadeau")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, calendrier, nouvelle campagne, carte-cadeau")
