@@ -71,11 +71,13 @@ public class AutopilotPlannerTests
     private sealed class FakeAi(bool available, string json) : IAiTextGenerator
     {
         public AiJsonRequest? Last { get; private set; }
+        public List<AiJsonRequest> Calls { get; } = [];
         public bool IsAvailable => available;
         public string ModelName => "fake";
         public Task<Result<AiJsonResponse>> GenerateJsonAsync(AiJsonRequest request, CancellationToken ct = default)
         {
             Last = request;
+            Calls.Add(request);
             return Task.FromResult(Result<AiJsonResponse>.Success(new AiJsonResponse(json, "fake-model", 10, 20)));
         }
     }
@@ -106,6 +108,24 @@ public class AutopilotPlannerTests
         Assert.Equal(19, TimeZoneInfo.ConvertTime(plan[0].At, BusinessTime.Zone).Hour);
         Assert.Equal(10, TimeZoneInfo.ConvertTime(plan[1].At, BusinessTime.Zone).Hour);
         Assert.Equal("-15 %", plan.Single(p => p.LinkPath == "/promo").Facts);
+    }
+
+    [Fact]
+    public async Task Un_rythme_soutenu_est_prepare_par_lots_de_sept_avec_assez_de_place_pour_la_reponse()
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            publications = Enumerable.Range(1, 7).Select(i => new { @public = "Familles occupées", sujet = $"Sujet {i}", angle = "Angle", lien = "/promo", style = "Service" }).ToArray(),
+        });
+        var ai = new FakeAi(true, json);
+        var slots = AutopilotSchedule.FreeSlots(DateTimeOffset.UtcNow, 21, 0, new Dictionary<DateOnly, int>());
+        var plan = (await new AutopilotPlanner(ai).PlanAsync(Request(1) with { Slots = slots })).Value!;
+
+        Assert.Equal(3, ai.Calls.Count);
+        Assert.Equal(21, plan.Count);
+        Assert.All(ai.Calls, c => Assert.True(c.MaxTokens >= 6000));
+        Assert.Contains("Sujets déjà choisis pour cette semaine", ai.Calls[1].User);
+        Assert.DoesNotContain("Sujets déjà choisis", ai.Calls[0].User);
     }
 
     [Fact]
