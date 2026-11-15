@@ -38,7 +38,9 @@ public sealed record AutopilotPlanRequest(
     DateTimeOffset Now,
     PlanBrief? Plan = null,
     // Format publicitaire de chaque créneau (voir CreativeFormats) ; choisi automatiquement s'il est vide.
-    IReadOnlyList<string>? Formats = null);
+    IReadOnlyList<string>? Formats = null,
+    // Sujets déjà choisis pour cette même semaine (préparation en plusieurs lots) : à ne pas répéter.
+    IReadOnlyList<string>? AlreadyPlanned = null);
 
 public interface IAutopilotPlanner
 {
@@ -65,8 +67,41 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         r = WithFormats(r, Random.Shared);
 
         if (!ai.IsAvailable) return Result<IReadOnlyList<PlannedPost>>.Success(Rotation(r, audiences));
+        if (r.Slots.Count <= BatchSize) return await PlanBatchAsync(r, audiences, ct);
 
-        var response = await ai.GenerateJsonAsync(new AiJsonRequest(SystemPrompt(r), UserPrompt(r, audiences), Schema, 3000), ct);
+        // Rythme soutenu (plus de 7 par semaine) : l'IA choisit les sujets par lots de 7, pour que sa réponse
+        // reste complète ; chaque lot connaît les sujets déjà choisis pour ne pas les répéter.
+        var all = new List<PlannedPost>();
+        string? lastError = null;
+        for (var start = 0; start < r.Slots.Count; start += BatchSize)
+        {
+            var n = Math.Min(BatchSize, r.Slots.Count - start);
+            var part = r with
+            {
+                Slots = r.Slots.Skip(start).Take(n).ToList(),
+                Formats = r.Formats!.Skip(start).Take(n).ToList(),
+                Plan = r.Plan is { SlotPillars.Count: > 0 } brief
+                    ? brief with { SlotPillars = Enumerable.Range(start, n).Select(i => SlotPillar(r, i)!).ToList() }
+                    : r.Plan,
+                AlreadyPlanned = [.. r.AlreadyPlanned ?? [], .. all.Select(p => p.Topic)],
+            };
+            var batch = await PlanBatchAsync(part, audiences, ct);
+            if (batch.IsFailure) lastError = batch.Error;
+            else all.AddRange(batch.Value!);
+        }
+        return all.Count == 0
+            ? Result<IReadOnlyList<PlannedPost>>.Failure(lastError ?? "L'IA n'a proposé aucun sujet.")
+            : Result<IReadOnlyList<PlannedPost>>.Success(all);
+    }
+
+    /// <summary>Au plus 7 créneaux par appel à l'IA : au-delà, sa réponse risque d'être coupée.</summary>
+    public const int BatchSize = 7;
+
+    private async Task<Result<IReadOnlyList<PlannedPost>>> PlanBatchAsync(AutopilotPlanRequest r, IReadOnlyList<AutopilotAudience> audiences, CancellationToken ct)
+    {
+        // Assez de place pour chaque sujet (angle détaillé, format, pilier) : la réponse ne doit jamais être coupée.
+        var maxTokens = Math.Clamp(1500 + 700 * r.Slots.Count, 3000, 8000);
+        var response = await ai.GenerateJsonAsync(new AiJsonRequest(SystemPrompt(r), UserPrompt(r, audiences), Schema, maxTokens), ct);
         if (response.IsFailure) return Result<IReadOnlyList<PlannedPost>>.Failure(response.Error!);
 
         try
@@ -214,6 +249,11 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
             sb.AppendLine(r.Plan?.Objective == PlanObjective.Visibility
                 ? "Fais davantage de ce qui atteint le plus de monde et suscite des interactions, en gardant un peu de variété pour continuer d'apprendre."
                 : "Fais davantage de ce qui apporte des demandes, en gardant un peu de variété pour continuer d'apprendre.");
+        }
+        if (r.AlreadyPlanned is { Count: > 0 } chosen)
+        {
+            sb.AppendLine().AppendLine("Sujets déjà choisis pour cette semaine (ne les répète pas, varie les angles) :");
+            foreach (var t in chosen) sb.AppendLine($"- {t}");
         }
         if (!string.IsNullOrWhiteSpace(r.Guidelines))
             sb.AppendLine().AppendLine("Consignes de l'entreprise :").AppendLine(r.Guidelines);
