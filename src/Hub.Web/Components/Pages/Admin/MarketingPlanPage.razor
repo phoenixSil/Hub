@@ -4,15 +4,15 @@
 @inject TimeProvider Clock
 @inject IJSRuntime Js
 
-<PageTitle>Plan marketing</PageTitle>
+<PageTitle>Campagne</PageTitle>
+
+<MarketingTabs />
 
 <div class="admin-head">
     <div>
-        <h1>Plan marketing</h1>
+        <h1>Campagne</h1>
         <p class="muted">
-            L'objectif, les étapes, les thèmes et la répartition des contenus pour les prochains mois.
-            Le pilote automatique suit ce plan chaque semaine. Les chiffres des réseaux sont relevés chaque jour,
-            et les ajustements proposés ne s'appliquent qu'avec votre accord.
+            Où en est votre campagne, ses thèmes et ses chiffres. Les publications elles-mêmes sont dans le <a href="/admin/marketing">calendrier</a>.
         </p>
     </div>
     @if (view is { Status: PlanStatus.Active })
@@ -40,15 +40,12 @@ else
     {
         <div class="admin-card plan-list">
             <div class="plan-list-head">
-                <h2>Mes plans</h2>
-                @if (!creating)
-                {
-                    <button class="btn btn-outline btn-sm" @onclick="StartCreating" disabled="@busy">Nouveau plan</button>
-                }
+                <h2>Mes campagnes</h2>
+                <a class="btn btn-outline btn-sm" href="/admin/marketing/nouvelle-campagne">Nouvelle campagne</a>
             </div>
-            <p class="muted small">Un seul plan tourne à la fois. Les autres attendent en réserve : lancez-en un quand aucun plan n'est en cours, ou programmez-le pour qu'il démarre tout seul à la fin du plan en cours.</p>
+            <p class="muted small">Une seule campagne tourne à la fois. Les autres attendent en réserve et peuvent prendre le relais toutes seules à la fin de la campagne en cours.</p>
             <table class="admin-table plan-list-table">
-                <thead><tr><th>Plan</th><th>Statut</th><th>Période</th><th class="num">Par semaine</th><th></th></tr></thead>
+                <thead><tr><th>Campagne</th><th>Statut</th><th>Période</th><th class="num">Par semaine</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var p in plans)
                     {
@@ -56,8 +53,8 @@ else
                             <td><strong>@p.Name</strong></td>
                             <td>
                                 <span class="status status-@StatusClass(p.Status)">@StatusLabel(p.Status)</span>
-                                @if (p.StartsAutomatically) { <br /><span class="muted small">Démarre tout seul le @AdminFormat.Day(p.StartsOn)</span> }
-                                @if (p.StoppedOn is { } stopped) { <br /><span class="muted small">Arrêté le @AdminFormat.Day(stopped)</span> }
+                                @if (p.StartsAutomatically) { <br /><span class="muted small">Démarre toute seule le @AdminFormat.Day(p.StartsOn)</span> }
+                                @if (p.StoppedOn is { } stopped) { <br /><span class="muted small">Arrêtée le @AdminFormat.Day(stopped)</span> }
                             </td>
                             <td>@AdminFormat.Day(p.StartsOn) → @AdminFormat.Day(p.EndsOn)</td>
                             <td class="num">@p.PostsPerWeek</td>
@@ -68,7 +65,7 @@ else
                                 }
                                 else if (p.Status == PlanStatus.Active && !stopping)
                                 {
-                                    <button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter la campagne</button>
                                 }
                                 else
                                 {
@@ -82,40 +79,12 @@ else
         </div>
     }
 
-    @if (plans.Count == 0 || creating)
+    @if (plans.Count == 0)
     {
         <div class="admin-card plan-create">
-            <h2>Créer le plan « Visibilité sur les réseaux »</h2>
-            <p>Trois étapes sur 13 semaines : <strong>se faire connaître</strong>, <strong>accélérer</strong>, <strong>amplifier</strong>.
-               Les thèmes suivent la saison et quatre piliers de contenu se partagent les publications :
-               conseiller 35 %, montrer 25 %, rassurer 20 % et proposer 20 %. Tout reste modifiable.</p>
-            @if (activePlan is not null)
-            {
-                <p class="muted">Le plan « @activePlan.Name » est en cours jusqu'au @AdminFormat.Day(activePlan.EndsOn) : ce nouveau plan sera mis <strong>en réserve</strong>.</p>
-                <label class="check"><input type="checkbox" @bind="afterCurrent" /> Le démarrer automatiquement à la fin du plan en cours (le @AdminFormat.Day(activePlan.EndsOn.AddDays(1)))</label>
-            }
-            <div class="field-row">
-                @if (activePlan is null || !afterCurrent)
-                {
-                    <div class="field">
-                        <label for="plan-start">Début</label>
-                        <input id="plan-start" type="date" @bind="startsOn" />
-                    </div>
-                }
-                <div class="field">
-                    <label for="plan-rythm">Publications par semaine</label>
-                    <select id="plan-rythm" @bind="postsPerWeek">
-                        @for (var n = 3; n <= AutopilotSchedule.MaxPostsPerWeek; n++) { var x = n; <option value="@x">@RythmLabel(x)</option> }
-                    </select>
-                </div>
-            </div>
-            <div class="actions">
-                <BusyButton OnClick="CreateAsync" IsBusy="@(action == "create")" BusyText="Création…">Créer le plan</BusyButton>
-                @if (plans.Count > 0)
-                {
-                    <button class="btn btn-ghost btn-sm" @onclick="() => creating = false" disabled="@busy">Annuler</button>
-                }
-            </div>
+            <h2>Aucune campagne pour l'instant</h2>
+            <p>Trois questions, puis vous voyez la première semaine de publications avant de démarrer.</p>
+            <a class="btn btn-primary" href="/admin/marketing/nouvelle-campagne">Créer une campagne</a>
         </div>
     }
 
@@ -133,16 +102,24 @@ else
             <span class="plan-status-actions">
                 @if (activePlan is null)
                 {
-                    <BusyButton OnClick="ActivateAsync" IsBusy="@(action == "activate")" BusyText="Lancement…">Lancer le plan</BusyButton>
+                    <BusyButton OnClick="ActivateAsync" IsBusy="@(action == "activate")" BusyText="Lancement…">Démarrer la campagne</BusyButton>
                 }
                 <button class="btn btn-ghost btn-sm" @onclick="DeleteDraftAsync" disabled="@busy">Supprimer</button>
             </span>
         }
         else if (v.Status == PlanStatus.Active && !stopping)
         {
-            <span class="plan-status-actions"><button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button></span>
+            <span class="plan-status-actions">
+                <BusyButton Class="btn btn-outline btn-sm" OnClick="TogglePauseAsync" IsBusy="@(action == "pause")" AnyBusy="busy" BusyText="…">@(paused ? "Reprendre" : "Mettre en pause")</BusyButton>
+                <button class="btn btn-outline-danger btn-sm" @onclick="StartStopping" disabled="@busy">Arrêter la campagne</button>
+            </span>
         }
     </div>
+
+    @if (v.Status == PlanStatus.Active && paused)
+    {
+        <div class="alert alert-info">Campagne en pause : aucune nouvelle publication n'est préparée. Celles déjà prévues dans le calendrier partent toujours.</div>
+    }
 
     @if (v.Status == PlanStatus.Draft)
     {
@@ -150,19 +127,19 @@ else
         <div class="alert alert-info plan-reserve">
             @if (activePlan is not null)
             {
-                <p><strong>Plan en réserve.</strong> Le plan « @activePlan.Name » est en cours jusqu'au @AdminFormat.Day(activePlan.EndsOn) :
-                   celui-ci ne peut pas être lancé tant qu'il tourne (jamais deux plans en même temps). Arrêtez le plan en cours,
-                   ou programmez celui-ci pour qu'il prenne le relais tout seul.</p>
+                <p><strong>Campagne en réserve.</strong> La campagne « @activePlan.Name » est en cours jusqu'au @AdminFormat.Day(activePlan.EndsOn) :
+                   celle-ci ne peut pas démarrer tant qu'elle tourne (jamais deux campagnes en même temps). Arrêtez la campagne en cours,
+                   ou programmez celle-ci pour qu'elle prenne le relais toute seule.</p>
             }
             else
             {
-                <p>En lançant le plan, le pilote automatique est activé au rythme du plan. Facebook et Instagram sont utilisés s'ils sont connectés.
+                <p>Au démarrage, les publications de la campagne sont préparées à son rythme et apparaissent dans le calendrier.
                    Pendant le premier mois, chaque publication attend votre accord.</p>
             }
             <label class="check">
                 <input type="checkbox" checked="@(selected?.StartsAutomatically == true)" disabled="@busy" @onchange="ToggleAutoStartAsync" />
                 @(activePlan is not null
-                    ? $"Démarrer automatiquement à la fin du plan en cours (le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))})"
+                    ? $"Démarrer automatiquement à la fin de la campagne en cours (le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))})"
                     : $"Démarrer automatiquement à sa date de début (le {AdminFormat.Day(v.StartsOn)})")
             </label>
         </div>
@@ -171,16 +148,16 @@ else
     @if (v.Status == PlanStatus.Active && stopping)
     {
         <div class="admin-card plan-stop">
-            <h2>Arrêter le plan ?</h2>
-            <p>Le plan passe dans l'historique avec ses chiffres. Les publications du pilote <strong>pas encore parues</strong> (à valider ou programmées) sont annulées.
-               Les publications déjà parues et celles écrites à la main ne sont pas touchées. Un plan arrêté ne se relance pas : vous pourrez en lancer un autre.</p>
+            <h2>Arrêter la campagne ?</h2>
+            <p>La campagne passe dans l'historique avec ses chiffres. Les publications du pilote <strong>pas encore parues</strong> (à valider ou programmées) sont annulées.
+               Les publications déjà parues et celles écrites à la main ne sont pas touchées. Une campagne arrêtée ne se relance pas : vous pourrez en créer une autre.</p>
             <fieldset class="plan-stop-choice">
                 <legend>Ensuite, le pilote automatique :</legend>
-                <label class="check"><input type="radio" name="after-stop" checked="@pauseAutopilot" @onchange="() => pauseAutopilot = true" /> se met en pause (plus aucune publication automatique)</label>
-                <label class="check"><input type="radio" name="after-stop" checked="@(!pauseAutopilot)" @onchange="() => pauseAutopilot = false" /> continue sans plan, à son rythme actuel</label>
+                <label class="check"><input type="radio" name="after-stop" checked="@pauseAutopilot" @onchange="() => pauseAutopilot = true" /> se met en pause (plus aucune publication préparée)</label>
+                <label class="check"><input type="radio" name="after-stop" checked="@(!pauseAutopilot)" @onchange="() => pauseAutopilot = false" /> continue sans campagne, à son rythme actuel</label>
             </fieldset>
             <div class="actions">
-                <BusyButton Class="btn btn-danger" OnClick="StopAsync" IsBusy="@(action == "stop")" BusyText="Arrêt…">Oui, arrêter le plan</BusyButton>
+                <BusyButton Class="btn btn-danger" OnClick="StopAsync" IsBusy="@(action == "stop")" BusyText="Arrêt…">Oui, arrêter la campagne</BusyButton>
                 <button class="btn btn-ghost btn-sm" @onclick="() => stopping = false" disabled="@busy">Annuler</button>
             </div>
         </div>
@@ -195,7 +172,7 @@ else
             {
                 <div class="plan-proposal">
                     <div>
-                        <strong>Cibles de fin de plan</strong>
+                        <strong>Cibles de fin de campagne</strong>
                         <p class="muted">@t.WeeklyReach.ToString("N0", Fr) personnes atteintes par semaine · @t.Followers.ToString("N0", Fr) abonnés · @Pct(t.EngagementRate) d'interaction</p>
                     </div>
                     <BusyButton OnClick="ApproveTargetsAsync" IsBusy="@(action == "targets")" BusyText="…">Approuver les cibles</BusyButton>
@@ -239,12 +216,12 @@ else
     </div>
     @if (v.Baseline is null && v.Status == PlanStatus.Active)
     {
-        <p class="muted small">Le point de départ est mesuré après la première semaine du plan. Des cibles réalistes vous sont ensuite proposées.</p>
+        <p class="muted small">Le point de départ est mesuré après la première semaine de la campagne. Des cibles réalistes vous sont ensuite proposées.</p>
     }
     else if (v.Expected is { } e)
     {
         <p class="muted small">Trajectoire visée aujourd'hui : @e.WeeklyReach.ToString("N0", Fr) personnes atteintes par semaine et @e.Followers.ToString("N0", Fr) abonnés.
-            @(v.OnTrack == true ? "Le plan est dans les temps." : "Le plan prend du retard : le pilote mise davantage sur ce qui atteint le plus de monde.")</p>
+            @(v.OnTrack == true ? "La campagne est dans les temps." : "La campagne prend du retard : les publications misent davantage sur ce qui atteint le plus de monde.")</p>
     }
 
     <div class="admin-card">
@@ -270,7 +247,7 @@ else
             <h2>Semaine par semaine</h2>
             @if (v.Weeks.Count == 0)
             {
-                <p class="muted">Les chiffres apparaîtront dès la première semaine du plan.</p>
+                <p class="muted">Les chiffres apparaîtront dès la première semaine de la campagne.</p>
             }
             else
             {
@@ -308,14 +285,14 @@ else
                     }
                 </tbody>
             </table>
-            <p class="muted small">La part réelle compte les publications du plan déjà parues ou prévues.</p>
+            <p class="muted small">La part réelle compte les publications de la campagne déjà parues ou prévues.</p>
         </div>
     </div>
 
     @if (form is not null && v.Status is PlanStatus.Draft or PlanStatus.Active)
     {
         <details class="admin-card plan-edit" open="@(v.Status == PlanStatus.Draft)">
-            <summary><h2>Modifier le plan</h2></summary>
+            <summary><h2>Réglages avancés : étapes, thèmes et répartition</h2></summary>
             <div class="field-row">
                 <div class="field">
                     <label for="plan-name">Nom</label>
@@ -357,19 +334,28 @@ else
                 </div>
             }
             <div class="actions">
-                <BusyButton OnClick="SaveAsync" IsBusy="@(action == "save")" BusyText="Enregistrement…">Enregistrer le plan</BusyButton>
+                <BusyButton OnClick="SaveAsync" IsBusy="@(action == "save")" BusyText="Enregistrement…">Enregistrer</BusyButton>
             </div>
         </details>
     }
+
+    <div class="admin-card plan-advanced">
+        <h2>Autres réglages</h2>
+        <ul>
+            <li><a href="/admin/pilote-automatique">Publics visés, heures, consignes d'écriture et réseaux</a></li>
+            <li><a href="/admin/planche">Planche d'essai des visuels (styles d'images)</a></li>
+            <li><a href="/admin/publications">Liste de toutes les publications</a></li>
+        </ul>
+    </div>
 
     @if (v.Status == PlanStatus.Active && !stopping)
     {
         <div class="admin-card plan-danger">
             <div>
-                <h2>Arrêter ce plan</h2>
-                <p class="muted small">Le plan passe dans l'historique et ses publications à venir sont annulées. Vous choisissez ensuite si le pilote se met en pause ou continue.</p>
+                <h2>Arrêter cette campagne</h2>
+                <p class="muted small">Elle passe dans l'historique et ses publications à venir sont annulées.</p>
             </div>
-            <button class="btn btn-outline-danger" @onclick="StartStopping" disabled="@busy">Arrêter le plan</button>
+            <button class="btn btn-outline-danger" @onclick="StartStopping" disabled="@busy">Arrêter la campagne</button>
         </div>
     }
     }
@@ -385,6 +371,7 @@ else
     private bool afterCurrent;
     private bool stopping;
     private bool pauseAutopilot = true;
+    private bool paused;
     private IReadOnlyDictionary<string, string>? errors;
     private bool loaded;
     private bool creating;
@@ -413,6 +400,7 @@ else
         view = selectedId is { } sel ? await Plans.GetAsync(sel) : await Plans.GetAsync();
         if (reloadForm) form = view is null ? null : await Plans.GetFormAsync(view.Id);
         if (view?.Status != PlanStatus.Active) stopping = false;
+        paused = await Plans.IsPausedAsync();
         loaded = true;
     }
 
@@ -423,6 +411,11 @@ else
         errors = null;
         await LoadAsync();
     }
+
+    private Task TogglePauseAsync() => RunAsync("pause", "Enregistrement…", async () =>
+        (await Plans.SetPausedAsync(!paused), paused
+            ? "Campagne reprise : la semaine est complétée tout de suite."
+            : "Campagne en pause : plus aucune nouvelle publication n'est préparée."));
 
     private async Task StartStopping()
     {
@@ -452,15 +445,15 @@ else
     });
 
     private Task ActivateAsync() => RunAsync("activate", "Lancement du plan…", async () =>
-        (await Plans.ActivateAsync(view!.Id), "Plan lancé : le pilote automatique le suit dès sa prochaine préparation. Les publications vous attendent dans « Publications »."));
+        (await Plans.ActivateAsync(view!.Id), "Campagne démarrée : ses publications sont en préparation et apparaissent dans le calendrier."));
 
     private Task StopAsync() => RunAsync("stop", "Arrêt du plan…", async () =>
     {
         var r = await Plans.StopAsync(view!.Id, pauseAutopilot);
         if (r.IsSuccess) stopping = false;
         return (r, pauseAutopilot
-            ? "Plan arrêté : il est dans l'historique, ses publications à venir sont annulées et le pilote automatique est en pause."
-            : "Plan arrêté : il est dans l'historique, ses publications à venir sont annulées. Le pilote continue sans plan.");
+            ? "Campagne arrêtée : elle est dans l'historique, ses publications à venir sont annulées et la préparation est en pause."
+            : "Campagne arrêtée : elle est dans l'historique, ses publications à venir sont annulées. La préparation continue sans campagne.");
     });
 
     private async Task ToggleAutoStartAsync(ChangeEventArgs e)
@@ -468,22 +461,22 @@ else
         var on = e.Value is true || string.Equals(e.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
         await RunAsync("autostart", "Enregistrement…", async () =>
             (await Plans.SetAutoStartAsync(view!.Id, on), on
-                ? "Ce plan démarrera tout seul" + (activePlan is null ? " à sa date de début." : $" le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))}, à la fin du plan en cours.")
-                : "Démarrage automatique annulé : le plan reste en réserve."));
+                ? "Cette campagne démarrera toute seule" + (activePlan is null ? " à sa date de début." : $" le {AdminFormat.Day(activePlan.EndsOn.AddDays(1))}, à la fin de la campagne en cours.")
+                : "Démarrage automatique annulé : la campagne reste en réserve."));
     }
 
     private Task DeleteDraftAsync() => RunAsync("delete", "Suppression du plan…", async () =>
     {
         var r = await Plans.DeleteDraftAsync(view!.Id);
         if (r.IsSuccess) selectedId = null;
-        return (r, "Plan supprimé.");
+        return (r, "Campagne supprimée.");
     });
 
     private Task SaveAsync() => RunAsync("save", "Enregistrement du plan…", async () =>
     {
         var r = await Plans.SaveAsync(view!.Id, form!);
         errors = r.FieldErrors;
-        return (r, "Plan enregistré.");
+        return (r, "Campagne enregistrée.");
     }, reloadForm: false);
 
     private Task ApproveTargetsAsync() => RunAsync("targets", "Enregistrement des cibles…", async () =>
@@ -532,9 +525,9 @@ else
     private string StatusLabel(PlanStatus s) => s switch
     {
         PlanStatus.Active => "En cours",
-        PlanStatus.Draft => activePlan is null ? "Brouillon" : "En réserve",
-        PlanStatus.Stopped => "Arrêté",
-        _ => "Terminé",
+        PlanStatus.Draft => activePlan is null ? "Pas démarrée" : "En réserve",
+        PlanStatus.Stopped => "Arrêtée",
+        _ => "Terminée",
     };
 
     private static string StatusClass(PlanStatus s) => s switch

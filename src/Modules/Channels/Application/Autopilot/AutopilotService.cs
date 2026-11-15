@@ -208,7 +208,6 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
     : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan RunEvery = TimeSpan.FromHours(20);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -243,9 +242,26 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
         }
     }
 
+    /// <summary>
+    /// Rendez-vous de la semaine : le jeudi à 18 h (heure de l'entreprise), la semaine suivante est préparée.
+    /// Filet de sécurité : jamais plus de 7 jours sans préparation.
+    /// </summary>
+    public static DateTimeOffset LastPreparationTime(DateTimeOffset now)
+    {
+        var local = TimeZoneInfo.ConvertTime(now, Hub.SharedKernel.Time.BusinessTime.Zone);
+        var day = DateOnly.FromDateTime(local.DateTime);
+        var back = ((int)day.DayOfWeek - (int)DayOfWeek.Thursday + 7) % 7;
+        var thursday = day.AddDays(-back);
+        var at = Hub.SharedKernel.Time.BusinessTime.FromLocal(thursday.ToDateTime(new TimeOnly(18, 0)));
+        return at > now ? Hub.SharedKernel.Time.BusinessTime.FromLocal(thursday.AddDays(-7).ToDateTime(new TimeOnly(18, 0))) : at;
+    }
+
     private async Task RunDueAsync(CancellationToken ct)
     {
-        var limit = clock.GetUtcNow() - RunEvery;
+        var now = clock.GetUtcNow();
+        var weekly = LastPreparationTime(now);
+        var safety = now - TimeSpan.FromDays(7);
+        var limit = weekly > safety ? weekly : safety;
         List<Guid> due;
         await using (var scope = scopes.CreateAsyncScope())
         {

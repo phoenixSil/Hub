@@ -69,4 +69,31 @@ public class MarketingCalendarTests
         Assert.True(progress.Get(tenant)!.Finished);
         Assert.Null(progress.Get(Guid.NewGuid()));
     }
+
+    [Fact]
+    public void Le_jeudi_toute_la_semaine_suivante_est_preparee_au_rythme_de_la_campagne()
+    {
+        // Jeudi 19 novembre : jusqu'au dimanche 29 (semaine suivante complète).
+        Assert.Equal(new DateOnly(2026, 11, 29), Hub.Modules.Channels.Application.Autopilot.AutopilotSchedule.HorizonEnd(new DateOnly(2026, 11, 19)));
+        // Lundi 16 : jusqu'au dimanche 22.
+        Assert.Equal(new DateOnly(2026, 11, 22), Hub.Modules.Channels.Application.Autopilot.AutopilotSchedule.HorizonEnd(new DateOnly(2026, 11, 16)));
+
+        var thursday = At(19, 18);
+        var none = new Dictionary<DateOnly, int>();
+        var slots = Hub.Modules.Channels.Application.Autopilot.AutopilotSchedule.WeekSlots(thursday, 7, none, none)
+            .Select(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s, BusinessTime.Zone).DateTime)).ToList();
+        // Fin de cette semaine (ven, sam, dim : 3 jours) puis la semaine suivante complète (7).
+        Assert.Equal(3, slots.Count(d => d <= new DateOnly(2026, 11, 22)));
+        Assert.Equal(7, slots.Count(d => d >= new DateOnly(2026, 11, 23)));
+
+        // Ce qui est déjà prévu par le pilote n'est pas refait.
+        var planned = Enumerable.Range(23, 7).ToDictionary(d => new DateOnly(2026, 11, d), _ => 1);
+        var again = Hub.Modules.Channels.Application.Autopilot.AutopilotSchedule.WeekSlots(thursday, 7, planned, planned);
+        Assert.Equal(3, again.Count);
+
+        // Rendez-vous du jeudi 18 h : le vendredi, le dernier rendez-vous est la veille ; le jeudi à 17 h, celui de la semaine d'avant.
+        var friday = At(20, 9);
+        Assert.Equal(At(19, 18), Hub.Modules.Channels.Application.Autopilot.AutopilotWorker.LastPreparationTime(friday));
+        Assert.Equal(At(12, 18), Hub.Modules.Channels.Application.Autopilot.AutopilotWorker.LastPreparationTime(At(19, 17)));
+    }
 }

@@ -106,4 +106,21 @@ internal sealed partial class MarketingPlanService
         await db.SaveChangesAsync(ct);
         return Result.Success();
     }
+
+    public async Task<bool> IsPausedAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return !await db.AutopilotSettings.AnyAsync(s => s.Enabled, ct);
+    }
+
+    public async Task<Result> SetPausedAsync(bool paused, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var settings = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
+        if (settings is null) return Result.Failure("Créez d'abord une campagne.");
+        settings.Enabled = !paused;
+        await db.SaveChangesAsync(ct);
+        if (!paused) trigger.Request(tenant.TenantId); // reprise : la semaine est complétée tout de suite
+        return Result.Success();
+    }
 }

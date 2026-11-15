@@ -8,7 +8,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 5. Le formulaire de devis public refuse un envoi vide et affiche les erreurs.
 6. Les anciennes adresses redirigent (301) ; une adresse inconnue reste en 404.
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
-8. Le plan marketing se crée, ses publications apparaissent dans le calendrier et s'approuvent d'un clic, se lance (le pilote passe au rythme du plan), relève les chiffres ; un plan en réserve ne se lance pas tant qu'un plan tourne.
+8. Marketing : assistant de campagne avec aperçu, calendrier (remplacer, retirer, tout approuver), campagne en réserve, pause, arrêt, campagne intensive.
 9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
 
 Usage : python3 e2e.py http://localhost:5080
@@ -135,81 +135,96 @@ def anchor_offset(page):
     assert title["y"] >= header["y"] + header["height"] - 1, f"titre à {title['y']:.0f}px, en-tête jusqu'à {header['y'] + header['height']:.0f}px"
 
 
-@step("Plan marketing : créé, lancé, chiffres relevés")
+def run_wizard(page, objective, duration, intensity):
+    page.goto(BASE + "/admin/marketing/nouvelle-campagne", wait_until="networkidle")
+    page.locator(".wiz-choice", has_text=objective).click()
+    page.locator(".wiz-choice", has_text=duration).click()
+    page.locator("button", has_text="Continuer").click()
+    page.locator(".wiz-choice", has_text=intensity).click()
+
+
+@step("Nouvelle campagne : assistant en 3 écrans, aperçu de la première semaine, démarrage")
 def marketing_plan(page):
+    run_wizard(page, "Être plus visible", "Trois mois", "Normal")
+    page.locator("button", has_text="Voir la première semaine").click()
+    # L'aperçu se prépare avec une barre de progression, puis les boutons de démarrage apparaissent.
+    expect(page.locator("button", has_text="Démarrer (je validerai plus tard)")).to_be_visible(timeout=300000)
+    expect(page.locator(".wiz-preview .cal-card").first).to_be_visible()
+    page.locator("button", has_text="Démarrer (je validerai plus tard)").click()
+    page.wait_for_url("**/admin/marketing?demarree=1", timeout=30000)
+    expect(page.locator(".alert-success")).to_contain_text("Campagne démarrée")
+
     page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
-    page.wait_for_timeout(800)
-    if page.locator("text=Créer le plan").count() > 0:
-        page.locator("button", has_text="Créer le plan").click()
-        expect(page.locator("text=Plan créé en brouillon")).to_be_visible(timeout=15000)
-    if page.locator("button", has_text="Lancer le plan").count() > 0:
-        page.locator("button", has_text="Lancer le plan").click()
-        expect(page.locator("text=Plan lancé")).to_be_visible(timeout=15000)
     expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
     expect(page.locator(".plan-phase")).to_have_count(3)
     expect(page.locator(".plan-mix tbody tr")).to_have_count(4)
     page.locator("button", has_text="Relever les chiffres").click()
     expect(page.locator(".alert-success, .alert-error").first).to_be_visible(timeout=30000)
 
-    # Plan en réserve : créé pendant le plan en cours, il ne peut pas être lancé, puis il est supprimé.
-    page.locator("button", has_text="Nouveau plan").click()
-    page.locator("button", has_text="Créer le plan").click()
-    expect(page.locator("text=Plan créé en réserve")).to_be_visible(timeout=15000)
-    expect(page.locator(".plan-status .status-approval")).to_have_text("En réserve")
-    expect(page.locator(".plan-reserve")).to_be_visible()
-    expect(page.locator("button", has_text="Lancer le plan")).to_have_count(0)
-    expect(page.locator(".plan-list-table tbody tr")).to_have_count(2)
-    page.locator(".plan-status-actions button", has_text="Supprimer").click()
-    expect(page.locator("text=Plan supprimé")).to_be_visible(timeout=15000)
-    expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
 
-    page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
-    expect(page.locator("select").first).to_have_value("7")
-
-
-@step("Calendrier : le lancement du plan prépare les publications, visibles jour par jour, approuvées d'un clic")
+@step("Calendrier : la semaine jour par jour, Remplacer, Retirer, Tout approuver")
 def marketing_calendar(page):
     page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    expect(page.locator(".mk-tabs a.active")).to_have_text("Calendrier")
     expect(page.locator(".cal-health")).to_be_visible()
     expect(page.locator(".cal-day")).to_have_count(7)
-    # Le lancement du plan a demandé la préparation : on attend qu'elle se termine (barre de progression).
-    page.wait_for_function(
-        "() => document.querySelector('.cal-progress.is-done, .cal-progress.is-failed') || document.querySelectorAll('.cal-card').length > 0",
-        timeout=240000)
-    page.wait_for_timeout(1500)
-    expect(page.locator(".cal-progress.is-failed")).to_have_count(0)
-    # Les créneaux commencent demain (le week-end, le calendrier s'ouvre déjà sur la semaine suivante).
-    if page.locator(".cal-card").count() == 0:
-        page.locator("button", has_text="Suivante").click()
-        page.wait_for_timeout(1000)
-    expect(page.locator(".cal-card").first).to_be_visible(timeout=60000)
-    expect(page.locator(".cal-card .cal-thumb img").first).to_be_visible()
     if page.locator(".cal-approve").count() == 0:
         page.locator("button", has_text="Suivante").click()
         page.wait_for_timeout(1000)
+    expect(page.locator(".cal-card.cal-pending").first).to_be_visible(timeout=60000)
+    expect(page.locator(".cal-card .cal-thumb img").first).to_be_visible()
+
+    # Remplacer : une nouvelle publication prend la place de l'ancienne, au même créneau.
+    before = page.locator(".cal-card").count()
+    page.locator(".cal-card.cal-pending button", has_text="Remplacer").first.click()
+    expect(page.locator(".alert-success")).to_contain_text("Publication remplacée", timeout=120000)
+    expect(page.locator(".cal-card")).to_have_count(before)
+
+    # Retirer, avec confirmation.
+    page.locator(".cal-card.cal-pending button", has_text="Retirer").first.click()
+    page.locator("button", has_text="Oui, retirer").click()
+    expect(page.locator(".alert-success")).to_contain_text("Publication retirée", timeout=15000)
+    expect(page.locator(".cal-card")).to_have_count(before - 1)
+
     page.locator(".cal-approve button", has_text="Tout approuver").click()
     expect(page.locator(".alert-success")).to_contain_text("approuvée(s)", timeout=15000)
     expect(page.locator(".cal-approve")).to_have_count(0)
     expect(page.locator(".cal-card.cal-ready").first).to_be_visible()
 
 
-@step("Nouvelle campagne : arrêt de l'ancienne, assistant en 3 écrans, aperçu de la semaine, démarrage avec tout approuvé")
-def campaign_wizard(page):
-    # Arrêter la campagne en cours (pilote en pause).
-    page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
-    page.locator(".plan-list-table button", has_text="Arrêter le plan").click()
-    page.locator("button", has_text="Oui, arrêter le plan").click()
-    expect(page.locator("text=Plan arrêté")).to_be_visible(timeout=15000)
-
-    page.goto(BASE + "/admin/marketing/nouvelle-campagne", wait_until="networkidle")
-    page.locator(".wiz-choice", has_text="Obtenir des demandes de devis").click()
-    page.locator(".wiz-choice", has_text="Six mois").click()
+@step("Campagne : en réserve pendant une autre, pause, reprise, arrêt")
+def campaign_page(page):
+    # Une deuxième campagne créée pendant la première attend en réserve.
+    run_wizard(page, "Obtenir des demandes de devis", "Un mois et demi", "Léger")
     page.locator("button", has_text="Continuer").click()
-    page.locator(".wiz-choice", has_text="Intensif").click()
+    expect(page.locator("text=Campagne prête, en attente")).to_be_visible(timeout=15000)
+
+    page.goto(BASE + "/admin/plan-marketing", wait_until="networkidle")
+    expect(page.locator(".mk-tabs a.active")).to_have_text("Campagne")
+    expect(page.locator(".plan-list-table tbody tr")).to_have_count(2)
+    page.locator(".plan-list-table tr", has_text="En réserve").locator("button", has_text="Ouvrir").click()
+    expect(page.locator(".plan-reserve")).to_be_visible()
+    expect(page.locator("button", has_text="Démarrer la campagne")).to_have_count(0)
+    page.locator(".plan-status-actions button", has_text="Supprimer").click()
+    expect(page.locator("text=Campagne supprimée")).to_be_visible(timeout=15000)
+    expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
+
+    page.locator(".plan-status-actions button", has_text="Mettre en pause").click()
+    expect(page.locator(".alert-success")).to_contain_text("Campagne en pause", timeout=15000)
+    page.locator(".plan-status-actions button", has_text="Reprendre").click()
+    expect(page.locator(".alert-success")).to_contain_text("Campagne reprise", timeout=15000)
+
+    page.locator(".plan-list-table button", has_text="Arrêter la campagne").click()
+    page.locator("button", has_text="Oui, arrêter la campagne").click()
+    expect(page.locator("text=Campagne arrêtée")).to_be_visible(timeout=15000)
+    expect(page.locator(".plan-status .status-lost")).to_have_text("Arrêtée")
+
+
+@step("Nouvelle campagne intensive : aperçu de 14 publications, démarrage avec tout approuvé")
+def campaign_wizard(page):
+    run_wizard(page, "Obtenir des demandes de devis", "Six mois", "Intensif")
     page.locator("button", has_text="Voir la première semaine").click()
-    # L'aperçu se prépare avec une barre de progression, puis les boutons de démarrage apparaissent.
     expect(page.locator("button", has_text="Démarrer et tout approuver")).to_be_visible(timeout=300000)
-    expect(page.locator(".wiz-preview .cal-card").first).to_be_visible()
     assert page.locator(".wiz-preview .cal-card").count() >= 7, "l'aperçu d'une semaine intensive doit compter au moins 7 publications"
     page.locator("button", has_text="Démarrer et tout approuver").click()
     page.wait_for_url("**/admin/marketing?demarree=1", timeout=30000)
@@ -220,6 +235,8 @@ def campaign_wizard(page):
     expect(page.locator(".plan-status .status-active")).to_have_text("En cours")
     expect(page.locator(".plan-status")).to_contain_text("Demandes de devis")
     expect(page.locator(".plan-status")).to_contain_text("14 publications par semaine")
+    page.goto(BASE + "/admin/pilote-automatique", wait_until="networkidle")
+    expect(page.locator("select").first).to_have_value("14")
 
 
 @step("Carte-cadeau : demandée sur le site, payée, envoyée puis utilisée")
@@ -267,6 +284,7 @@ with sync_playwright() as p:
     anchor_offset(page)
     marketing_plan(page)
     marketing_calendar(page)
+    campaign_page(page)
     campaign_wizard(page)
     gift_card(page)
     browser.close()
