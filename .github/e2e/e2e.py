@@ -246,6 +246,7 @@ def campaign_wizard(page):
 @step("Gardien : une publication en échec passager est relancée toute seule, et notée au journal")
 def guardian(page):
     page.goto(BASE + "/admin/publications/nouvelle", wait_until="networkidle")
+    page.fill("#post-title", "Test des relances")
     page.fill("#post-message", "Test des relances [échec passager] : un ménage impeccable, sans effort.")
     page.locator("#post-message").blur()
     for name, wanted in (("Facebook", True), ("Instagram", False)):

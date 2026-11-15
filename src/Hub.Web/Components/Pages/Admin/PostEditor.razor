@@ -117,7 +117,7 @@ else
                     <h2>2. La publication</h2>
                     <div class="field">
                         <label>Titre interne <span class="muted small">(jamais publié)</span></label>
-                        <input @bind="draft.Title" @bind:event="oninput" />
+                        <input id="post-title" @bind="draft.Title" @bind:event="oninput" />
                         <FieldError Errors="errors" For="Title" />
                     </div>
                     <div class="field">
