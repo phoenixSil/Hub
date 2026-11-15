@@ -56,6 +56,52 @@ public static class AutopilotSchedule
             .ToList();
     }
 
+    /// <summary>
+    /// Fin de la période à préparer : le dimanche de la semaine qui contient J+4.
+    /// Le jeudi, c'est le dimanche de la semaine suivante (toute la semaine suivante est prête) ;
+    /// en début de semaine, c'est le dimanche qui vient.
+    /// </summary>
+    public static DateOnly HorizonEnd(DateOnly today)
+    {
+        var d = today.AddDays(4);
+        return d.AddDays(-(((int)d.DayOfWeek + 6) % 7)).AddDays(6);
+    }
+
+    /// <summary>
+    /// Créneaux à remplir de demain jusqu'à <see cref="HorizonEnd"/>, semaine par semaine (lundi à dimanche) :
+    /// chaque semaine reçoit son rythme (au prorata des jours restants), moins ce que le pilote y a déjà prévu.
+    /// </summary>
+    /// <param name="busyCount">Publications déjà prévues par jour (toutes).</param>
+    /// <param name="plannedCount">Publications du pilote déjà prévues par jour.</param>
+    public static IReadOnlyList<DateTimeOffset> WeekSlots(DateTimeOffset now, int postsPerWeek,
+        IReadOnlyDictionary<DateOnly, int> busyCount, IReadOnlyDictionary<DateOnly, int> plannedCount)
+    {
+        postsPerWeek = Math.Clamp(postsPerWeek, 1, MaxPostsPerWeek);
+        var perDay = PerDay(postsPerWeek);
+        var waves = Waves(perDay);
+        var today = LocalDay(now);
+        var first = today.AddDays(1);
+        var end = HorizonEnd(today);
+        var result = new List<DateTimeOffset>();
+        for (var monday = first.AddDays(-(((int)first.DayOfWeek + 6) % 7)); monday <= end; monday = monday.AddDays(7))
+        {
+            var days = Enumerable.Range(0, 7).Select(monday.AddDays).Where(d => d >= first && d <= end).ToList();
+            var target = (int)Math.Round(postsPerWeek * days.Count / 7.0, MidpointRounding.AwayFromZero);
+            var need = target - days.Sum(d => plannedCount.GetValueOrDefault(d));
+            if (need <= 0) continue;
+            var free = days
+                .SelectMany(d => Enumerable.Range(busyCount.GetValueOrDefault(d), Math.Max(0, perDay - busyCount.GetValueOrDefault(d))).Select(rank => (Day: d, Rank: rank)))
+                .ToList();
+            if (free.Count == 0) continue;
+            need = Math.Min(need, free.Count);
+            result.AddRange(Enumerable.Range(0, need)
+                .Select(k => free[(int)Math.Floor((k + 0.5) * free.Count / need)])
+                .Distinct()
+                .Select(x => BusinessTime.FromLocal(x.Day.ToDateTime(perDay == 1 ? TimeOnly.MinValue : new TimeOnly(waves[Math.Min(x.Rank, waves.Length - 1)], 0)))));
+        }
+        return result;
+    }
+
     public static DateOnly LocalDay(DateTimeOffset at) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, BusinessTime.Zone).DateTime);
 }
 
@@ -137,7 +183,8 @@ internal sealed class AutopilotRunner(
         }
 
         var now = clock.GetUtcNow();
-        var horizonEnd = now.AddDays(AutopilotSchedule.HorizonDays + 1);
+        // Jusqu'au dimanche de la semaine qui contient J+4 (le jeudi : toute la semaine suivante).
+        var horizonEnd = BusinessTime.FromLocal(AutopilotSchedule.HorizonEnd(AutopilotSchedule.LocalDay(now)).AddDays(1).ToDateTime(TimeOnly.MinValue));
         await ExpireAsync(db, now, ct);
 
         var upcoming = await db.Posts.AsNoTracking()
@@ -146,8 +193,8 @@ internal sealed class AutopilotRunner(
             .Select(p => new { p.FromAutopilot, At = p.ScheduledAt ?? p.PublishedAt, p.Status })
             .ToListAsync(ct);
         var busy = upcoming.Where(p => p.At is not null).GroupBy(p => AutopilotSchedule.LocalDay(p.At!.Value)).ToDictionary(g => g.Key, g => g.Count());
-        var planned = upcoming.Count(p => p.FromAutopilot && p.At > now);
-        var slots = AutopilotSchedule.FreeSlots(now, settings.PostsPerWeek, planned, busy);
+        var planned = upcoming.Where(p => p.FromAutopilot && p.At > now).GroupBy(p => AutopilotSchedule.LocalDay(p.At!.Value)).ToDictionary(g => g.Key, g => g.Count());
+        var slots = AutopilotSchedule.WeekSlots(now, settings.PostsPerWeek, busy, planned);
 
         var (created, problems) = await FillAsync(db, settings, slots, now, ct, planId);
 

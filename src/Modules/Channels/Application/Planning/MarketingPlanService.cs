@@ -134,6 +134,12 @@ public interface IMarketingPlanService
 
     /// <summary>Abandonne une campagne pas encore démarrée, et les publications de son aperçu.</summary>
     Task<Result> AbandonAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Vrai quand la préparation des publications est en pause.</summary>
+    Task<bool> IsPausedAsync(CancellationToken ct = default);
+
+    /// <summary>Met en pause (plus aucune nouvelle publication préparée) ou reprend la campagne.</summary>
+    Task<Result> SetPausedAsync(bool paused, CancellationToken ct = default);
 }
 
 internal sealed partial class MarketingPlanService(

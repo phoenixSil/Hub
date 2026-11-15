@@ -89,6 +89,8 @@ CHECKS = r"""
   }
 
   const shown = e => {
+    // Contenu d'un <details> fermé : Chrome le met en page sans l'afficher (content-visibility), il n'est pas visible.
+    if (e.closest('details:not([open])') && !e.closest('summary')) return false;
     const r = e.getBoundingClientRect(), s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
   };

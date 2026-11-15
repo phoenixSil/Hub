@@ -11,10 +11,12 @@
 
 <PageTitle>Calendrier marketing</PageTitle>
 
+<MarketingTabs />
+
 <div class="admin-head">
     <div>
         <h1>Calendrier</h1>
-        <p class="muted">Tout ce qui va partir sur vos réseaux, jour par jour. Approuvez, modifiez ou remplacez en un clic.</p>
+        <p class="muted">Tout ce qui va partir sur vos réseaux, jour par jour. Chaque jeudi soir, la semaine suivante est préparée : approuvez-la en un clic.</p>
     </div>
     <div class="cal-head-actions">
         <a class="btn btn-primary btn-sm" href="/admin/marketing/nouvelle-campagne">Nouvelle campagne</a>
@@ -178,7 +180,7 @@
         monday = DefaultMonday(Today);
         await LoadAsync();
         if (new Uri(Nav.Uri).Query.Contains("demarree=1"))
-            Show("Campagne démarrée : ses publications sont dans le calendrier. La semaine suivante sera préparée automatiquement.", false);
+            Show("Campagne démarrée : ses publications sont dans le calendrier. Chaque jeudi soir, la semaine suivante est préparée et vous recevez un courriel.", false);
         poll = new Timer(_ => InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
     }
 
