@@ -58,6 +58,31 @@ public static class PlanTemplates
         return (phases, DefaultPillars, end);
     }
 
+    /// <summary>Piliers d'une campagne « demandes de devis » : plus de preuves et d'offres, moins de simples conseils.</summary>
+    public static IReadOnlyList<PlanPillar> LeadsPillars { get; } =
+    [
+        new("Conseiller", "Astuces et conseils d'entretien utiles, qui donnent envie de nous suivre.", 20),
+        new("Montrer", "Avant/après, coulisses, l'équipe au travail : on voit le résultat.", 25),
+        new("Rassurer", "Avis de clients, assurances, sérieux et garanties : pourquoi nous confier sa maison.", 25),
+        new("Proposer", "Un service ou une offre précise, avec l'invitation claire à demander un devis.", 30),
+    ];
+
+    /// <summary>Campagne « demandes de devis » : installer la confiance, présenter les services, pousser les demandes.</summary>
+    public static (IReadOnlyList<PlanPhase> Phases, IReadOnlyList<PlanPillar> Pillars, DateOnly EndsOn) Leads(DateOnly start, int weeks = DefaultWeeks)
+    {
+        var (phases, _, end) = Visibility(start, weeks);
+        IReadOnlyList<PlanPhase> renamed =
+        [
+            phases[0] with { Name = "Installer la confiance", Focus = "Présenter l'équipe, les avis de clients et le sérieux ; montrer des résultats avant/après." },
+            phases[1] with { Name = "Présenter les services", Focus = "Un service à la fois, concret, avec ce qu'il règle pour le client et l'invitation à demander un devis." },
+            phases[2] with { Name = "Pousser les demandes", Focus = "Offres et rappels clairs, urgence de saison honnête, chaque publication invite à demander un devis." },
+        ];
+        return (renamed, LeadsPillars, end);
+    }
+
+    public static (IReadOnlyList<PlanPhase> Phases, IReadOnlyList<PlanPillar> Pillars, DateOnly EndsOn) For(PlanObjective objective, DateOnly start, int weeks) =>
+        objective == PlanObjective.Leads ? Leads(start, weeks) : Visibility(start, weeks);
+
     private static DateOnly Mid(DateOnly a, DateOnly b) => a.AddDays((b.DayNumber - a.DayNumber) / 2);
 }
 

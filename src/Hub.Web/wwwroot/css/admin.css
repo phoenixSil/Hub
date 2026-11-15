@@ -472,3 +472,30 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
     .cal-thumb { aspect-ratio: auto; height: 100%; }
     .cal-actions .btn-sm { padding: 8px 10px; font-size: .85rem; }
 }
+
+/* ===== Assistant « Nouvelle campagne » ===== */
+.wiz-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0 0 16px; }
+.wiz-steps li { padding: 6px 12px; border-radius: 99px; background: #eef3f6; color: var(--muted); font-size: .88rem; font-weight: 600; }
+.wiz-steps li.is-current { background: var(--blue, #0097ce); color: #fff; }
+.wiz-steps li.is-done { background: #eaf8ec; color: #1d6b2c; }
+.admin-card h2 + .wiz-choices { margin-top: 8px; }
+.wiz-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.wiz-choices-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wiz-choices-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.wiz-choice { text-align: left; display: grid; gap: 4px; align-content: start; padding: 14px; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; font: inherit; color: inherit; }
+.wiz-choice strong { font-size: 1rem; }
+.wiz-choice span { color: var(--muted); font-size: .9rem; }
+.wiz-choice:hover { border-color: #9fd3e8; }
+.wiz-choice.is-selected { border-color: var(--blue, #0097ce); background: #eef7fb; box-shadow: 0 0 0 3px rgba(0,151,206,.12); }
+.wiz-reco { display: inline-block; margin-left: 6px; background: #e2e735; color: #0b3954 !important; font-size: .7rem !important; font-weight: 700; padding: 1px 7px; border-radius: 99px; vertical-align: 2px; }
+.wiz-networks { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 18px; }
+.wiz-networks .is-disabled { color: var(--muted); }
+.wiz-nav { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 8px; }
+.wiz-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+@media (max-width: 760px) {
+    .wiz-choices, .wiz-choices-3, .wiz-choices-4 { grid-template-columns: 1fr; }
+    .wiz-nav { justify-content: stretch; }
+    .wiz-nav > * { flex: 1 1 100%; }
+    .wiz-preview { grid-template-columns: 1fr; }
+    .wiz-preview .cal-card { display: grid; grid-template-columns: 96px 1fr; }
+}

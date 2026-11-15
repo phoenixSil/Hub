@@ -79,6 +79,12 @@ public interface IMarketingCalendar
 
     /// <summary>Le voyant d'état : vide quand tout fonctionne.</summary>
     Task<IReadOnlyList<HealthIssue>> HealthAsync(CancellationToken ct = default);
+
+    /// <summary>Publications préparées pour l'aperçu d'une campagne pas encore démarrée.</summary>
+    Task<IReadOnlyList<CalendarPost>> PreviewPostsAsync(Guid planId, CancellationToken ct = default);
+
+    /// <summary>Réseaux connectés (Facebook, Instagram) : ceux que l'assistant propose.</summary>
+    Task<IReadOnlyList<ChannelType>> ConnectedAsync(CancellationToken ct = default);
 }
 
 internal sealed class MarketingCalendar(
@@ -142,6 +148,29 @@ internal sealed class MarketingCalendar(
     }
 
     public Task<PreparationState?> PreparationAsync(CancellationToken ct = default) => Task.FromResult(progress.Get(tenant.TenantId));
+
+    public async Task<IReadOnlyList<CalendarPost>> PreviewPostsAsync(Guid planId, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var plan = await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId, ct);
+        if (plan is null) return [];
+        var posts = await db.Posts.AsNoTracking()
+            .Where(p => p.FromAutopilot && p.CreatedAt >= plan.CreatedAt && p.Status != PostStatus.Cancelled)
+            .ToListAsync(ct);
+        var ids = posts.Select(p => p.Id).ToList();
+        var targets = await db.PostTargets.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct);
+        return CalendarLogic.Week(CalendarLogic.Monday(BusinessTime.Today(clock)), posts, targets).Days.SelectMany(d => d.Posts)
+            .Concat(CalendarLogic.Week(CalendarLogic.Monday(BusinessTime.Today(clock)).AddDays(7), posts, targets).Days.SelectMany(d => d.Posts))
+            .OrderBy(p => p.At).ToList();
+    }
+
+    public async Task<IReadOnlyList<ChannelType>> ConnectedAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Channels.AsNoTracking()
+            .Where(c => c.SettingsJson != null && (c.Type == ChannelType.Facebook || c.Type == ChannelType.Instagram))
+            .Select(c => c.Type).ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<HealthIssue>> HealthAsync(CancellationToken ct = default)
     {

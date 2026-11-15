@@ -274,4 +274,15 @@ public class MarketingPlanTests
         Assert.Equal(plan.EndsOn, shifted[^1].To);
         Assert.Equal(phases.Select(p => p.To.DayNumber - p.From.DayNumber), shifted.Select(p => p.To.DayNumber - p.From.DayNumber));
     }
+
+    [Fact]
+    public void Une_campagne_demandes_de_devis_met_l_accent_sur_les_offres_et_les_preuves()
+    {
+        var (phases, pillars, end) = PlanTemplates.For(PlanObjective.Leads, Start, 26);
+        Assert.Equal("Installer la confiance", phases[0].Name);
+        Assert.Equal(Start.AddDays(26 * 7 - 1), end);
+        Assert.Equal(100, pillars.Sum(p => p.Share));
+        Assert.True(pillars.Single(p => p.Name == "Proposer").Share > PlanTemplates.DefaultPillars.Single(p => p.Name == "Proposer").Share);
+        Assert.Equal("Se faire connaître", PlanTemplates.For(PlanObjective.Visibility, Start, 6).Phases[0].Name);
+    }
 }

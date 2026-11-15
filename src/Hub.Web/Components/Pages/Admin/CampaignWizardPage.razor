@@ -1,0 +1,307 @@
+@page "/admin/marketing/nouvelle-campagne"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Hub.Modules.Channels.Application.Marketing
+@using Hub.Modules.Channels.Application.Planning
+@using Hub.Modules.Channels.Application.Autopilot
+@using Hub.Modules.Channels.Domain
+@inject IMarketingPlanService Plans
+@inject IMarketingCalendar Calendar
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+
+<PageTitle>Nouvelle campagne</PageTitle>
+
+<div class="admin-head">
+    <div>
+        <a href="/admin/marketing" class="muted small">← Calendrier</a>
+        <h1>Nouvelle campagne</h1>
+        <p class="muted">Trois questions, puis vous voyez la première semaine avant de démarrer.</p>
+    </div>
+</div>
+
+<ol class="wiz-steps" aria-label="Étapes">
+    <li class="@(step == 1 ? "is-current" : step > 1 ? "is-done" : null)">1. Objectif et durée</li>
+    <li class="@(step == 2 ? "is-current" : step > 2 ? "is-done" : null)">2. Intensité et réseaux</li>
+    <li class="@(step == 3 ? "is-current" : null)">3. Aperçu et démarrage</li>
+</ol>
+
+@if (error is not null)
+{
+    <div class="alert alert-error" role="alert">@error</div>
+}
+
+@if (!loaded)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (step == 1)
+{
+    <div class="admin-card">
+        <h2>Quel est votre objectif ?</h2>
+        <div class="wiz-choices">
+            <button type="button" class="wiz-choice @(objective == PlanObjective.Visibility ? "is-selected" : null)" @onclick="() => objective = PlanObjective.Visibility">
+                <strong>Être plus visible</strong>
+                <span>Plus de personnes voient ScintiNet, s'abonnent et partagent. Idéal pour démarrer.</span>
+            </button>
+            <button type="button" class="wiz-choice @(objective == PlanObjective.Leads ? "is-selected" : null)" @onclick="() => objective = PlanObjective.Leads">
+                <strong>Obtenir des demandes de devis</strong>
+                <span>Plus de preuves, d'offres et d'invitations claires à demander un devis.</span>
+            </button>
+        </div>
+
+        <h2>Pendant combien de temps ?</h2>
+        <div class="wiz-choices wiz-choices-3">
+            @foreach (var w in MarketingPlanService.CampaignWeeks)
+            {
+                var x = w;
+                <button type="button" class="wiz-choice @(weeks == x ? "is-selected" : null)" @onclick="() => weeks = x">
+                    <strong>@WeeksLabel(x)</strong>
+                    <span>@x semaines</span>
+                </button>
+            }
+        </div>
+        <div class="wiz-nav">
+            <button class="btn btn-primary" @onclick="() => step = 2">Continuer</button>
+        </div>
+    </div>
+}
+else if (step == 2)
+{
+    <div class="admin-card">
+        <h2>À quelle intensité ?</h2>
+        <div class="wiz-choices wiz-choices-4">
+            @foreach (var (label, n, note) in Intensities)
+            {
+                var x = n;
+                <button type="button" class="wiz-choice @(postsPerWeek == x ? "is-selected" : null)" @onclick="() => postsPerWeek = x">
+                    <strong>@label</strong>
+                    <span>@x publications par semaine</span>
+                    <span class="muted small">@note</span>
+                </button>
+            }
+        </div>
+
+        <h2>Sur quels réseaux ?</h2>
+        <div class="wiz-networks">
+            @foreach (var c in new[] { ChannelType.Facebook, ChannelType.Instagram })
+            {
+                var x = c;
+                var on = connected.Contains(x);
+                <label class="check @(on ? null : "is-disabled")">
+                    <input type="checkbox" checked="@(on && channels.Contains(x))" disabled="@(!on)" @onchange="e => Toggle(x, e.Value is true)" />
+                    @x
+                    @if (!on) { <a href="/admin/canaux" class="small">(non connecté : connecter)</a> }
+                </label>
+            }
+        </div>
+
+        <h2>Voulez-vous valider avant que ça parte ?</h2>
+        <div class="wiz-choices">
+            <button type="button" class="wiz-choice @(approve ? "is-selected" : null)" @onclick="() => approve = true">
+                <strong>Oui, je valide chaque semaine <span class="wiz-reco">recommandé</span></strong>
+                <span>Les publications de la semaine vous attendent dans le calendrier : un clic sur « Tout approuver ». Rappel par courriel la veille.</span>
+            </button>
+            <button type="button" class="wiz-choice @(!approve ? "is-selected" : null)" @onclick="() => approve = false">
+                <strong>Non, publier sans validation</strong>
+                <span>Tout part à l'heure prévue. Vous pouvez toujours modifier ou retirer une publication dans le calendrier.</span>
+            </button>
+        </div>
+        <div class="wiz-nav">
+            <button class="btn btn-ghost" @onclick="() => step = 1">← Retour</button>
+            <BusyButton Class="btn btn-primary" OnClick="CreateAsync" IsBusy="busy" BusyText="Création…" Disabled="@(channels.Count == 0)">
+                @(active is null ? "Voir la première semaine" : "Continuer")
+            </BusyButton>
+        </div>
+        @if (connected.Count == 0)
+        {
+            <p class="alert alert-error">Aucun réseau n'est connecté : <a href="/admin/canaux">connectez Facebook ou Instagram</a> d'abord.</p>
+        }
+    </div>
+}
+else
+{
+    <div class="admin-card">
+        @if (queued)
+        {
+            <h2>Campagne prête, en attente</h2>
+            <p>La campagne « @active?.Name » est en cours jusqu'au <strong>@Day(active!.EndsOn)</strong>. Votre nouvelle campagne prendra le relais toute seule le <strong>@Day(active.EndsOn.AddDays(1))</strong> : jamais deux campagnes en même temps.</p>
+            <p class="muted">Sa première semaine sera préparée à son démarrage, et vous la retrouverez dans le calendrier.</p>
+            <div class="wiz-nav">
+                <a class="btn btn-primary" href="/admin/marketing">Retour au calendrier</a>
+                <a class="btn btn-ghost" href="/admin/plan-marketing">Voir mes campagnes</a>
+            </div>
+        }
+        else
+        {
+            <h2>Votre première semaine</h2>
+            @if (preparation is { Finished: false } p)
+            {
+                <div class="cal-progress" aria-live="polite">
+                    <div class="cal-progress-text">
+                        <span class="spinner" aria-hidden="true"></span>
+                        @(p.Target == 0 ? "Choix des sujets de la semaine…" : $"Préparation : {p.Done} sur {p.Target} publication(s) prête(s)…")
+                        <span class="muted small">Texte et image pour chacune : environ une minute par publication. Vous pouvez quitter la page, la préparation continue.</span>
+                    </div>
+                    <div class="cal-bar"><span style="width:@(p.Target == 0 ? 5 : Math.Max(5, 100 * p.Done / p.Target))%"></span></div>
+                </div>
+            }
+            else if (preparation is { Failed: true } f)
+            {
+                <div class="alert alert-error">La préparation a échoué : @f.Summary
+                    <button class="btn btn-primary btn-sm" @onclick="PreviewAsync" disabled="@busy">Réessayer</button>
+                </div>
+            }
+
+            @if (preview.Count > 0)
+            {
+                <div class="wiz-preview">
+                    @foreach (var post in preview)
+                    {
+                        <article class="cal-card cal-pending">
+                            @if (post.ImageUrl is not null) { <a href="/admin/publications/@post.Id" class="cal-thumb"><img src="@post.ImageUrl" alt="" loading="lazy" /></a> }
+                            <div class="cal-card-body">
+                                <div class="cal-meta"><strong>@When(post.At)</strong>
+                                    @foreach (var c in post.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()">@(c == ChannelType.Facebook ? "FB" : "IG")</span> }
+                                </div>
+                                <a href="/admin/publications/@post.Id" class="cal-title">@post.Title</a>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+
+            @if (preparation is { Finished: true, Failed: false } || (preparation is null && preview.Count > 0))
+            {
+                <p>Vous pouvez ouvrir une publication pour la modifier. Rien ne part tant que la campagne n'est pas démarrée.</p>
+                <div class="wiz-nav">
+                    <button class="btn btn-ghost" @onclick="AbandonAsync" disabled="@busy">Annuler la campagne</button>
+                    @if (approve)
+                    {
+                        <BusyButton Class="btn btn-outline" OnClick="() => StartAsync(false)" IsBusy="@(action == "start")" AnyBusy="busy" BusyText="Démarrage…">Démarrer (je validerai plus tard)</BusyButton>
+                        <BusyButton Class="btn btn-primary" OnClick="() => StartAsync(true)" IsBusy="@(action == "start-approve")" AnyBusy="busy" BusyText="Démarrage…">Démarrer et tout approuver</BusyButton>
+                    }
+                    else
+                    {
+                        <BusyButton Class="btn btn-primary" OnClick="() => StartAsync(false)" IsBusy="@(action == "start")" AnyBusy="busy" BusyText="Démarrage…">Démarrer la campagne</BusyButton>
+                    }
+                </div>
+            }
+            else if (preparation is { Finished: false })
+            {
+                <div class="wiz-nav"><button class="btn btn-ghost" @onclick="AbandonAsync" disabled="@busy">Annuler la campagne</button></div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private int step = 1;
+    private bool loaded;
+    private PlanObjective objective = PlanObjective.Visibility;
+    private int weeks = 13;
+    private int postsPerWeek = 7;
+    private bool approve = true;
+    private List<ChannelType> channels = [];
+    private IReadOnlyList<ChannelType> connected = [];
+    private PlanSummary? active;
+    private Guid? planId;
+    private bool queued;
+    private PreparationState? preparation;
+    private IReadOnlyList<CalendarPost> preview = [];
+    private string? error;
+    private bool busy;
+    private string? action;
+    private Timer? poll;
+
+    private static readonly (string Label, int PerWeek, string Note)[] Intensities =
+    [
+        ("Léger", 3, "Présence régulière, peu de travail."),
+        ("Normal", 7, "Une par jour : le bon rythme pour être vu."),
+        ("Intensif", 14, "Deux par jour (9 h et 18 h)."),
+        ("Maximum", 21, "Trois par jour : communication agressive. Environ 3 fois le coût en IA du rythme normal."),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        connected = await Calendar.ConnectedAsync();
+        channels = connected.ToList();
+        active = (await Plans.ListAsync()).FirstOrDefault(p => p.Status == PlanStatus.Active);
+        loaded = true;
+        poll = new Timer(_ => InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+    }
+
+    private void Toggle(ChannelType c, bool on)
+    {
+        channels.Remove(c);
+        if (on) channels.Add(c);
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var r = await Plans.CreateCampaignAsync(new CampaignRequest(objective, weeks, postsPerWeek, channels, approve, AfterCurrent: active is not null));
+            if (r.IsFailure) { error = r.FieldErrors?.Values.FirstOrDefault() ?? r.Error; return; }
+            planId = r.Value;
+            step = 3;
+            if (active is not null) { queued = true; return; }
+            await PreviewAsync();
+        }
+        finally { busy = false; }
+    }
+
+    private async Task PreviewAsync()
+    {
+        var r = await Plans.PreviewAsync(planId!.Value);
+        if (r.IsFailure) { error = r.Error; return; }
+        error = null;
+        preparation = await Calendar.PreparationAsync();
+    }
+
+    private async Task PollAsync()
+    {
+        if (planId is null || queued) return;
+        var before = preparation;
+        preparation = await Calendar.PreparationAsync();
+        var posts = await Calendar.PreviewPostsAsync(planId.Value);
+        if (posts.Count != preview.Count || preparation != before)
+        {
+            preview = posts;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartAsync(bool approveAll)
+    {
+        if (busy) return;
+        busy = true;
+        action = approveAll ? "start-approve" : "start";
+        try
+        {
+            var r = await Plans.ActivateAsync(planId!.Value);
+            if (r.IsFailure) { error = r.Error; return; }
+            if (approveAll)
+                foreach (var monday in preview.Select(p => CalendarLogic.Monday(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.At, Hub.SharedKernel.Time.BusinessTime.Zone).DateTime))).Distinct())
+                    await Calendar.ApproveWeekAsync(monday);
+            Nav.NavigateTo("/admin/marketing?demarree=1");
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private async Task AbandonAsync()
+    {
+        if (planId is { } id) await Plans.AbandonAsync(id);
+        Nav.NavigateTo("/admin/marketing");
+    }
+
+    private static readonly System.Globalization.CultureInfo Fr = System.Globalization.CultureInfo.GetCultureInfo("fr-CA");
+    private static string Day(DateOnly d) => d.ToString("d MMMM yyyy", Fr);
+    private static string When(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Hub.SharedKernel.Time.BusinessTime.Zone).ToString("ddd d MMM, H'h'mm", Fr).Replace("h00", "h");
+    private static string WeeksLabel(int w) => w switch { 6 => "Un mois et demi", 13 => "Trois mois", 26 => "Six mois", _ => $"{w} semaines" };
+
+    public void Dispose() => poll?.Dispose();
+}

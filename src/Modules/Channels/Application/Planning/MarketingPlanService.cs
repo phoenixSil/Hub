@@ -16,6 +16,15 @@ public sealed record PillarActual(string Name, int TargetShare, int Posts, doubl
 /// <summary>Une ligne de la liste des plans (en cours, en réserve, terminés ou arrêtés).</summary>
 public sealed record PlanSummary(Guid Id, string Name, PlanStatus Status, DateOnly StartsOn, DateOnly EndsOn, int PostsPerWeek, bool StartsAutomatically, DateOnly? StoppedOn);
 
+/// <summary>Ce que l'assistant « Nouvelle campagne » demande, en trois écrans.</summary>
+public sealed record CampaignRequest(
+    PlanObjective Objective,
+    int Weeks,
+    int PostsPerWeek,
+    IReadOnlyList<ChannelType> Channels,
+    bool ApproveEachWeek,
+    bool AfterCurrent);
+
 /// <summary>Tout ce qu'affiche la page « Plan marketing ».</summary>
 public sealed record MarketingPlanView(
     Guid Id,
@@ -113,12 +122,25 @@ public interface IMarketingPlanService
     /// <summary>Relève les chiffres auprès des réseaux et met le plan à jour, tout de suite.</summary>
     Task<Result> RefreshAsync(CancellationToken ct = default);
     Task<Result> DeleteDraftAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Assistant : crée la campagne (en attente), règle le rythme, les réseaux et la validation.
+    /// Sans campagne en cours, elle commence demain et son aperçu peut être préparé avant de la démarrer.
+    /// </summary>
+    Task<Result<Guid>> CreateCampaignAsync(CampaignRequest request, CancellationToken ct = default);
+
+    /// <summary>Prépare la première semaine de la campagne pour la montrer avant de la démarrer.</summary>
+    Task<Result> PreviewAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Abandonne une campagne pas encore démarrée, et les publications de son aperçu.</summary>
+    Task<Result> AbandonAsync(Guid id, CancellationToken ct = default);
 }
 
-internal sealed class MarketingPlanService(
+internal sealed partial class MarketingPlanService(
     IDbContextFactory<ChannelsDbContext> factory,
     PlanInsightsCollector collector,
     AutopilotTrigger trigger,
+    Marketing.AutopilotProgress progress,
     ITenantContext tenant,
     TimeProvider clock) : IMarketingPlanService
 {
@@ -266,6 +288,10 @@ internal sealed class MarketingPlanService(
             return Result.Failure($"Un plan est déjà en cours jusqu'au {active.EndsOn.ToString("d MMMM yyyy", Fr)} : " +
                                   "arrêtez-le d'abord, ou programmez celui-ci pour qu'il démarre automatiquement à sa fin.");
         await StartAsync(db, plan, BusinessTime.Today(clock), ct);
+        // Campagne sans validation : les publications de son aperçu partiront à leur heure.
+        if (plan.FromWizard && await db.AutopilotSettings.AnyAsync(s => s.PublishWithoutApproval, ct))
+            foreach (var post in await db.Posts.Where(p => p.FromAutopilot && p.CreatedAt >= plan.CreatedAt && p.Status == PostStatus.AwaitingApproval).ToListAsync(ct))
+                post.Status = PostStatus.Scheduled;
         await db.SaveChangesAsync(ct);
         // Le pilote prépare tout de suite les publications du plan, sans attendre son passage habituel (toutes les 20 h).
         trigger.Request(tenant.TenantId);
@@ -294,11 +320,15 @@ internal sealed class MarketingPlanService(
         }
         settings.Enabled = true;
         settings.PostsPerWeek = plan.PostsPerWeek;
-        settings.PublishWithoutApproval = false;
+        // Réseaux et validation : ceux choisis dans l'assistant sont gardés ; sinon, les réseaux connectés.
         var channels = AutopilotService.ReadChannels(settings.Channels).ToList();
-        var connected = await db.Channels.Where(c => c.SettingsJson != null).Select(c => c.Type).ToListAsync(ct);
-        foreach (var c in new[] { ChannelType.Facebook, ChannelType.Instagram })
-            if (connected.Contains(c) && !channels.Contains(c)) channels.Add(c);
+        if (!plan.FromWizard)
+        {
+            settings.PublishWithoutApproval = false;
+            var connected = await db.Channels.Where(c => c.SettingsJson != null).Select(c => c.Type).ToListAsync(ct);
+            foreach (var c in new[] { ChannelType.Facebook, ChannelType.Instagram })
+                if (connected.Contains(c) && !channels.Contains(c)) channels.Add(c);
+        }
         settings.Channels = string.Join(",", channels);
     }
 

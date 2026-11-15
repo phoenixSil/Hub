@@ -193,10 +193,11 @@ internal sealed class AutopilotService(
 /// <summary>File des demandes « Préparer maintenant », lue par <see cref="AutopilotWorker"/>.</summary>
 internal sealed class AutopilotTrigger
 {
-    private readonly System.Threading.Channels.Channel<(Guid TenantId, bool Redo)> requests =
-        System.Threading.Channels.Channel.CreateUnbounded<(Guid TenantId, bool Redo)>();
-    public void Request(Guid tenantId, bool redo = false) => requests.Writer.TryWrite((tenantId, redo));
-    public ChannelReader<(Guid TenantId, bool Redo)> Reader => requests.Reader;
+    private readonly System.Threading.Channels.Channel<(Guid TenantId, bool Redo, Guid? PlanId)> requests =
+        System.Threading.Channels.Channel.CreateUnbounded<(Guid TenantId, bool Redo, Guid? PlanId)>();
+    /// <param name="planId">Aperçu d'une campagne pas encore démarrée.</param>
+    public void Request(Guid tenantId, bool redo = false, Guid? planId = null) => requests.Writer.TryWrite((tenantId, redo, planId));
+    public ChannelReader<(Guid TenantId, bool Redo, Guid? PlanId)> Reader => requests.Reader;
 }
 
 /// <summary>
@@ -223,11 +224,14 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
             while (trigger.Reader.TryRead(out var request))
             {
                 if (request.Redo) await RedoAsync(request.TenantId, onlyOldFormat: false, stoppingToken);
-                else await RunAsync(request.TenantId, force: true, stoppingToken);
+                else await RunAsync(request.TenantId, force: true, stoppingToken, request.PlanId);
             }
 
             try { await RunDueAsync(stoppingToken); }
             catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogError(ex, "Pilote automatique"); }
+
+            try { await RemindDueAsync(stoppingToken); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogError(ex, "Rappel de validation"); }
 
             using var wake = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             try
@@ -252,6 +256,29 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
                 .Select(s => s.TenantId).ToListAsync(ct);
         }
         foreach (var tenantId in due) await RunAsync(tenantId, force: false, ct);
+    }
+
+    /// <summary>À partir de 17 h (heure de l'entreprise) : rappel des publications de demain qui attendent l'accord.</summary>
+    private async Task RemindDueAsync(CancellationToken ct)
+    {
+        var local = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Hub.SharedKernel.Time.BusinessTime.Zone);
+        if (local.Hour < 17) return;
+        var today = DateOnly.FromDateTime(local.DateTime);
+        List<Guid> tenants;
+        await using (var scope = scopes.CreateAsyncScope())
+        {
+            var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ChannelsDbContext>>();
+            await using var db = await factory.CreateDbContextAsync(ct);
+            tenants = await db.AutopilotSettings.IgnoreQueryFilters()
+                .Where(s => s.LastReminderOn == null || s.LastReminderOn < today)
+                .Select(s => s.TenantId).ToListAsync(ct);
+        }
+        foreach (var tenantId in tenants)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenantId);
+            await scope.ServiceProvider.GetRequiredService<AutopilotRunner>().RemindAsync(ct);
+        }
     }
 
     private async Task RedoOldFormatsAsync(CancellationToken ct)
@@ -281,13 +308,13 @@ internal sealed class AutopilotWorker(IServiceScopeFactory scopes, AutopilotTrig
         }
     }
 
-    private async Task RunAsync(Guid tenantId, bool force, CancellationToken ct)
+    private async Task RunAsync(Guid tenantId, bool force, CancellationToken ct, Guid? planId = null)
     {
         try
         {
             await using var scope = scopes.CreateAsyncScope();
             scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenantId);
-            await scope.ServiceProvider.GetRequiredService<AutopilotRunner>().RunAsync(force, ct);
+            await scope.ServiceProvider.GetRequiredService<AutopilotRunner>().RunAsync(force, ct, planId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
