@@ -290,7 +290,7 @@ internal sealed partial class MarketingPlanService(
         await StartAsync(db, plan, BusinessTime.Today(clock), ct);
         // Campagne sans validation : les publications de son aperçu partiront à leur heure.
         if (plan.FromWizard && await db.AutopilotSettings.AnyAsync(s => s.PublishWithoutApproval, ct))
-            foreach (var post in await db.Posts.Where(p => p.FromAutopilot && p.CreatedAt >= plan.CreatedAt && p.Status == PostStatus.AwaitingApproval).ToListAsync(ct))
+            foreach (var post in await db.Posts.Where(p => p.PlanId == plan.Id && p.Status == PostStatus.AwaitingApproval).ToListAsync(ct))
                 post.Status = PostStatus.Scheduled;
         await db.SaveChangesAsync(ct);
         // Le pilote prépare tout de suite les publications du plan, sans attendre son passage habituel (toutes les 20 h).
@@ -364,7 +364,8 @@ internal sealed partial class MarketingPlanService(
 
         // Les publications du pilote préparées pour ce plan et pas encore parues sont annulées.
         var upcoming = await db.Posts
-            .Where(p => p.FromAutopilot && (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled) && p.ScheduledAt > now)
+            .Where(p => p.FromAutopilot && (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled) && p.ScheduledAt > now
+                        && (p.PlanId == plan.Id || p.PlanId == null))
             .ToListAsync(ct);
         foreach (var post in upcoming) post.Status = PostStatus.Cancelled;
 

@@ -40,7 +40,7 @@ internal sealed partial class MarketingPlanService
             // Les campagnes d'aperçu abandonnées sans avoir été démarrées ne restent pas.
             foreach (var old in await db.MarketingPlans.Where(p => p.Status == PlanStatus.Draft && p.FromWizard && !p.StartsAutomatically).ToListAsync(ct))
             {
-                foreach (var post in await db.Posts.Where(p => p.FromAutopilot && p.CreatedAt >= old.CreatedAt && p.Status == PostStatus.AwaitingApproval).ToListAsync(ct))
+                foreach (var post in await db.Posts.Where(p => p.PlanId == old.Id && p.Status == PostStatus.AwaitingApproval).ToListAsync(ct))
                     post.Status = PostStatus.Cancelled;
                 db.MarketingPlans.Remove(old);
             }
@@ -88,7 +88,7 @@ internal sealed partial class MarketingPlanService
         if (plan is null || plan.Status != PlanStatus.Draft) return Result.Failure("Campagne introuvable.");
         if (await ActiveAsync(db, tracking: false, ct) is not null)
             return Result.Failure("Une campagne est en cours : l'aperçu sera préparé quand celle-ci démarrera.");
-        progress.Queue(tenant.TenantId, clock.GetUtcNow());
+        progress.Queue(tenant.TenantId, clock.GetUtcNow(), id);
         trigger.Request(tenant.TenantId, planId: id);
         return Result.Success();
     }
@@ -99,8 +99,7 @@ internal sealed partial class MarketingPlanService
         var plan = await db.MarketingPlans.FirstOrDefaultAsync(p => p.Id == id && p.Status == PlanStatus.Draft, ct);
         if (plan is null) return Result.Failure("Seule une campagne pas encore démarrée peut être abandonnée.");
         var preview = await db.Posts
-            .Where(p => p.FromAutopilot && p.CreatedAt >= plan.CreatedAt
-                        && (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled) && p.PublishedAt == null)
+            .Where(p => p.PlanId == plan.Id && (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled) && p.PublishedAt == null)
             .ToListAsync(ct);
         foreach (var post in preview) post.Status = PostStatus.Cancelled;
         db.MarketingPlans.Remove(plan);

@@ -259,14 +259,17 @@ else
         var r = await Plans.PreviewAsync(planId!.Value);
         if (r.IsFailure) { error = r.Error; return; }
         error = null;
-        preparation = await Calendar.PreparationAsync();
+        var state = await Calendar.PreparationAsync();
+        preparation = state?.PlanId == planId ? state : new PreparationState(DateTimeOffset.UtcNow, 0, 0, false, null, false, planId);
     }
 
     private async Task PollAsync()
     {
         if (planId is null || queued) return;
         var before = preparation;
-        preparation = await Calendar.PreparationAsync();
+        var state = await Calendar.PreparationAsync();
+        // Seule la préparation de cet aperçu compte (pas une autre en cours pour l'ancienne campagne).
+        preparation = state?.PlanId == planId ? state : preparation ?? new PreparationState(DateTimeOffset.UtcNow, 0, 0, false, null, false, planId);
         var posts = await Calendar.PreviewPostsAsync(planId.Value);
         if (posts.Count != preview.Count || preparation != before)
         {

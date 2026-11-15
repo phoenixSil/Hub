@@ -35,14 +35,15 @@ public enum HealthAction { None, Retry, OpenChannels, CreateCampaign, ResumeAuto
 public sealed record HealthIssue(HealthLevel Level, string Message, string ActionLabel, HealthAction Action);
 
 /// <summary>Une préparation de publications en cours ou terminée (affichée avec une barre de progression).</summary>
-public sealed record PreparationState(DateTimeOffset StartedAt, int Target, int Done, bool Finished, string? Summary, bool Failed);
+public sealed record PreparationState(DateTimeOffset StartedAt, int Target, int Done, bool Finished, string? Summary, bool Failed, Guid? PlanId = null);
 
 /// <summary>Avancement des préparations, par entreprise (en mémoire : il suffit pour la barre de progression).</summary>
 public sealed class AutopilotProgress
 {
     private readonly ConcurrentDictionary<Guid, PreparationState> runs = new();
 
-    public void Start(Guid tenantId, int target, DateTimeOffset now) => runs[tenantId] = new PreparationState(now, target, 0, false, null, false);
+    public void Start(Guid tenantId, int target, DateTimeOffset now, Guid? planId = null) =>
+        runs[tenantId] = new PreparationState(now, target, 0, false, null, false, planId);
 
     public void Step(Guid tenantId, int done) => runs.AddOrUpdate(tenantId,
         _ => new PreparationState(DateTimeOffset.UtcNow, done, done, false, null, false),
@@ -53,7 +54,7 @@ public sealed class AutopilotProgress
         (_, r) => r with { Finished = true, Summary = summary, Failed = failed });
 
     /// <summary>Demande envoyée, pas encore commencée : la barre s'affiche tout de suite.</summary>
-    public void Queue(Guid tenantId, DateTimeOffset now) => runs[tenantId] = new PreparationState(now, 0, 0, false, null, false);
+    public void Queue(Guid tenantId, DateTimeOffset now, Guid? planId = null) => runs[tenantId] = new PreparationState(now, 0, 0, false, null, false, planId);
 
     public PreparationState? Get(Guid tenantId) => runs.TryGetValue(tenantId, out var r) ? r : null;
 }
@@ -155,7 +156,7 @@ internal sealed class MarketingCalendar(
         var plan = await db.MarketingPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId, ct);
         if (plan is null) return [];
         var posts = await db.Posts.AsNoTracking()
-            .Where(p => p.FromAutopilot && p.CreatedAt >= plan.CreatedAt && p.Status != PostStatus.Cancelled)
+            .Where(p => p.PlanId == planId && p.Status != PostStatus.Cancelled)
             .ToListAsync(ct);
         var ids = posts.Select(p => p.Id).ToList();
         var targets = await db.PostTargets.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct);

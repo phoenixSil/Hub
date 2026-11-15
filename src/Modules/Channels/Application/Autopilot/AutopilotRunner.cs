@@ -237,7 +237,9 @@ internal sealed class AutopilotRunner(
         var created = 0;
         var problems = new List<string>();
         if (slots.Count == 0) return (0, problems);
-        progress.Start(tenant.TenantId, slots.Count, now);
+        // Campagne servie : l'aperçu demandé, sinon la campagne en cours.
+        var campaignId = planId ?? await db.MarketingPlans.AsNoTracking().Where(p => p.Status == PlanStatus.Active).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct);
+        progress.Start(tenant.TenantId, slots.Count, now, campaignId);
         try
         {
             var context = await source.GetAsync(ct);
@@ -268,12 +270,20 @@ internal sealed class AutopilotRunner(
             var channels = AutopilotService.ReadChannels(settings.Channels);
             foreach (var item in plan.Value!)
             {
+                // Campagne arrêtée ou abandonnée pendant la préparation : on s'arrête là.
+                if (campaignId is { } cid && !await db.MarketingPlans.AsNoTracking().AnyAsync(
+                        p => p.Id == cid && (p.Status == PlanStatus.Active || (planId != null && p.Status == PlanStatus.Draft)), ct))
+                {
+                    problems.Add("campagne arrêtée pendant la préparation");
+                    break;
+                }
                 var post = await PrepareAsync(item, context, settings, channels, recentScenes,
                     memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
                 if (post is not null)
                 {
                     // Aperçu d'une campagne pas encore démarrée : rien ne part avant le démarrage.
                     if (planId is not null) post.Value.Post.Status = PostStatus.AwaitingApproval;
+                    post.Value.Post.PlanId = campaignId;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
