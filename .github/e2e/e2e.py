@@ -178,7 +178,7 @@ def marketing_calendar(page):
         timeout=240000)
     page.wait_for_timeout(1500)
     expect(page.locator(".cal-progress.is-failed")).to_have_count(0)
-    # Les créneaux commencent demain : un dimanche, ils sont tous dans la semaine suivante.
+    # Les créneaux commencent demain (le week-end, le calendrier s'ouvre déjà sur la semaine suivante).
     if page.locator(".cal-card").count() == 0:
         page.locator("button", has_text="Suivante").click()
         page.wait_for_timeout(1000)

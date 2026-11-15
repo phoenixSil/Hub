@@ -75,9 +75,9 @@
     <button class="btn btn-ghost btn-sm" @onclick="() => MoveAsync(-7)" disabled="@busy" aria-label="Semaine précédente">‹ Précédente</button>
     <h2>Semaine du @Day(monday) au @Day(monday.AddDays(6))</h2>
     <button class="btn btn-ghost btn-sm" @onclick="() => MoveAsync(7)" disabled="@busy" aria-label="Semaine suivante">Suivante ›</button>
-    @if (monday != CalendarLogic.Monday(Today))
+    @if (monday != DefaultMonday(Today))
     {
-        <button class="btn btn-ghost btn-sm" @onclick="() => GoToAsync(CalendarLogic.Monday(Today))" disabled="@busy">Cette semaine</button>
+        <button class="btn btn-ghost btn-sm" @onclick="() => GoToAsync(DefaultMonday(Today))" disabled="@busy">Revenir à la semaine en cours</button>
     }
 </div>
 
@@ -166,11 +166,15 @@
     private Timer? poll;
 
     private DateOnly Today => Hub.SharedKernel.Time.BusinessTime.Today(Clock);
+
+    /// <summary>Le samedi et le dimanche, la semaine qui compte est la suivante : le calendrier s'ouvre dessus.</summary>
+    private static DateOnly DefaultMonday(DateOnly today) =>
+        today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? CalendarLogic.Monday(today).AddDays(7) : CalendarLogic.Monday(today);
     private bool Preparing => preparation is { Finished: false };
 
     protected override async Task OnInitializedAsync()
     {
-        monday = CalendarLogic.Monday(Today);
+        monday = DefaultMonday(Today);
         await LoadAsync();
         poll = new Timer(_ => InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
     }
