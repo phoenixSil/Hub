@@ -135,12 +135,16 @@ def anchor_offset(page):
     assert title["y"] >= header["y"] + header["height"] - 1, f"titre à {title['y']:.0f}px, en-tête jusqu'à {header['y'] + header['height']:.0f}px"
 
 
+def choice(page, title):
+    return page.locator(f".wiz-choice:has(strong:text-is('{title}'))")
+
+
 def run_wizard(page, objective, duration, intensity):
     page.goto(BASE + "/admin/marketing/nouvelle-campagne", wait_until="networkidle")
-    page.locator(".wiz-choice", has_text=objective).click()
-    page.locator(".wiz-choice", has_text=duration).click()
+    choice(page, objective).click()
+    choice(page, duration).click()
     page.locator("button", has_text="Continuer").click()
-    page.locator(".wiz-choice", has_text=intensity).click()
+    choice(page, intensity).click()
 
 
 @step("Nouvelle campagne : assistant en 3 écrans, aperçu de la première semaine, démarrage")
