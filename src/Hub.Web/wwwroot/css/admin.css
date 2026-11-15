@@ -506,3 +506,11 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 .mk-tabs a:hover { color: var(--ink, #0f2533); }
 .mk-tabs a.active { color: var(--blue-dark, #007aa8); border-bottom-color: var(--blue, #0097ce); }
 .plan-advanced ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+
+/* Gardien : dernière vérification et journal des relances */
+.cal-guard { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: -4px 0 14px; font-size: .88rem; color: var(--muted); }
+.cal-journal { flex-basis: 100%; }
+.cal-journal summary { cursor: pointer; font-weight: 600; color: var(--blue-dark, #007aa8); }
+.cal-journal ul { list-style: none; padding: 8px 0 0; margin: 0; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+.cal-journal li { color: var(--ink, #0f2533); }
+.cal-journal li.ko { color: #8a1b12; }

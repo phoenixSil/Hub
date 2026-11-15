@@ -204,8 +204,14 @@ internal sealed class SimulatedPublisher(ChannelType channel, ILogger logger) : 
     public Task<Result<string>> TestAsync(ChannelCredentials c, CancellationToken ct = default) =>
         Task.FromResult(Result<string>.Success($"{c.AccountName ?? "Page"} (simulée)"));
 
+    /// <summary>Marqueur pour tester les relances : un texte qui le contient échoue une fois par réseau, puis passe.</summary>
+    public const string TransientFailureMarker = "[échec passager]";
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> FailedOnce = new();
+
     public Task<PublishResult> PublishAsync(PublishRequest r, ChannelCredentials c, CancellationToken ct = default)
     {
+        if (r.Message.Contains(TransientFailureMarker, StringComparison.Ordinal) && FailedOnce.TryAdd($"{channel}|{r.Message}", true))
+            return Task.FromResult(PublishResult.Fail("Service temporairement indisponible (simulé)."));
         var id = $"simule_{Guid.NewGuid():N}"[..20];
         logger.LogInformation("Publication simulée sur {Channel} : {Message} | {Link} | {Image}", channel, r.Message, r.Link, r.ImageUrl);
         return Task.FromResult(PublishResult.Ok(id, null));

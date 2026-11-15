@@ -63,6 +63,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<MarketingPlan> MarketingPlans => Set<MarketingPlan>();
     public DbSet<PostStats> PostStats => Set<PostStats>();
     public DbSet<AudienceSnapshot> AudienceSnapshots => Set<AudienceSnapshot>();
+    public DbSet<MaintenanceEntry> MaintenanceEntries => Set<MaintenanceEntry>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -118,6 +119,14 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.LastRunSummary).HasMaxLength(1000);
             e.Property(x => x.DisabledStyles).HasMaxLength(1000);
             e.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        b.Entity<MaintenanceEntry>(e =>
+        {
+            e.ToTable("MaintenanceEntries");
+            e.Property(x => x.Kind).HasMaxLength(30);
+            e.Property(x => x.Message).HasMaxLength(1000);
+            e.HasIndex(x => new { x.TenantId, x.At });
         });
 
         b.Entity<ImageUsage>(e =>
@@ -200,6 +209,8 @@ public static class ChannelsModule
 
         // Plan marketing : le pilote le suit ; les chiffres des réseaux sont relevés chaque jour.
         services.AddScoped<PlanInsightsCollector>();
+        services.AddScoped<Application.Marketing.MarketingGuardian>();
+        services.AddHostedService<Application.Marketing.MarketingGuardianWorker>();
         services.AddScoped<IMarketingPlanService, MarketingPlanService>();
         services.AddHostedService<PlanInsightsWorker>();
         services.AddSingleton<IModuleInitializer, ChannelsInitializer>();
