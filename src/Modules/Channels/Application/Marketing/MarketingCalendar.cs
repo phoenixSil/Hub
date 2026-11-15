@@ -84,6 +84,12 @@ public interface IMarketingCalendar
     /// <summary>Publications préparées pour l'aperçu d'une campagne pas encore démarrée.</summary>
     Task<IReadOnlyList<CalendarPost>> PreviewPostsAsync(Guid planId, CancellationToken ct = default);
 
+    /// <summary>Dernière vérification du gardien et son journal (30 dernières actions).</summary>
+    Task<GuardianStatus> GuardianAsync(CancellationToken ct = default);
+
+    /// <summary>Lance tout de suite la vérification du gardien (sans attendre les 30 minutes).</summary>
+    Task<GuardianReport> CheckNowAsync(CancellationToken ct = default);
+
     /// <summary>Réseaux connectés (Facebook, Instagram) : ceux que l'assistant propose.</summary>
     Task<IReadOnlyList<ChannelType>> ConnectedAsync(CancellationToken ct = default);
 }
@@ -93,9 +99,22 @@ internal sealed class MarketingCalendar(
     AutopilotRunner runner,
     AutopilotTrigger trigger,
     AutopilotProgress progress,
+    MarketingGuardian guardian,
     ITenantContext tenant,
     TimeProvider clock) : IMarketingCalendar
 {
+    public async Task<GuardianStatus> GuardianAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var last = await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind == MarketingGuardian.Check).OrderByDescending(e => e.At).FirstOrDefaultAsync(ct);
+        var journal = await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind != MarketingGuardian.Check)
+            .OrderByDescending(e => e.At).Take(30).ToListAsync(ct);
+        var batch = last is null ? [] : journal.Where(e => e.At == last.At).ToList();
+        return new GuardianStatus(last?.At, batch.Count(e => e.Success), batch.Count(e => !e.Success), journal);
+    }
+
+    public Task<GuardianReport> CheckNowAsync(CancellationToken ct = default) => guardian.RunAsync(ct);
+
     public async Task<CalendarWeek> WeekAsync(DateOnly monday, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

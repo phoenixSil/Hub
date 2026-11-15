@@ -10,6 +10,9 @@ public sealed class ChannelsOptions
 
     /// <summary>Remplacer les vrais réseaux par des réseaux simulés (développement, tests). Jamais en production.</summary>
     public bool Simulate { get; set; }
+
+    /// <summary>Délai avant une relance, en minutes (vide : 30 min puis 2 h). 0 pour les tests de bout en bout.</summary>
+    public double? RetryDelayMinutes { get; set; }
 }
 
 /// <summary>Donne le connecteur d'un réseau : le vrai, ou le simulé si Channels:Simulate est activé.</summary>

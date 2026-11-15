@@ -46,6 +46,33 @@
     }
 </div>
 
+@* Gardien : vérification toutes les 30 minutes de ce qui a échoué, et relances. *@
+<div class="cal-guard">
+    <span>
+        @if (guard?.LastCheck is { } last)
+        {
+            <text>Dernière vérification à @Time(last) : @guard.Fixed relance(s), @guard.NeedsAction problème(s) à régler.</text>
+        }
+        else
+        {
+            <text>Vérification automatique toutes les 30 minutes : rien n'a encore été vérifié.</text>
+        }
+    </span>
+    <BusyButton Class="btn btn-ghost btn-sm" OnClick="CheckNowAsync" IsBusy="@(action == "check")" AnyBusy="busy" BusyText="Vérification…">Vérifier maintenant</BusyButton>
+    @if (guard is { Journal.Count: > 0 })
+    {
+        <details class="cal-journal">
+            <summary>Journal des relances</summary>
+            <ul>
+                @foreach (var e in guard.Journal)
+                {
+                    <li class="@(e.Success ? "ok" : "ko")"><span class="muted small">@When(e.At)</span> @(e.Success ? "✓" : "⚠") @e.Message</li>
+                }
+            </ul>
+        </details>
+    }
+</div>
+
 @if (preparation is { } prep && (!prep.Finished || showSummary))
 {
     <div class="cal-progress @(prep.Finished ? (prep.Failed ? "is-failed" : "is-done") : null)" aria-live="polite">
@@ -167,6 +194,7 @@
     private bool busy;
     private string? action;
     private Timer? poll;
+    private GuardianStatus? guard;
 
     private DateOnly Today => Hub.SharedKernel.Time.BusinessTime.Today(Clock);
 
@@ -189,7 +217,15 @@
         week = await Calendar.WeekAsync(monday);
         issues = await Calendar.HealthAsync();
         preparation = await Calendar.PreparationAsync();
+        guard = await Calendar.GuardianAsync();
     }
+
+    private Task CheckNowAsync() => RunAsync("check", async () =>
+    {
+        var r = await Calendar.CheckNowAsync();
+        var text = r.Lines.Count == 0 ? "Vérification faite : rien à relancer." : $"Vérification faite : {r.Fixed} relance(s), {r.NeedsAction} problème(s) à régler.";
+        return (Result.Success(), text);
+    });
 
     /// <summary>Pendant une préparation : la barre avance et les nouvelles publications apparaissent au fur et à mesure.</summary>
     private async Task PollAsync()
@@ -301,6 +337,8 @@
     private static readonly System.Globalization.CultureInfo Fr = System.Globalization.CultureInfo.GetCultureInfo("fr-CA");
     private static string Day(DateOnly d) => d.ToString("d MMMM", Fr);
     private static string DayName(DateOnly d) => d.ToString("ddd", Fr).TrimEnd('.');
+    private static string Time(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Hub.SharedKernel.Time.BusinessTime.Zone).ToString("H'h'mm", Fr);
+    private static string When(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Hub.SharedKernel.Time.BusinessTime.Zone).ToString("d MMM H'h'mm", Fr);
     private static string Hour(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Hub.SharedKernel.Time.BusinessTime.Zone).ToString("H'h'mm", Fr).Replace("h00", "h");
 
     public void Dispose() => poll?.Dispose();

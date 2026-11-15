@@ -243,6 +243,27 @@ def campaign_wizard(page):
     expect(page.locator("select").first).to_have_value("14")
 
 
+@step("Gardien : une publication en échec passager est relancée toute seule, et notée au journal")
+def guardian(page):
+    page.goto(BASE + "/admin/publications/nouvelle", wait_until="networkidle")
+    page.fill("#post-message", "Test des relances [échec passager] : un ménage impeccable, sans effort.")
+    page.locator("#post-message").blur()
+    for name, wanted in (("Facebook", True), ("Instagram", False)):
+        box = page.locator("label.check", has_text=name).locator("input[type=checkbox]")
+        if box.count() and box.is_checked() != wanted:
+            box.click()
+    page.locator("button", has_text="Publier maintenant").click()
+    # Premier envoi : échec passager (simulé).
+    expect(page.locator("text=Service temporairement indisponible").first).to_be_visible(timeout=20000)
+
+    page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    page.locator("button", has_text="Vérifier maintenant").click()
+    expect(page.locator(".alert-success")).to_contain_text("Vérification faite", timeout=120000)
+    page.locator(".cal-journal summary").click()
+    expect(page.locator(".cal-journal")).to_contain_text("relancée sur Facebook, partie")
+    expect(page.locator(".cal-guard")).to_contain_text("Dernière vérification")
+
+
 @step("Carte-cadeau : demandée sur le site, payée, envoyée puis utilisée")
 def gift_card(page):
     page.goto(BASE + "/carte-cadeau", wait_until="networkidle")
@@ -290,6 +311,7 @@ with sync_playwright() as p:
     marketing_calendar(page)
     campaign_page(page)
     campaign_wizard(page)
+    guardian(page)
     gift_card(page)
     browser.close()
 
@@ -297,4 +319,4 @@ if failures:
     for f in failures:
         print(f"::error title=Test de bout en bout::{f}")
     sys.exit(1)
-print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, calendrier, nouvelle campagne, carte-cadeau")
+print("::notice::Tests de bout en bout : FAQ, statut des demandes, export CSV, menu mobile, validation du devis, redirections, ancres du menu, plan marketing, calendrier, nouvelle campagne, gardien des relances, carte-cadeau")
