@@ -356,7 +356,7 @@ h1:focus, h1:focus-visible { outline: none; }
 .snow-toggle { position: absolute; z-index: 3; right: 16px; bottom: 16px; border: 1px solid rgba(255, 255, 255, .6); background: rgba(0, 0, 0, .18);
     color: #fff; border-radius: 99px; padding: 6px 14px; font: inherit; font-size: .8rem; cursor: pointer; }
 .snow-toggle:hover { background: rgba(0, 0, 0, .3); }
-.season-slide.snow-off .flake { display: none; }
+.season-slide.snow-off .flake, .hero.snow-off .flake { display: none; }
 
 @media (prefers-reduced-motion: no-preference) {
     .flake { animation: snow-fall var(--t) linear var(--d) infinite; }

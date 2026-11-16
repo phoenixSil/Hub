@@ -2,7 +2,11 @@
    Tout est décoratif (aria-hidden) ; les animations s'arrêtent si le visiteur a demandé moins d'animations. *@
 
 <div class="season-decor" aria-hidden="true">
-    @if (Season.Key == "noel")
+    @if (Season.Skin is not null)
+    {
+        @* Habillage d'hiver : la neige tombe sur toute la bannière (WinterSnow), pas seulement sur cette diapositive. *@
+    }
+    else if (Season.Key == "noel")
     {
         <div class="snow">
             @foreach (var f in Flakes)
@@ -20,7 +24,18 @@
 
     <div class="season-mascot">
         <img src="/images/site/logo-mark.png" alt="" width="269" height="271" />
-        @if (Season.Key == "noel")
+        @if (Season.Key == "hiver")
+        {
+            @* Une tuque bleue à pompon : l'hiver québécois, sans les Fêtes. *@
+            <svg class="hat hat-tuque" viewBox="0 0 120 96">
+                <path d="M14 72 Q14 20 60 16 Q106 20 106 72 Z" fill="#0097ce" />
+                <path d="M22 44 Q60 34 98 44 M18 58 Q60 48 102 58" stroke="#ffffff" stroke-width="6" fill="none" />
+                <rect x="8" y="66" width="104" height="20" rx="8" fill="#ffffff" />
+                <path d="M16 70 V82 M28 70 V82 M40 70 V82 M52 70 V82 M64 70 V82 M76 70 V82 M88 70 V82 M100 70 V82" stroke="#cfe3f1" stroke-width="3" />
+                <circle cx="60" cy="14" r="13" fill="#ffffff" />
+            </svg>
+        }
+        else if (Season.Key == "noel")
         {
             <svg class="hat hat-noel" viewBox="0 0 120 90">
                 <path d="M14 70 Q40 6 96 14 Q78 26 86 58 Z" fill="#c8102e" />
@@ -46,7 +61,7 @@
         }
     </div>
 </div>
-@if (Season.Key == "noel")
+@if (Season.Key == "noel" && Season.Skin is null)
 {
     <button type="button" class="snow-toggle" data-snow-toggle aria-pressed="false">Arrêter la neige</button>
 }

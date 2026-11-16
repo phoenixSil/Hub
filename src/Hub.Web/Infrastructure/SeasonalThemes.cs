@@ -23,11 +23,20 @@ public sealed record SeasonalTheme(
     string BarBackground,
     string BarText,
     string SlideBackground,
-    string SlideText);
+    string SlideText,
+    // Habillage complet du site pendant la saison (« hiver » : neige, blanc, bleu glace) ; null = accessoire seulement.
+    string? Skin = null)
+{
+    /// <summary>Couleur du mot mis en valeur dans la bannière (lime sur fond foncé, bleu profond sur fond neige).</summary>
+    public string HighlightColor => Skin == SeasonalThemes.WinterSkin ? "#00668f" : "#e2e735";
+}
 
 public static class SeasonalThemes
 {
     public const string Auto = "auto", None = "aucun";
+
+    /// <summary>Habillage « Neige de Québec » : tout le site en blanc, bleu glace et nuit d'hiver.</summary>
+    public const string WinterSkin = "hiver";
 
     public static readonly SeasonalTheme Halloween = new(
         "halloween", "Halloween",
@@ -36,8 +45,8 @@ public static class SeasonalThemes
         Title: "Le ménage d'après fête,", Highlight: "ensorcelé",
         Lead: "Bonbons écrasés, décorations, maquillage sur les tissus : on fait tout briller.",
         Cta: "Demander un devis", CtaUrl: "/devis",
-        // Jusqu'à la veille du thème de Noël : le site passe de l'un à l'autre tout seul.
-        From: (10, 15), To: (11, 19),
+        // Jusqu'à la veille du thème d'hiver : le site passe de l'un à l'autre tout seul.
+        From: (10, 15), To: (11, 15),
         BarBackground: "#e2e735", BarText: "#0b3954",
         SlideBackground: "#0b3954", SlideText: "#ffffff");
 
@@ -49,10 +58,25 @@ public static class SeasonalThemes
         Lead: "Avant le réveillon et après : recevez l'esprit tranquille. Offrez aussi du temps à vos parents.",
         Cta: "Réserver mon ménage des Fêtes", CtaUrl: "/devis",
         From: (11, 20), To: (1, 6),
-        BarBackground: "#007aa8", BarText: "#ffffff",
-        SlideBackground: "#007aa8", SlideText: "#ffffff");
+        BarBackground: "#eaf5fc", BarText: "#0b2a3c",
+        SlideBackground: "#e6f2fb", SlideText: "#0b2a3c",
+        Skin: WinterSkin);
 
-    public static IReadOnlyList<SeasonalTheme> All { get; } = [Halloween, Christmas];
+    /// <summary>L'hiver québécois : de la mi-novembre au printemps (Noël passe devant pendant les Fêtes).</summary>
+    public static readonly SeasonalTheme Winter = new(
+        "hiver", "Hiver",
+        Bar: "L'hiver est arrivé : on s'occupe du calcium et de la sloche chez vous",
+        Eyebrow: "Hiver à Québec",
+        Title: "Dehors, il neige. Chez vous,", Highlight: "tout brille.",
+        Lead: "Sloche, calcium, poussière des maisons fermées : on s'occupe de l'hiver pour vous. Ménage, vitres, immeubles et soutien aux aînés, partout à Québec.",
+        Cta: "Mon devis gratuit en 2 minutes", CtaUrl: "/devis",
+        From: (11, 16), To: (3, 20),
+        BarBackground: "#eaf5fc", BarText: "#0b2a3c",
+        SlideBackground: "#e6f2fb", SlideText: "#0b2a3c",
+        Skin: WinterSkin);
+
+    /// <summary>Dans l'ordre de priorité : le premier dont la période contient la date l'emporte (Noël avant Hiver).</summary>
+    public static IReadOnlyList<SeasonalTheme> All { get; } = [Halloween, Christmas, Winter];
 
     public static SeasonalTheme? Find(string? key) => All.FirstOrDefault(t => t.Key == key);
 

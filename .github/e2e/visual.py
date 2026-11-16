@@ -45,6 +45,10 @@ PUBLIC = [
     ("carte-cadeau", "/carte-cadeau"),
     ("accueil-noel", "/?theme=noel"),
     ("accueil-halloween", "/?theme=halloween"),
+    ("accueil-hiver", "/?theme=hiver"),
+    ("service-hiver", "/services/nettoyage-residentiel?theme=hiver"),
+    ("devis-hiver", "/devis?theme=hiver"),
+    ("accueil-sans-theme", "/?theme=aucun"),
 ]
 
 ADMIN = [

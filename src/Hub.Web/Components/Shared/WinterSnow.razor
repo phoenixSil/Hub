@@ -1,0 +1,20 @@
+@* Habillage d'hiver de la bannière d'accueil : la neige qui tombe sur toutes les diapositives.
+   La silhouette de Québec et la congère sont dessinées en CSS (site-hiver.css). Décoratif (aria-hidden) ;
+   la neige s'arrête si le visiteur a demandé moins d'animations, ou d'un clic. *@
+
+<div class="winter-snow snow" aria-hidden="true">
+    @foreach (var f in Flakes)
+    {
+        <span class="flake" style="left:@(f.X)%;--d:@(f.Delay)s;--t:@(f.Duration)s;--s:@(f.Size)px"></span>
+    }
+</div>
+<button type="button" class="snow-toggle" data-snow-toggle aria-pressed="false">Arrêter la neige</button>
+
+@code {
+    private sealed record Flake(int X, double Delay, double Duration, int Size);
+
+    // Positions fixes (pas de hasard) : le rendu est identique d'une page à l'autre et dans les tests visuels.
+    private static readonly Flake[] Flakes = Enumerable.Range(0, 34)
+        .Select(i => new Flake((i * 29 + 7) % 100, Math.Round(i * 0.61 % 10, 1), 10 + i % 7, 3 + i % 5))
+        .ToArray();
+}
