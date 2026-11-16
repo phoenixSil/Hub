@@ -377,6 +377,16 @@ def spam_filter(page):
     expect(page.locator("a", has_text="RobertBuimi")).to_have_count(0)
 
 
+def save_video(page, video, name):
+    """Garde la vidéo produite avec les captures (branche « apercus »), pour la regarder."""
+    import os
+    src = video.get_attribute("src")
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "apercus")
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, name), "wb") as f:
+        f.write(page.request.get(src if src.startswith("http") else BASE + src).body())
+
+
 @step("Reels : avant/après téléversé, monté, refait par l'IA (simulée) puis publié en Reel")
 def reels(page):
     import os
@@ -393,11 +403,13 @@ def reels(page):
     video = page.locator("#reel video.reel-video")
     expect(video).to_have_attribute("src", re.compile(r"\.mp4$"), timeout=30000)
     expect(page.locator("#reel")).to_contain_text("Reel avant/après")
+    save_video(page, video, "reel-avant-apres.mp4")
 
     # L'IA vidéo (simulée) refait le Reel : le budget est compté.
     page.locator("#reel button", has_text="Créer un Reel IA").click()
     expect(page.locator(".alert-success")).to_contain_text("Reel prêt", timeout=300000)
     expect(page.locator("#reel")).to_contain_text("Reel IA")
+    save_video(page, page.locator("#reel video.reel-video"), "reel-ia-simule.mp4")
 
     page.locator("button", has_text="Publier maintenant").click()
     expect(page.locator(".alert-success")).to_contain_text("Publication envoyée", timeout=120000)
