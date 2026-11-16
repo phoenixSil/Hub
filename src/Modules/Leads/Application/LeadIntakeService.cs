@@ -50,6 +50,13 @@ internal sealed class LeadIntakeService(
         if (errors.Count > 0)
             return Result<Guid>.Invalid(errors);
 
+        // Filtre anti-pourriel : formules de robots, langue, liens, envois répétés du même expéditeur.
+        var since = clock.GetUtcNow().AddHours(-24);
+        var email = s.Email.Trim().ToLowerInvariant();
+        var name = s.FullName.Trim();
+        var sameSender = await db.Leads.CountAsync(l => l.CreatedAt >= since && (l.Email == email || l.FullName == name), ct);
+        var verdict = SpamFilter.Check(name, s.Subject, s.Message, s.Phone, sameSender);
+
         var lead = new Lead
         {
             Kind = s.Kind,
@@ -77,6 +84,14 @@ internal sealed class LeadIntakeService(
         };
         db.Leads.Add(lead);
         db.Activities.Add(new LeadActivity { LeadId = lead.Id, Author = "Site web", Action = "Demande reçue" });
+        if (verdict.IsSpam)
+        {
+            // Gardée au cas où (« Ce n'est pas un pourriel »), mais sans courriel ni statistique.
+            lead.Status = LeadStatus.Spam;
+            db.Activities.Add(new LeadActivity { LeadId = lead.Id, Author = "Filtre anti-pourriel", Action = SpamFilter.Describe(verdict) });
+            await db.SaveChangesAsync(ct);
+            return Result<Guid>.Success(lead.Id);
+        }
         await db.SaveChangesAsync(ct);
 
         await events.PublishAsync(new LeadSubmitted(
