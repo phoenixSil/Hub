@@ -5,6 +5,7 @@
 @inject IMarketingResults Results
 @inject ICurrentTenant Tenant
 @inject Hub.Modules.Channels.Application.Reviews.IReviewService Reviews
+@inject Hub.Modules.Channels.Application.Decisions.IDecisionJournal Decisions
 
 <PageTitle>Résultats du marketing</PageTitle>
 
@@ -37,6 +38,46 @@ else
         <div class="kpi"><span>Clients gagnés</span><strong>@report.Won</strong></div>
         <div class="kpi"><span>Photos IA ce mois</span><strong>@report.PhotosThisMonth</strong><small class="muted">≈ @report.PhotoCostThisMonth.ToString("0.00", Fr) $</small></div>
     </div>
+
+    @if (decisionSummary is not null)
+    {
+        <div class="admin-card" id="decision-journal">
+            <div class="dj-head">
+                <div>
+                    <h2>Journal des décisions</h2>
+                    <p class="muted small">Pour chaque publication : le contexte, le choix fait (créneau, format, cible, thème, intensité) et ce qu'il a rapporté 7 jours après. Environ @((decisionSummary.ExplorationRate * 100).ToString("0", Fr)) % des créneaux du pilote sont tirés au hasard (« essai ») pour apprendre ce qui marche le mieux.</p>
+                </div>
+                <a class="btn btn-outline btn-sm" href="/admin/resultats/decisions.csv" download data-enhance-nav="false">Exporter (CSV)</a>
+            </div>
+            <div class="kpi-grid">
+                <div class="kpi"><span>Décisions</span><strong>@decisionSummary.Total</strong></div>
+                <div class="kpi"><span>Clôturées (J+7)</span><strong>@decisionSummary.Closed</strong></div>
+                <div class="kpi"><span>En attente</span><strong>@decisionSummary.Pending</strong></div>
+                <div class="kpi"><span>Essais</span><strong>@decisionSummary.Explorations</strong></div>
+                <div class="kpi kpi-accent"><span>Récompense moyenne</span><strong>@(decisionSummary.AverageReward?.ToString("0.#", Fr) ?? "—")</strong></div>
+            </div>
+            @if (decisionRows.Count > 0)
+            {
+                <div class="table-wrap">
+                    <table class="admin-table dj-table">
+                        <thead><tr><th>Publication</th><th>Choix</th><th>Créneau</th><th>Format · thème</th><th>Résultat</th></tr></thead>
+                        <tbody>
+                            @foreach (var d in decisionRows)
+                            {
+                                <tr>
+                                    <td><a href="/admin/publications/@d.PostId">@d.PostTitle</a><br /><span class="muted small">@AdminFormat.Local(d.DecidedAt, "d MMM HH:mm")</span></td>
+                                    <td>@d.Policy@(d.Explored is null ? "" : $" ({d.Explored})")@(d.EditedByHuman ? " · modifiée" : "")</td>
+                                    <td>@d.Slot</td>
+                                    <td>@(d.Format ?? "—") · @(d.Theme ?? "—")</td>
+                                    <td>@(d.Note ?? (d.ClosedAt is null ? "en attente" : $"{d.Leads} demande(s), {d.Interactions} interaction(s) · r = {d.Reward?.ToString("0.#", Fr)}"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
 
     @if (google is not null)
     {
@@ -146,6 +187,8 @@ else
     private int days = 30;
     private MarketingReport? report;
     private Result<Hub.Modules.Channels.Publishers.LocationMetrics>? google;
+    private Hub.Modules.Channels.Application.Decisions.DecisionSummary? decisionSummary;
+    private IReadOnlyList<Hub.Modules.Channels.Application.Decisions.DecisionView> decisionRows = [];
     private string BioLink = "";
 
     protected override async Task OnInitializedAsync()
@@ -154,6 +197,8 @@ else
         BioLink = $"{(company.SiteUrl ?? "https://votre-site").TrimEnd('/')}/devis?utm_source=instagram&utm_medium=social&utm_campaign={MarketingResults.BioCampaign}";
         report = await Results.GetAsync(days);
         await LoadGoogleAsync();
+        decisionSummary = await Decisions.SummaryAsync();
+        decisionRows = await Decisions.ListAsync(10);
     }
 
     private async Task LoadGoogleAsync()

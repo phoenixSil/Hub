@@ -112,6 +112,16 @@ public static class AdminEndpoints
             var name = $"demandes-{BusinessTime.Today(TimeProvider.System):yyyy-MM-dd}.csv";
             return Results.File(bytes, "text/csv; charset=utf-8", name);
         }).RequireAuthorization();
+
+        app.MapGet("/admin/resultats/decisions.csv", async (HttpContext ctx, ITenantContext tenant,
+            Hub.Modules.Channels.Application.Decisions.IDecisionJournal journal) =>
+        {
+            if (Guid.TryParse(ctx.User.FindFirst(HubClaims.TenantId)?.Value, out var tenantId))
+                tenant.Set(tenantId);
+            var csv = await journal.ExportCsvAsync(ctx.RequestAborted);
+            var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv)).ToArray();
+            return Results.File(bytes, "text/csv; charset=utf-8", $"journal-decisions-{BusinessTime.Today(TimeProvider.System):yyyy-MM-dd}.csv");
+        }).RequireAuthorization();
     }
 
     /// <summary>Échappe une cellule CSV et neutralise les formules (=, +, -, @) pour Excel.</summary>

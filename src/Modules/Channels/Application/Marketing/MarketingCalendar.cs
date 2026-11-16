@@ -17,7 +17,8 @@ public sealed record CalendarPost(
     IReadOnlyList<ChannelType> Channels,
     PostStatus Status,
     bool FromAutopilot,
-    string? Error);
+    string? Error,
+    bool Trial = false);
 
 public sealed record CalendarDay(DateOnly Date, IReadOnlyList<CalendarPost> Posts);
 
@@ -125,7 +126,9 @@ internal sealed class MarketingCalendar(
             .ToListAsync(ct);
         var ids = posts.Select(p => p.Id).ToList();
         var targets = await db.PostTargets.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct);
-        return CalendarLogic.Week(monday, posts, targets);
+        var trials = (await db.Decisions.AsNoTracking().Where(d => ids.Contains(d.PostId) && d.Policy == DecisionPolicy.Exploration)
+            .Select(d => d.PostId).ToListAsync(ct)).ToHashSet();
+        return CalendarLogic.Week(monday, posts, targets, trials);
     }
 
     public async Task<Result<int>> ApproveWeekAsync(DateOnly monday, CancellationToken ct = default)
@@ -255,14 +258,14 @@ public static class CalendarLogic
     public static (DateTimeOffset From, DateTimeOffset To) Bounds(DateOnly monday) =>
         (BusinessTime.FromLocal(monday.ToDateTime(TimeOnly.MinValue)), BusinessTime.FromLocal(monday.AddDays(7).ToDateTime(TimeOnly.MinValue)));
 
-    public static CalendarWeek Week(DateOnly monday, IEnumerable<Post> posts, IEnumerable<PostTarget> targets)
+    public static CalendarWeek Week(DateOnly monday, IEnumerable<Post> posts, IEnumerable<PostTarget> targets, IReadOnlySet<Guid>? trials = null)
     {
         var byPost = targets.ToLookup(t => t.PostId);
         var items = posts
             .Where(p => (p.ScheduledAt ?? p.PublishedAt) is not null && p.Status != PostStatus.Cancelled)
             .Select(p => new CalendarPost(p.Id, (p.ScheduledAt ?? p.PublishedAt)!.Value, string.IsNullOrWhiteSpace(p.Title) ? Clip(p.Message) : p.Title,
                 p.ImageUrl, byPost[p.Id].Select(t => t.Channel).Distinct().ToList(), p.Status, p.FromAutopilot,
-                byPost[p.Id].Select(t => t.Error).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e))))
+                byPost[p.Id].Select(t => t.Error).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)), trials?.Contains(p.Id) == true))
             .ToList();
         var days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i))
             .Select(d => new CalendarDay(d, items.Where(p => AutopilotSchedule.LocalDay(p.At) == d).OrderBy(p => p.At).ToList()))

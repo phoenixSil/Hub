@@ -57,6 +57,7 @@ internal sealed class MarketingGuardian(
     PlanInsightsCollector insights,
     Reviews.IReviewService reviews,
     IChannelConnections connections,
+    Decisions.DecisionJournal decisions,
     IAutopilotContextSource source,
     IEmailSender email,
     ITenantContext tenant,
@@ -212,6 +213,14 @@ internal sealed class MarketingGuardian(
                 markers.Add(new MaintenanceEntry { At = now, Kind = GoogleMarker, Success = true, Message = "Google ajouté à la campagne." });
             }
         }
+
+        // 8. Journal des décisions : publications à journaliser, résultats à clôturer (J+7) et à finaliser (J+30).
+        var sync = await decisions.SyncAsync(ct);
+        if (sync.Closed + sync.Finalized > 0)
+            Log("Décisions", $"{sync.Closed} décision(s) clôturée(s), {sync.Finalized} finalisée(s)"
+                + (sync.AverageReward is { } avg ? $" : récompense moyenne {avg.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA"))}." : "."), true);
+        if (sync.Recorded > 0)
+            Log("Décisions", $"{sync.Recorded} publication(s) ajoutée(s) au journal des décisions.", true);
 
         var needsAction = entries.Count(e => !e.Success);
         var fixedCount = entries.Count(e => e.Success);

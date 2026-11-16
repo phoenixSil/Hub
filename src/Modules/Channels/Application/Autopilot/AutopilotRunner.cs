@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Hub.Modules.Channels.Application.Decisions;
 using Hub.Modules.Channels.Application.Marketing;
 using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
@@ -120,6 +121,8 @@ internal sealed class AutopilotRunner(
     IEmailSender email,
     AutopilotProgress progress,
     ITenantContext tenant,
+    DecisionJournal decisions,
+    Microsoft.Extensions.Options.IOptions<DecisionOptions> decisionOptions,
     TimeProvider clock,
     ILogger<AutopilotRunner> logger)
 {
@@ -324,7 +327,10 @@ internal sealed class AutopilotRunner(
                     problems.Add("campagne arrêtée pendant la préparation");
                     break;
                 }
-                var post = await PrepareAsync(item, context, settings, channels, recentScenes,
+                // Exploration (journal des décisions) : une part des créneaux est tirée au hasard, avec sa probabilité.
+                var explored = PublicationDecisions.Explore(item.At, decisionOptions.Value.ExplorationRate, Random.Shared, clock.GetUtcNow());
+                var planned = explored.Explored ? item with { At = explored.At } : item;
+                var post = await PrepareAsync(planned, context, settings, channels, recentScenes,
                     memory with { RecentImageUrls = recentImages.Take(10).ToList(), RecentStyles = recentStyles.Take(10).ToList() }, problems, ct);
                 if (post is not null)
                 {
@@ -336,6 +342,9 @@ internal sealed class AutopilotRunner(
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
                     db.Posts.Add(post.Value.Post);
                     db.PostTargets.AddRange(post.Value.Targets);
+                    await decisions.RecordAsync(db, post.Value.Post, post.Value.Targets.Select(t => t.Channel),
+                        explored.Explored ? DecisionPolicy.Exploration : DecisionPolicy.Ai,
+                        explored.Explored ? "Créneau" : null, explored.Propensity, ct);
                     await db.SaveChangesAsync(ct);
                     created++;
                 }

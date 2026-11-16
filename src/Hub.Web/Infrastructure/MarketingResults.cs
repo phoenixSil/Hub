@@ -130,3 +130,23 @@ public sealed class MarketingResults(
         _ => c.ToString(),
     };
 }
+
+/// <summary>Visites et demandes par campagne, pour clôturer les décisions du journal (module Canaux).</summary>
+public sealed class DecisionOutcomeSource(IDashboardQueries stats, ILeadAttribution leads)
+    : Hub.Modules.Channels.Application.Decisions.IDecisionOutcomeSource
+{
+    public async Task<IReadOnlyDictionary<string, Hub.Modules.Channels.Application.Decisions.CampaignOutcome>> GetAsync(
+        IReadOnlyCollection<string> campaigns, CancellationToken ct = default)
+    {
+        var list = campaigns.ToList();
+        var views = await stats.GetCampaignViewsAsync(list, ct);
+        var origins = await leads.ListForCampaignsAsync(list, ct);
+        return list.ToDictionary(c => c, c =>
+        {
+            var l = origins.Where(x => x.Campaign == c).ToList();
+            return new Hub.Modules.Channels.Application.Decisions.CampaignOutcome(
+                views.Where(x => x.Campaign == c).Sum(x => x.PageViews),
+                l.Count, l.Count(x => x.Kind == LeadKind.Appointment), l.Count(x => x.Status == LeadStatus.Won));
+        });
+    }
+}
