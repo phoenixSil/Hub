@@ -296,12 +296,20 @@ def gift_card(page):
     expect(page.locator(".giftcard-aside .alert-success")).to_contain_text("50 $")
 
 
-@step("Google Business : connecté en un clic, avis relevés, réponse proposée puis publiée")
+@step("Google Business : connecté en un clic, ajouté aux publications prévues, avis relevés, réponse proposée puis publiée")
 def google_business(page):
     page.goto(BASE + "/admin/canaux", wait_until="networkidle")
     page.locator("a", has_text="Connecter avec Google").first.click()
     page.wait_for_url("**/admin/canaux?connecte=**", timeout=20000)
     expect(page.locator("text=Google Business connecté").first).to_be_visible(timeout=15000)
+
+    # Le gardien ajoute Google aux publications déjà prévues.
+    page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    page.locator("button", has_text="Vérifier maintenant").click()
+    expect(page.locator(".alert-success")).to_contain_text("Vérification faite", timeout=120000)
+    page.locator(".cal-journal summary").click()
+    expect(page.locator(".cal-journal")).to_contain_text("aussi sur votre fiche Google")
+    expect(page.locator(".cal-net-googlebusiness").first).to_be_visible()
 
     page.goto(BASE + "/admin/avis-google", wait_until="networkidle")
     card = page.locator(".rv-card", has_text="Jean-François").first
