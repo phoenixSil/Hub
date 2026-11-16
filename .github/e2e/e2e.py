@@ -101,7 +101,7 @@ def results(page):
     page.goto(BASE + "/admin/resultats", wait_until="networkidle")
     page.wait_for_selector("text=Le parcours", timeout=15000)
     expect(page.locator(".kpi").first).to_contain_text("Publications parties")
-    expect(page.locator("text=Chaque publication")).to_be_visible()
+    expect(page.get_by_role("heading", name="Chaque publication")).to_be_visible()
     expect(page.locator("table.admin-table").last).to_contain_text("Facebook")
     page.click("text=7 jours")
     page.wait_for_timeout(800)
