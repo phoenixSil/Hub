@@ -10,12 +10,13 @@
     return;
 }
 
+<div class="@SkinClass">
 <a class="skip-link" href="#contenu">Aller au contenu</a>
 
 @if (season is not null)
 {
     <a class="season-bar season-@season.Key" href="@season.CtaUrl"
-       style="--season-bar-bg:@season.BarBackground;--season-bar-text:@season.BarText">@season.Bar <Icon Name="arrow-right" Size="14" /></a>
+       style="--season-bar-bg:@season.BarBackground;--season-bar-text:@season.BarText">@if (season.Skin is not null) { <Icon Name="snowflake" Size="16" Class="season-bar-flake" /> }@season.Bar <Icon Name="arrow-right" Size="14" /></a>
 }
 
 <div class="topbar">
@@ -101,6 +102,13 @@
             <img src="@SiteFormat.Logo(tenant)" alt="@tenant.Name" class="footer-logo" width="150" height="47" loading="lazy" />
             <p>@(tenant.ServiceAreaSummary ?? tenant.Tagline)</p>
             <div class="footer-social"><SocialLinks Tenant="tenant" Size="18" /></div>
+            @if (season?.Skin is not null)
+            {
+                <p class="footer-local">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#e0453a" d="M12 1.5l1.7 3.5 2.2-.9-.5 3.7 2.8-1.4-.3 2.3 2.9.6-2.6 2.2.7 1.5-4-.6.2 3.8L13 14.9V22h-2v-7.1l-2.1 1.3.2-3.8-4 .6.7-1.5L3.2 9.2l2.9-.6-.3-2.3 2.8 1.4-.5-3.7 2.2.9z"/></svg>
+                    Fièrement d'ici, à Québec
+                </p>
+            }
         </div>
         @foreach (var category in catalog)
         {
@@ -153,6 +161,7 @@
 </footer>
 
 <a class="call-fab" href="@SiteFormat.PhoneHref(tenant.Phone)" aria-label="Appeler @tenant.Name"><Icon Name="phone" Size="22" /></a>
+</div>
 
 <div class="consent" id="consent" hidden role="dialog" aria-labelledby="consent-title">
     <div class="consent-inner">
@@ -173,6 +182,9 @@
     private Tenant? tenant;
     private IReadOnlyList<CategoryWithServices> catalog = [];
     private SeasonalTheme? season;
+
+    /// <summary>Habillage complet de la saison (« skin-hiver ») sur tout le site public.</summary>
+    private string? SkinClass => season?.Skin is { } skin ? $"skin-{skin}" : null;
 
     protected override async Task OnInitializedAsync()
     {

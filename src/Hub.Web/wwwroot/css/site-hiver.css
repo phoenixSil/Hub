@@ -1,0 +1,127 @@
+/* ===== Habillage d'hiver « Neige de Québec » =====
+   Actif seulement quand le thème saisonnier porte l'habillage « hiver » (Hiver, Noël) : classe .skin-hiver
+   posée sur tout le site public par SiteLayout. Le blanc domine ; bleu glace et nuit d'hiver structurent ;
+   le rouge érable ne sert qu'aux Fêtes et aux cartes-cadeaux. Le logo ne change pas. */
+
+.skin-hiver {
+    --tint: #f4f9fd;
+    --line: #dcebf5;
+    --ink: #0b2a3c;
+    --blue-deep: #0b2a3c;
+    --radius: 20px;
+    --shadow: 0 1px 2px rgba(11, 42, 60, .05), 0 14px 32px rgba(11, 42, 60, .07);
+    --winter-blue: #00668f;
+    --frost: #e6f2fb;
+    --maple: #b3261e;
+}
+.skin-hiver :focus-visible { outline-color: #0097ce; }
+
+/* Bandeau, barre du haut, en-tête : tout en blanc */
+.skin-hiver .season-bar { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #d3e7f4; }
+.skin-hiver .season-bar-flake { color: #0097ce; }
+.skin-hiver .topbar { background: #fff; color: #33475b; border-bottom: 1px solid #e7f0f6; }
+.skin-hiver .topbar a { color: #33475b; }
+.skin-hiver .topbar a:hover { color: var(--ink); }
+.skin-hiver .topbar-gift { color: var(--maple) !important; }
+.skin-hiver .site-header { box-shadow: 0 6px 18px rgba(11, 42, 60, .05); }
+
+/* Boutons : nuit d'hiver et blanc */
+.skin-hiver .btn-primary { background: var(--ink); color: #fff; box-shadow: 0 8px 20px rgba(11, 42, 60, .16); }
+.skin-hiver .btn-primary:hover { background: #123c55; color: #fff; }
+.skin-hiver .btn-outline { border-color: #0097ce; color: var(--winter-blue); }
+.skin-hiver .btn-outline:hover { background: #0097ce; color: #fff; }
+.skin-hiver .btn-light { background: var(--ink); color: #fff; }
+.skin-hiver .btn-light:hover { background: #123c55; color: #fff; }
+.skin-hiver .btn-ghost-light { border-color: #bcdcef; color: var(--ink); background: #fff; }
+.skin-hiver .btn-ghost-light:hover { background: #eaf5fc; color: var(--ink); }
+.skin-hiver .call-fab { background: var(--ink); color: #fff; }
+
+/* Bannière d'accueil : ciel d'hiver, silhouette de Québec, congère, neige */
+.skin-hiver .hero { background: linear-gradient(180deg, #d6eaf7 0%, #eaf4fb 48%, #fff 100%); }
+.skin-hiver .hero::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 190px; z-index: 1; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 200' preserveAspectRatio='none'%3E%3Cpath fill='%23cfe3f1' d='M0 150H60V128H90V140H130V118L150 104 170 118V140H230V122H260V138H300V112H312V92L318 70 324 92V112H336V136H380V120H410V134H470V100H486V82L500 68 514 82V100H530V86L546 70 562 86V100H578V60H590V40L600 22 610 40V60H622V100H640V84L656 70 672 84V100H690V130H740V116H770V132H820V108H832V90L838 72 844 90V108H856V134H920V120H960V136H1020V114H1050V132H1110V122H1150V140H1210V126H1250V142H1320V132H1380V146H1440V200H0Z'/%3E%3Cpath fill='%23ffffff' d='M0 168C180 140 330 186 520 164 700 144 860 182 1040 160 1200 142 1320 176 1440 156V200H0Z'/%3E%3C/svg%3E") bottom / 100% 100% no-repeat; }
+.skin-hiver .hero-track { position: relative; z-index: 2; }
+.skin-hiver .hero-slide, .skin-hiver .season-slide { background: transparent; color: var(--ink); }
+.skin-hiver .hero-content { padding-bottom: 170px; }
+.skin-hiver .hero h1, .skin-hiver .hero-title, .skin-hiver .page-hero h1,
+.skin-hiver .season-slide .hero-title { color: var(--ink); text-shadow: none; }
+.skin-hiver .hero-lead, .skin-hiver .season-slide .hero-lead { color: #33475b; text-shadow: none; }
+.skin-hiver .hl, .skin-hiver .hero-title .hl, .skin-hiver .giftcard-hero .hl { color: var(--winter-blue); }
+.skin-hiver .eyebrow-light { color: var(--winter-blue); background: #fff; border: 1px solid #cfe4f2; }
+.skin-hiver .eyebrow { color: var(--winter-blue); }
+.skin-hiver .hero-dots { z-index: 4; }
+.skin-hiver .hero-dot { background: rgba(11, 42, 60, .25); }
+.skin-hiver .hero-dot[aria-current="true"] { background: var(--ink); }
+
+/* La photo de chaque offre posée dans une « fenêtre givrée » (ordinateur et tablette en largeur) */
+@media (min-width: 980px) {
+    .skin-hiver .hero-slide:not(.season-slide) .hero-content { padding-right: calc(min(38vw, 470px) + 56px); }
+    .skin-hiver .hero-slide:not(.season-slide)::after { content: ""; position: absolute; top: 50%; transform: translateY(-58%);
+        right: max(20px, calc((100% - var(--container)) / 2 + 20px)); width: min(38vw, 470px); aspect-ratio: 4 / 3.2;
+        background: radial-gradient(circle at 0 0, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 32%),
+                    radial-gradient(circle at 100% 100%, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 34%),
+                    var(--hero-image) center / cover no-repeat;
+        border: 14px solid #fff; border-radius: 28px; box-shadow: 0 30px 60px rgba(11, 42, 60, .16); }
+}
+
+/* Neige : flocons blancs bordés de bleu pour se voir sur le ciel clair */
+.skin-hiver .winter-snow { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.skin-hiver .flake { background: #fff; opacity: .95; box-shadow: 0 0 6px rgba(110, 170, 212, .9); }
+.skin-hiver .snow-toggle { z-index: 5; background: #fff; color: var(--ink); border-color: #cfe4f2; }
+.skin-hiver .snow-toggle:hover { background: #eaf5fc; }
+.skin-hiver .season-mascot img { filter: drop-shadow(0 12px 24px rgba(11, 42, 60, .18)); }
+.hat-tuque { left: 2%; top: -30%; transform: rotate(-10deg); }
+
+/* En-tête des pages intérieures : bande givrée et congère */
+.skin-hiver .page-hero, .skin-hiver .page-hero-plain { background: linear-gradient(180deg, #dceefa 0%, #f2f8fd 70%, #fff 100%); color: var(--ink); padding-bottom: 110px; }
+.skin-hiver .page-hero .hero-lead a { color: var(--winter-blue); }
+.skin-hiver .page-hero::after, .skin-hiver .cta-band::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 70px; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 90' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0 50C160 20 320 74 520 46 720 18 880 70 1080 44 1240 24 1340 56 1440 40V90H0Z'/%3E%3C/svg%3E") bottom / 100% 100% no-repeat; }
+.skin-hiver .page-hero .container { position: relative; z-index: 1; }
+
+/* Bande d'appel à l'action : givre clair au lieu du dégradé foncé */
+.skin-hiver .cta-band { position: relative; background: linear-gradient(135deg, #fff 0%, #eef7fd 60%, #dceefa 100%); color: var(--ink);
+    border-top: 1px solid #d3e7f4; padding-bottom: 110px; }
+.skin-hiver .cta-band h2 { color: var(--ink); }
+.skin-hiver .cta-band p { color: #33475b; }
+.skin-hiver .cta-band .container { position: relative; z-index: 1; }
+
+/* Sections et cartes : blanc, bordure bleu glace, ombre froide */
+.skin-hiver .trust-strip { background: #fff; border-bottom-color: #e7f0f6; }
+.skin-hiver .trust-item .icon { color: #0097ce; }
+.skin-hiver .service-card, .skin-hiver .feature, .skin-hiver .review, .skin-hiver .faq-item, .skin-hiver .step,
+.skin-hiver .value-list li, .skin-hiver .lead-form, .skin-hiver .area-grid a { box-shadow: 0 10px 26px rgba(11, 42, 60, .05); }
+.skin-hiver .service-card-media::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 24px; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 30' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0 18C40 6 70 26 110 16 150 6 190 24 230 14 260 8 285 18 300 12V30H0Z'/%3E%3C/svg%3E") bottom / 100% 100% no-repeat; }
+.skin-hiver .service-card-icon { z-index: 1; background: #0097ce; }
+.skin-hiver .step:nth-child(even) .step-icon { background: rgba(0, 151, 206, .1); color: var(--winter-blue); }
+.skin-hiver .check-list .icon { color: #0097ce; }
+.skin-hiver .chips a { background: #f1f8fd; border-color: #d3e7f4; }
+.skin-hiver .price-box { border-color: #0097ce; background: #f1f8fd; }
+.skin-hiver .credit-result .credit-net { border-color: #0097ce; }
+.skin-hiver .thanks-icon { background: var(--ink); color: #fff; }
+.skin-hiver .giftcard-preview { background: var(--ink); box-shadow: inset 0 -8px 0 var(--maple), var(--shadow); }
+.skin-hiver .aside-card { background: #fff; box-shadow: 0 20px 44px rgba(11, 42, 60, .08); }
+
+/* Pied de page : nuit d'hiver bordée d'une congère */
+.skin-hiver .site-footer { position: relative; background: var(--ink); color: #c9dbe7; padding-top: 120px; }
+.skin-hiver .site-footer::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 80px; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 80' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0 0H1440V34C1290 62 1150 22 990 44 820 68 690 24 520 46 360 66 210 26 0 50Z'/%3E%3C/svg%3E") top / 100% 100% no-repeat; }
+.skin-hiver .site-footer a { color: #c9dbe7; }
+.skin-hiver .site-footer a:hover { color: #fff; }
+.footer-local { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0; color: #fff; font-weight: 500; }
+
+@media (max-width: 760px) {
+    /* Sur téléphone, le flocon reste sur la même ligne que le texte. */
+    .skin-hiver .season-bar { display: block; }
+    .skin-hiver .season-bar-flake { vertical-align: -3px; margin-right: 4px; }
+    .skin-hiver .hero::before { height: 110px; }
+    .skin-hiver .hero-content { padding-bottom: 130px; }
+    .skin-hiver .page-hero, .skin-hiver .page-hero-plain { padding-bottom: 80px; }
+    .skin-hiver .page-hero::after, .skin-hiver .cta-band::after { height: 40px; }
+    .skin-hiver .site-footer { padding-top: 80px; }
+    .skin-hiver .site-footer::before { height: 44px; }
+    .hat-tuque { top: -24%; }
+}
+.skin-hiver .breadcrumb { color: #4c6274; }
+.skin-hiver .breadcrumb a { color: var(--winter-blue); }

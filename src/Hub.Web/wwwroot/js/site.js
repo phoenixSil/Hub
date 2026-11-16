@@ -51,7 +51,7 @@
         var button = document.querySelector("[data-snow-toggle]");
         if (!button || button.dataset.ready) return;
         button.dataset.ready = "1";
-        var slide = button.closest(".season-slide");
+        var slide = button.closest(".season-slide") || button.closest(".hero");
         function apply(off) {
             slide.classList.toggle("snow-off", off);
             button.setAttribute("aria-pressed", off ? "true" : "false");
