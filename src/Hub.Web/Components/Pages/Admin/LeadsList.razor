@@ -1,6 +1,7 @@
 @page "/admin/demandes"
 @rendermode InteractiveServer
 @inject ILeadInbox Leads
+@inject AuthenticationStateProvider Auth
 
 <PageTitle>Demandes</PageTitle>
 
@@ -9,8 +10,16 @@
         <h1>Demandes</h1>
         <p class="muted">Toutes les demandes reçues par le site. Les pourriels sont masqués sauf si vous les filtrez.</p>
     </div>
-    <a class="btn btn-outline btn-sm" href="/admin/demandes/export.csv" download>Exporter (CSV)</a>
+    <div class="actions">
+        <BusyButton Class="btn btn-outline btn-sm" OnClick="CleanAsync" IsBusy="cleaning" AnyBusy="cleaning" BusyText="Nettoyage…">Nettoyer les pourriels</BusyButton>
+        <a class="btn btn-outline btn-sm" href="/admin/demandes/export.csv" download>Exporter (CSV)</a>
+    </div>
 </div>
+
+@if (feedback is not null)
+{
+    <div class="alert alert-success" role="status">@feedback</div>
+}
 
 <div class="admin-card filters">
     <select @bind="status" @bind:after="LoadAsync">
@@ -42,11 +51,28 @@
     private string? search;
     private List<Lead> items = [];
     private Dictionary<LeadStatus, int> counts = [];
+    private bool cleaning;
+    private string? feedback;
 
     protected override async Task OnInitializedAsync()
     {
         status = StatusQuery;
         await LoadAsync();
+    }
+
+    private async Task CleanAsync()
+    {
+        if (cleaning) return;
+        cleaning = true;
+        try
+        {
+            var user = (await Auth.GetAuthenticationStateAsync()).User;
+            var n = await Leads.CleanSpamAsync(user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur");
+            feedback = n == 0 ? "Aucun pourriel trouvé parmi les demandes nouvelles ou perdues."
+                : $"{n} demande(s) classée(s) en pourriel. Retrouvez-les avec le filtre « Pourriel » (bouton « Ce n'est pas un pourriel » sur chaque fiche).";
+            await LoadAsync();
+        }
+        finally { cleaning = false; }
     }
 
     private async Task LoadAsync()

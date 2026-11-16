@@ -39,6 +39,14 @@
     <div class="alert @(messageIsError ? "alert-error" : "alert-success")">@message</div>
 }
 
+@if (l.Status == LeadStatus.Spam)
+{
+    <div class="alert alert-warning spam-banner">
+        <span>Cette demande est classée en <strong>pourriel</strong> : elle n'a envoyé aucun courriel et ne compte dans aucune statistique.</span>
+        <button class="btn btn-outline btn-sm" @onclick="NotSpamAsync">Ce n'est pas un pourriel</button>
+    </div>
+}
+
 <div class="admin-columns">
     <div class="admin-card">
         <h2>Coordonnées</h2>
@@ -262,6 +270,14 @@
             await Leads.ChangeStatusAsync(Id, s, await AuthorAsync());
             await LoadAsync();
         }
+    }
+
+    private async Task NotSpamAsync()
+    {
+        await Leads.ChangeStatusAsync(Id, LeadStatus.New, await AuthorAsync());
+        message = "Demande remise dans les nouvelles demandes.";
+        messageIsError = false;
+        await LoadAsync();
     }
 
     private async Task AddNoteAsync()

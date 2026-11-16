@@ -33,6 +33,9 @@ public interface ILeadInbox
     Task<LeadDetail?> GetAsync(Guid id, CancellationToken ct = default);
     Task<Dictionary<LeadStatus, int>> CountByStatusAsync(CancellationToken ct = default);
     Task ChangeStatusAsync(Guid id, LeadStatus status, string author, CancellationToken ct = default);
+
+    /// <summary>Applique le filtre anti-pourriel aux demandes nouvelles ou perdues déjà reçues ; renvoie le nombre classé.</summary>
+    Task<int> CleanSpamAsync(string author, CancellationToken ct = default);
     Task AddNoteAsync(Guid id, string note, string author, CancellationToken ct = default);
     Task<Result> ConfirmAppointmentAsync(Guid id, DateTimeOffset when, string? note, string author, CancellationToken ct = default);
 

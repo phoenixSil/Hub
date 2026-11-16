@@ -348,6 +348,34 @@ def decision_journal(page):
     assert content.count("\n") >= total + 1, "lignes manquantes dans l'export"
 
 
+@step("Pourriel : un message de robot est classé tout seul, sans courriel, et peut être rétabli")
+def spam_filter(page):
+    page.goto(BASE + "/contact", wait_until="networkidle")
+    page.fill("#name", "RobertBuimi")
+    page.fill("#email", "robert.buimi.e2e@example.com")
+    page.fill("#subject", "Hi, i am writing about the price")
+    page.fill("#message", "Hi, i am writing about your the price for reseller")
+    page.locator("input[name='Model.ConsentGiven']").check()
+    page.locator("form button[type=submit]").first.click()
+    page.wait_for_url("**/merci**", timeout=20000)
+
+    page.goto(BASE + "/admin/demandes", wait_until="networkidle")
+    expect(page.locator("text=RobertBuimi")).to_have_count(0)
+    page.locator(".filters select").first.select_option("Spam")
+    expect(page.locator("a", has_text="RobertBuimi").first).to_be_visible(timeout=15000)
+    page.locator("a", has_text="RobertBuimi").first.click()
+    expect(page.locator(".spam-banner")).to_be_visible(timeout=15000)
+    expect(page.locator("text=formule connue des robots").first).to_be_visible()
+    page.locator(".spam-banner button", has_text="Ce n'est pas un pourriel").click()
+    expect(page.locator(".alert-success")).to_contain_text("remise dans les nouvelles demandes", timeout=15000)
+
+    # Le nettoyage en un clic le reclasse aussitôt.
+    page.goto(BASE + "/admin/demandes", wait_until="networkidle")
+    page.locator("button", has_text="Nettoyer les pourriels").click()
+    expect(page.locator(".alert-success")).to_contain_text("classée(s) en pourriel", timeout=15000)
+    expect(page.locator("a", has_text="RobertBuimi")).to_have_count(0)
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -369,6 +397,7 @@ with sync_playwright() as p:
     gift_card(page)
     google_business(page)
     decision_journal(page)
+    spam_filter(page)
     browser.close()
 
 if failures:

@@ -67,6 +67,32 @@ internal sealed class LeadInboxService(
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<int> CleanSpamAsync(string author, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var all = await db.Leads.Select(l => new { l.Id, l.Email, l.FullName, l.CreatedAt }).ToListAsync(ct);
+        var candidates = await db.Leads.Where(l => l.Status == LeadStatus.New || l.Status == LeadStatus.Lost).ToListAsync(ct);
+        var count = 0;
+        foreach (var lead in candidates)
+        {
+            // Même expéditeur dans les 24 h qui précèdent (comme à la réception).
+            var same = all.Count(o => o.Id != lead.Id && o.CreatedAt <= lead.CreatedAt && o.CreatedAt >= lead.CreatedAt.AddHours(-24)
+                && (o.Email == lead.Email || o.FullName == lead.FullName));
+            var verdict = SpamFilter.Check(lead.FullName, lead.Subject, lead.Message, lead.Phone, same);
+            if (!verdict.IsSpam) continue;
+            var before = lead.Status;
+            lead.Status = LeadStatus.Spam;
+            db.Activities.Add(new LeadActivity
+            {
+                LeadId = lead.Id, Author = author,
+                Action = $"Statut : {LeadLabels.Of(before)} → {LeadLabels.Of(LeadStatus.Spam)}. " + SpamFilter.Describe(verdict),
+            });
+            count++;
+        }
+        await db.SaveChangesAsync(ct);
+        return count;
+    }
+
     public async Task AddNoteAsync(Guid id, string note, string author, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(note)) return;
