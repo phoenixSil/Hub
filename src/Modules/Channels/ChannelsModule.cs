@@ -64,6 +64,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<PostStats> PostStats => Set<PostStats>();
     public DbSet<AudienceSnapshot> AudienceSnapshots => Set<AudienceSnapshot>();
     public DbSet<MaintenanceEntry> MaintenanceEntries => Set<MaintenanceEntry>();
+    public DbSet<Decision> Decisions => Set<Decision>();
     public DbSet<GoogleReview> Reviews => Set<GoogleReview>();
 
     protected override void ConfigureModel(ModelBuilder b)
@@ -139,6 +140,26 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Kind).HasMaxLength(30);
             e.Property(x => x.Message).HasMaxLength(1000);
             e.HasIndex(x => new { x.TenantId, x.At });
+        });
+
+        b.Entity<Decision>(e =>
+        {
+            e.ToTable("Decisions");
+            e.Property(x => x.Domain).HasMaxLength(40);
+            e.Property(x => x.Policy).HasMaxLength(20);
+            e.Property(x => x.Explored).HasMaxLength(40);
+            e.Property(x => x.Slot).HasMaxLength(40);
+            e.Property(x => x.Format).HasMaxLength(60);
+            e.Property(x => x.Audience).HasMaxLength(100);
+            e.Property(x => x.Theme).HasMaxLength(60);
+            e.Property(x => x.Pillar).HasMaxLength(40);
+            e.Property(x => x.VisualKind).HasMaxLength(30);
+            e.Property(x => x.Channels).HasMaxLength(100);
+            e.Property(x => x.ContextJson).HasMaxLength(2000);
+            e.Property(x => x.Cost).HasPrecision(10, 2);
+            e.Property(x => x.Note).HasMaxLength(200);
+            e.HasIndex(x => new { x.TenantId, x.PostId });
+            e.HasIndex(x => new { x.TenantId, x.DecidedAt });
         });
 
         b.Entity<ImageUsage>(e =>
@@ -224,6 +245,10 @@ public static class ChannelsModule
         // Plan marketing : le pilote le suit ; les chiffres des réseaux sont relevés chaque jour.
         services.AddScoped<PlanInsightsCollector>();
         services.AddScoped<Application.Marketing.MarketingGuardian>();
+        services.Configure<Application.Decisions.DecisionOptions>(configuration.GetSection(Application.Decisions.DecisionOptions.Section));
+        services.AddSingleton<Application.Decisions.IDecisionAdapter, Application.Decisions.PublicationDecisions>();
+        services.AddScoped<Application.Decisions.DecisionJournal>();
+        services.AddScoped<Application.Decisions.IDecisionJournal>(sp => sp.GetRequiredService<Application.Decisions.DecisionJournal>());
         services.AddScoped<Application.Reviews.IReviewService, Application.Reviews.ReviewService>();
         services.AddHostedService<Application.Marketing.MarketingGuardianWorker>();
         services.AddScoped<IMarketingPlanService, MarketingPlanService>();

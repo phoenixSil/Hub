@@ -10,6 +10,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 7. Une section ouverte depuis le menu n'est pas cachée sous l'en-tête collant.
 8. Marketing : assistant de campagne avec aperçu, calendrier (remplacer, retirer, tout approuver), campagne en réserve, pause, arrêt, campagne intensive.
 9. Une carte-cadeau se demande sur le site, se marque payée (elle part), s'utilise et son solde se vérifie.
+11. Journal des décisions : les publications y sont, le gardien clôture leurs résultats, l'export CSV se télécharge.
 10. Google Business : connexion en un clic, avis relevés, réponse proposée par l'IA puis publiée, chiffres de la fiche.
 
 Usage : python3 e2e.py http://localhost:5080
@@ -100,7 +101,7 @@ def results(page):
     page.goto(BASE + "/admin/resultats", wait_until="networkidle")
     page.wait_for_selector("text=Le parcours", timeout=15000)
     expect(page.locator(".kpi").first).to_contain_text("Publications parties")
-    expect(page.locator("text=Chaque publication")).to_be_visible()
+    expect(page.get_by_role("heading", name="Chaque publication")).to_be_visible()
     expect(page.locator("table.admin-table").last).to_contain_text("Facebook")
     page.click("text=7 jours")
     page.wait_for_timeout(800)
@@ -327,6 +328,26 @@ def google_business(page):
     expect(page.locator("#google-metrics")).to_contain_text("Vues de la fiche", timeout=20000)
 
 
+@step("Journal des décisions : publications journalisées, résultats clôturés par le gardien, export CSV")
+def decision_journal(page):
+    page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    page.locator("button", has_text="Vérifier maintenant").click()
+    expect(page.locator(".alert-success")).to_contain_text("Vérification faite", timeout=120000)
+    page.goto(BASE + "/admin/resultats", wait_until="networkidle")
+    card = page.locator("#decision-journal")
+    expect(card).to_be_visible(timeout=20000)
+    total = int(card.locator(".kpi", has_text="Décisions").locator("strong").inner_text())
+    closed = int(card.locator(".kpi", has_text="Clôturées").locator("strong").inner_text())
+    assert total >= 3, f"{total} décision(s) seulement dans le journal"
+    assert closed >= 1, "aucune décision clôturée par le gardien"
+    expect(card.locator(".dj-table tbody tr").first).to_be_visible()
+    with page.expect_download(timeout=15000) as d:
+        card.locator("a", has_text="Exporter (CSV)").click()
+    content = open(d.value.path(), encoding="utf-8-sig").read()
+    assert content.startswith("decision_id;domaine;publication_id"), content[:80]
+    assert content.count("\n") >= total + 1, "lignes manquantes dans l'export"
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -347,6 +368,7 @@ with sync_playwright() as p:
     guardian(page)
     gift_card(page)
     google_business(page)
+    decision_journal(page)
     browser.close()
 
 if failures:

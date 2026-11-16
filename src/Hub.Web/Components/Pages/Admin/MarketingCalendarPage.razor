@@ -145,6 +145,7 @@
                             <div class="cal-meta">
                                 <strong>@Hour(p.At)</strong>
                                 @foreach (var c in p.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()" title="@PostLabels.Of(c)">@Short(c)</span> }
+                                @if (p.Trial) { <span class="cal-trial" title="Créneau tiré au hasard pour apprendre quel moment marche le mieux (journal des décisions). Vous pouvez le modifier comme d'habitude.">essai</span> }
                             </div>
                             <a href="/admin/publications/@p.Id" class="cal-title">@p.Title</a>
                             <span class="cal-state">@StateLabel(p)</span>

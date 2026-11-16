@@ -71,6 +71,7 @@ else
     builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiImageGenerator, NoAiImageGenerator>();
 builder.Services.AddSingleton<Hub.Modules.Channels.Application.IPhotoComposer, SkiaPhotoComposer>();
 builder.Services.AddScoped<IMarketingResults, MarketingResults>();
+builder.Services.AddScoped<Hub.Modules.Channels.Application.Decisions.IDecisionOutcomeSource, DecisionOutcomeSource>();
 builder.Services.AddHostedService<WeeklyReportWorker>();
 
 // Courriels : fournisseur choisi par Email:Provider, sinon détecté (Resend, Azure Communication, dossier local, journal).
