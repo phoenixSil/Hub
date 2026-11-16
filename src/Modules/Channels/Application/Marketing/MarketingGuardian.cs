@@ -56,6 +56,7 @@ internal sealed class MarketingGuardian(
     AutopilotProgress progress,
     PlanInsightsCollector insights,
     Reviews.IReviewService reviews,
+    IChannelConnections connections,
     IAutopilotContextSource source,
     IEmailSender email,
     ITenantContext tenant,
@@ -64,6 +65,9 @@ internal sealed class MarketingGuardian(
     ILogger<MarketingGuardian> logger)
 {
     public const string Check = "Verification";
+
+    /// <summary>Repère discret (hors journal) : Google a déjà été ajouté à cette publication ou à la campagne, une seule fois.</summary>
+    public const string GoogleMarker = "GoogleAjout";
     private static readonly TimeSpan StuckAfter = TimeSpan.FromMinutes(15);
 
     public async Task<GuardianReport> RunAsync(CancellationToken ct = default)
@@ -177,6 +181,38 @@ internal sealed class MarketingGuardian(
             }
         }
 
+        // 7. Google Business connecté : les publications à venir partent aussi sur la fiche Google, et la campagne aussi.
+        //    Une seule fois par publication : si vous retirez Google d'une publication, le gardien ne le remet pas.
+        var markers = new List<MaintenanceEntry>();
+        if ((await connections.GetStatusAsync(ChannelType.GoogleBusiness, ct)).IsConnected)
+        {
+            var done = (await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind == GoogleMarker)
+                .Select(e => e.PostId).ToListAsync(ct)).ToHashSet();
+            var upcoming = await db.Posts
+                .Where(p => (p.Status == PostStatus.AwaitingApproval || p.Status == PostStatus.Scheduled) && p.ScheduledAt > now
+                    && !db.PostTargets.Any(t => t.PostId == p.Id && t.Channel == ChannelType.GoogleBusiness))
+                .Select(p => p.Id).ToListAsync(ct);
+            var added = upcoming.Where(id => !done.Contains(id)).ToList();
+            foreach (var id in added)
+            {
+                db.PostTargets.Add(new PostTarget { PostId = id, Channel = ChannelType.GoogleBusiness });
+                markers.Add(new MaintenanceEntry { At = now, Kind = GoogleMarker, Success = true, PostId = id, Message = "Google ajouté." });
+            }
+            if (added.Count > 0) Log("Google", $"{added.Count} publication(s) à venir partiront aussi sur votre fiche Google.", true);
+
+            var autopilot = await db.AutopilotSettings.FirstOrDefaultAsync(ct);
+            if (autopilot is not null && !done.Contains(null))
+            {
+                var channels = AutopilotService.ReadChannels(autopilot.Channels);
+                if (!channels.Contains(ChannelType.GoogleBusiness))
+                {
+                    autopilot.Channels = string.Join(",", channels.Append(ChannelType.GoogleBusiness));
+                    Log("Google", "Les prochaines publications de la campagne partiront aussi sur Google.", true);
+                }
+                markers.Add(new MaintenanceEntry { At = now, Kind = GoogleMarker, Success = true, Message = "Google ajouté à la campagne." });
+            }
+        }
+
         var needsAction = entries.Count(e => !e.Success);
         var fixedCount = entries.Count(e => e.Success);
         entries.Add(new MaintenanceEntry
@@ -185,8 +221,9 @@ internal sealed class MarketingGuardian(
             Message = $"Vérification : {fixedCount} relance(s), {needsAction} problème(s) à régler.",
         });
         // Le journal ne garde que 30 jours.
-        await db.MaintenanceEntries.Where(e => e.At < now.AddDays(-30)).ExecuteDeleteAsync(ct);
+        await db.MaintenanceEntries.Where(e => e.At < now.AddDays(-30) && e.Kind != GoogleMarker).ExecuteDeleteAsync(ct);
         db.MaintenanceEntries.AddRange(entries);
+        db.MaintenanceEntries.AddRange(markers);
         await db.SaveChangesAsync(ct);
 
         if (needsAction > 0) await AlertAsync(db, entries.Where(e => !e.Success && e.Kind != Check).ToList(), dayStart, ct);

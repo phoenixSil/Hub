@@ -107,7 +107,7 @@ internal sealed class MarketingCalendar(
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var last = await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind == MarketingGuardian.Check).OrderByDescending(e => e.At).FirstOrDefaultAsync(ct);
-        var journal = await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind != MarketingGuardian.Check)
+        var journal = await db.MaintenanceEntries.AsNoTracking().Where(e => e.Kind != MarketingGuardian.Check && e.Kind != MarketingGuardian.GoogleMarker)
             .OrderByDescending(e => e.At).Take(30).ToListAsync(ct);
         var batch = last is null ? [] : journal.Where(e => e.At == last.At).ToList();
         return new GuardianStatus(last?.At, batch.Count(e => e.Success), batch.Count(e => !e.Success), journal);
