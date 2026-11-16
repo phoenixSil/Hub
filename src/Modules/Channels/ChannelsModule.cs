@@ -65,6 +65,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<AudienceSnapshot> AudienceSnapshots => Set<AudienceSnapshot>();
     public DbSet<MaintenanceEntry> MaintenanceEntries => Set<MaintenanceEntry>();
     public DbSet<Decision> Decisions => Set<Decision>();
+    public DbSet<VideoUsage> VideoUsages => Set<VideoUsage>();
     public DbSet<GoogleReview> Reviews => Set<GoogleReview>();
 
     protected override void ConfigureModel(ModelBuilder b)
@@ -97,6 +98,9 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Format).HasMaxLength(40);
             e.Property(x => x.SceneNote).HasMaxLength(400);
             e.Property(x => x.ArtStyle).HasMaxLength(40);
+            e.Property(x => x.ReelKind).HasMaxLength(20);
+            e.Property(x => x.VideoUrl).HasMaxLength(1000);
+            e.Property(x => x.ReelError).HasMaxLength(500);
             e.HasIndex(x => new { x.Status, x.ScheduledAt });
             e.HasIndex(x => new { x.TenantId, x.Campaign });
         });
@@ -160,6 +164,14 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Note).HasMaxLength(200);
             e.HasIndex(x => new { x.TenantId, x.PostId });
             e.HasIndex(x => new { x.TenantId, x.DecidedAt });
+        });
+
+        b.Entity<VideoUsage>(e =>
+        {
+            e.ToTable("VideoUsages");
+            e.Property(x => x.Month).HasMaxLength(7);
+            e.Property(x => x.Cost).HasPrecision(10, 2);
+            e.HasIndex(x => new { x.TenantId, x.Month }).IsUnique();
         });
 
         b.Entity<ImageUsage>(e =>
@@ -248,6 +260,8 @@ public static class ChannelsModule
         services.Configure<Application.Decisions.DecisionOptions>(configuration.GetSection(Application.Decisions.DecisionOptions.Section));
         services.AddSingleton<Application.Decisions.IDecisionAdapter, Application.Decisions.PublicationDecisions>();
         services.AddScoped<Application.Decisions.DecisionJournal>();
+        services.Configure<Application.Reels.ReelOptions>(configuration.GetSection(Application.Reels.ReelOptions.Section));
+        services.AddScoped<Application.Reels.IReelService, Application.Reels.ReelService>();
         services.AddScoped<Application.Decisions.IDecisionJournal>(sp => sp.GetRequiredService<Application.Decisions.DecisionJournal>());
         services.AddScoped<Application.Reviews.IReviewService, Application.Reviews.ReviewService>();
         services.AddHostedService<Application.Marketing.MarketingGuardianWorker>();

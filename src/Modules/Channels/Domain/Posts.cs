@@ -76,6 +76,39 @@ public sealed class Post : TenantEntity
 
     /// <summary>Style visuel de l'image (voir la bible de styles), pour ne pas le répéter.</summary>
     public string? ArtStyle { get; set; }
+
+    /// <summary>
+    /// Reel (vidéo verticale) : type demandé (<see cref="ReelKinds"/>). La vidéo est préparée à part ;
+    /// tant que <see cref="VideoUrl"/> est vide, la publication partirait avec son image.
+    /// </summary>
+    public string? ReelKind { get; set; }
+
+    /// <summary>Adresse publique de la vidéo du Reel (MP4 vertical 1080×1920).</summary>
+    public string? VideoUrl { get; set; }
+
+    /// <summary>Dernière erreur de préparation de la vidéo (affichée dans l'éditeur), ou null.</summary>
+    public string? ReelError { get; set; }
+}
+
+/// <summary>Les trois façons de faire un Reel.</summary>
+public static class ReelKinds
+{
+    /// <summary>Scène générée par l'IA vidéo (payant, plafonné chaque mois).</summary>
+    public const string Ai = "IA";
+
+    /// <summary>Vidéos avant/après filmées et téléversées par l'entreprise.</summary>
+    public const string BeforeAfter = "AvantApres";
+
+    /// <summary>Montage animé des images de la publication (gratuit).</summary>
+    public const string Montage = "Montage";
+
+    public static string Label(string? kind) => kind switch
+    {
+        Ai => "Reel IA",
+        BeforeAfter => "Reel avant/après",
+        Montage => "Reel monté",
+        _ => "Image",
+    };
 }
 
 /// <summary>Publication d'un <see cref="Post"/> sur un réseau donné.</summary>

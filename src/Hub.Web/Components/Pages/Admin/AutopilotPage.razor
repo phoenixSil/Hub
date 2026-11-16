@@ -3,6 +3,7 @@
 @inject IAutopilotService Autopilot
 @inject IPublisherResolver Publishers
 @inject IPostWriter Writer
+@inject Hub.Modules.Channels.Application.Reels.IReelService Reels
 
 <PageTitle>Pilote automatique</PageTitle>
 
@@ -45,6 +46,19 @@ else
                     </select>
                     <span class="muted small">3 à 5 par semaine pour entretenir la présence ; 7 pour un objectif de visibilité ; jusqu'à 21 (3 par jour : matin, midi et soir) pour une communication intensive. Le Plan marketing règle ce rythme.</span>
                     <FieldError Errors="errors" For="PostsPerWeek" />
+                </div>
+                <div class="field">
+                    <label for="reels-per-week">Reels (vidéos) par semaine</label>
+                    <select id="reels-per-week" @bind="form.ReelsPerWeek">
+                        @for (var n = 0; n <= 7; n++) { var v = n; <option value="@v">@(v == 0 ? "Aucun" : $"{v} par semaine")</option> }
+                    </select>
+                    <span class="muted small">
+                        Parmi les publications de la semaine : la première devient un Reel généré par l'IA
+                        @if (Reels.AiConfigured) { <text>(≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $ chacun)</text> }
+                        , les autres des Reels montés à partir des images (gratuits).
+                        @if (budget is not null) { <text> Vidéos IA ce mois-ci : @budget.Used.ToString("0.00", AdminFormat.Fr) $ sur un plafond de @budget.Cap.ToString("0", AdminFormat.Fr) $ ; au-delà, Reels montés seulement.</text> }
+                    </span>
+                    <FieldError Errors="errors" For="ReelsPerWeek" />
                 </div>
                 <div class="field">
                     <label>Validation</label>
@@ -125,6 +139,7 @@ else
     private AutopilotForm? form;
     private IReadOnlyDictionary<string, string>? errors;
     private int pending;
+    private Hub.Modules.Channels.Application.Reels.ReelBudget? budget;
     private string? working;
     private string? feedback;
     private bool feedbackIsError;
@@ -137,6 +152,7 @@ else
     {
         form = await Autopilot.GetAsync();
         pending = await Autopilot.PendingCountAsync();
+        budget = await Reels.BudgetAsync();
     }
 
     private void Toggle(ChannelType c, bool on)

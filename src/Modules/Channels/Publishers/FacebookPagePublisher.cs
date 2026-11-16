@@ -13,6 +13,9 @@ public sealed class FacebookOptions
     /// <summary>Version de l'API Graph de Meta.</summary>
     public string GraphVersion { get; set; } = "v27.0";
     public string GraphBaseUrl { get; set; } = "https://graph.facebook.com";
+
+    /// <summary>Service d'envoi des vidéos (Reels) de Meta.</summary>
+    public string UploadBaseUrl { get; set; } = "https://rupload.facebook.com";
 }
 
 /// <summary>
@@ -51,6 +54,7 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
 
     public async Task<PublishResult> PublishAsync(PublishRequest r, ChannelCredentials c, CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(r.VideoUrl)) return await PublishReelAsync(r, c, ct);
         var form = new Dictionary<string, string> { ["access_token"] = c.AccessToken };
         string path;
         if (!string.IsNullOrWhiteSpace(r.ImageUrl))
@@ -85,6 +89,60 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
             logger.LogError(ex, "Facebook injoignable");
             return PublishResult.Fail("Facebook est injoignable pour le moment.");
         }
+    }
+
+    /// <summary>
+    /// Reel de page en trois temps (API Reels de Meta) : réserver la vidéo, la faire télécharger par Meta depuis son adresse
+    /// publique, puis la publier avec sa description (texte + lien).
+    /// </summary>
+    private async Task<PublishResult> PublishReelAsync(PublishRequest r, ChannelCredentials c, CancellationToken ct)
+    {
+        try
+        {
+            var start = await FormAsync(Url($"{c.AccountId}/video_reels"), new()
+            {
+                ["upload_phase"] = "start",
+                ["access_token"] = c.AccessToken,
+            }, ct);
+            if (start.IsFailure) return PublishResult.Fail(start.Error!);
+            var videoId = start.Value!["video_id"]?.GetValue<string>();
+            if (videoId is null) return PublishResult.Fail("Facebook n'a pas réservé la vidéo du Reel.");
+
+            using (var upload = new HttpRequestMessage(HttpMethod.Post,
+                       $"{options.Value.UploadBaseUrl.TrimEnd('/')}/video-upload/{options.Value.GraphVersion}/{videoId}"))
+            {
+                upload.Headers.TryAddWithoutValidation("Authorization", $"OAuth {c.AccessToken}");
+                upload.Headers.TryAddWithoutValidation("file_url", r.VideoUrl);
+                using var sent = await http.SendAsync(upload, ct);
+                if (!sent.IsSuccessStatusCode)
+                    return PublishResult.Fail(ErrorOf(JsonNode.Parse(await sent.Content.ReadAsStringAsync(ct))) ?? $"Facebook n'a pas reçu la vidéo ({(int)sent.StatusCode}).");
+            }
+
+            var finish = await FormAsync(Url($"{c.AccountId}/video_reels"), new()
+            {
+                ["upload_phase"] = "finish",
+                ["video_id"] = videoId,
+                ["video_state"] = "PUBLISHED",
+                ["description"] = string.IsNullOrWhiteSpace(r.Link) ? r.Message : $"{r.Message}\n\n{r.Link}",
+                ["access_token"] = c.AccessToken,
+            }, ct);
+            if (finish.IsFailure) return PublishResult.Fail(finish.Error!);
+            return PublishResult.Ok(videoId, $"https://www.facebook.com/reel/{videoId}");
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Facebook injoignable (Reel)");
+            return PublishResult.Fail("Facebook est injoignable pour le moment.");
+        }
+    }
+
+    private async Task<Result<JsonNode>> FormAsync(string url, Dictionary<string, string> form, CancellationToken ct)
+    {
+        using var response = await http.PostAsync(url, new FormUrlEncodedContent(form), ct);
+        var json = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+        return response.IsSuccessStatusCode && json is not null
+            ? Result<JsonNode>.Success(json)
+            : Result<JsonNode>.Failure(ErrorOf(json) ?? $"Facebook a répondu {(int)response.StatusCode}.");
     }
 
     public async Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials c, CancellationToken ct = default)
@@ -243,7 +301,7 @@ internal sealed class SimulatedPublisher(ChannelType channel, ILogger logger) : 
         if (r.Message.Contains(TransientFailureMarker, StringComparison.Ordinal) && FailedOnce.TryAdd($"{channel}|{r.Message}", true))
             return Task.FromResult(PublishResult.Fail("Service temporairement indisponible (simulé)."));
         var id = $"simule_{Guid.NewGuid():N}"[..20];
-        logger.LogInformation("Publication simulée sur {Channel} : {Message} | {Link} | {Image}", channel, r.Message, r.Link, r.ImageUrl);
+        logger.LogInformation("Publication simulée sur {Channel} : {Message} | {Link} | {Image} | {Video}", channel, r.Message, r.Link, r.ImageUrl, r.VideoUrl ?? "(pas de vidéo)");
         return Task.FromResult(PublishResult.Ok(id, null));
     }
 }

@@ -18,6 +18,9 @@ public sealed class AutopilotSettings : TenantEntity
 
     public int PostsPerWeek { get; set; } = 3;
 
+    /// <summary>Reels par semaine préparés par le pilote (le premier généré par l'IA si le budget le permet, les autres montés).</summary>
+    public int ReelsPerWeek { get; set; } = 2;
+
     /// <summary>Publics visés, en JSON (liste de <see cref="AutopilotAudience"/>).</summary>
     public string AudiencesJson { get; set; } = "[]";
 
@@ -43,4 +46,14 @@ public sealed class ImageUsage : TenantEntity
     /// <summary>Mois, au format « 2026-11 ».</summary>
     public string Month { get; set; } = string.Empty;
     public int Count { get; set; }
+}
+
+/// <summary>Vidéos générées par l'IA dans le mois : secondes et coût estimé (plafond mensuel).</summary>
+public sealed class VideoUsage : TenantEntity
+{
+    /// <summary>Mois, au format « 2026-11 ».</summary>
+    public string Month { get; set; } = string.Empty;
+    public int Count { get; set; }
+    public double Seconds { get; set; }
+    public decimal Cost { get; set; }
 }

@@ -18,6 +18,9 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
 
     /// <summary>Attente maximale du traitement de l'image par Instagram.</summary>
     internal TimeSpan ProcessingTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Une vidéo (Reel) demande plus de traitement chez Instagram qu'une image.</summary>
+    internal TimeSpan VideoProcessingTimeout { get; init; } = TimeSpan.FromMinutes(5);
     internal TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(3);
 
     public ChannelType Channel => ChannelType.Instagram;
@@ -50,24 +53,32 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
 
     public async Task<PublishResult> PublishAsync(PublishRequest r, ChannelCredentials c, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(r.ImageUrl))
+        var reel = !string.IsNullOrWhiteSpace(r.VideoUrl);
+        if (!reel && string.IsNullOrWhiteSpace(r.ImageUrl))
             return PublishResult.Fail("Instagram exige une image : ajoutez un visuel à la publication.");
 
         try
         {
-            // 1. Le média (image + légende).
-            var created = await PostAsync($"{c.AccountId}/media", new Dictionary<string, string>
+            // 1. Le média : un Reel (vidéo verticale, aussi visible dans le fil) ou une image, avec sa légende.
+            var form = new Dictionary<string, string>
             {
-                ["image_url"] = r.ImageUrl,
                 ["caption"] = Caption(r.Message, r.Link),
                 ["access_token"] = c.AccessToken,
-            }, ct);
+            };
+            if (reel)
+            {
+                form["media_type"] = "REELS";
+                form["video_url"] = r.VideoUrl!;
+                form["share_to_feed"] = "true";
+            }
+            else form["image_url"] = r.ImageUrl!;
+            var created = await PostAsync($"{c.AccountId}/media", form, ct);
             if (created.IsFailure) return PublishResult.Fail(created.Error!);
             var container = created.Value!["id"]?.GetValue<string>();
             if (container is null) return PublishResult.Fail("Instagram n'a pas créé le média.");
 
-            // 2. Instagram télécharge et traite l'image : on attend qu'elle soit prête.
-            var ready = await WaitUntilReadyAsync(container, c.AccessToken, ct);
+            // 2. Instagram télécharge et traite l'image (ou la vidéo, plus longue) : on attend qu'elle soit prête.
+            var ready = await WaitUntilReadyAsync(container, c.AccessToken, ct, reel ? VideoProcessingTimeout : ProcessingTimeout);
             if (ready.IsFailure) return PublishResult.Fail(ready.Error!);
 
             // 3. La publication.
@@ -102,9 +113,9 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
         return text.Length <= MaxCaption ? text : text[..(MaxCaption - 1)] + "…";
     }
 
-    private async Task<Result> WaitUntilReadyAsync(string container, string token, CancellationToken ct)
+    private async Task<Result> WaitUntilReadyAsync(string container, string token, CancellationToken ct, TimeSpan timeout)
     {
-        var deadline = DateTimeOffset.UtcNow + ProcessingTimeout;
+        var deadline = DateTimeOffset.UtcNow + timeout;
         while (true)
         {
             var status = await GetAsync($"{container}?fields=status_code,status", token, ct);
@@ -117,8 +128,8 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
                     return Result.Success();
                 case "ERROR":
                 case "EXPIRED":
-                    return Result.Failure($"Instagram a refusé l'image ({status.Value["status"]?.GetValue<string>() ?? "format non accepté"}). " +
-                                          "Elle doit être en JPEG, entre 320 et 1440 px de large, au format carré ou proche.");
+                    return Result.Failure($"Instagram a refusé le média ({status.Value["status"]?.GetValue<string>() ?? "format non accepté"}). " +
+                                          "Image : JPEG de 320 à 1440 px de large. Vidéo : MP4 vertical de 3 à 90 secondes.");
             }
             if (DateTimeOffset.UtcNow >= deadline) return Result.Failure("Instagram traite encore l'image : réessayez dans une minute.");
             await Task.Delay(PollInterval, ct);

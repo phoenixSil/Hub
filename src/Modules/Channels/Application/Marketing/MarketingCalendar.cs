@@ -18,7 +18,10 @@ public sealed record CalendarPost(
     PostStatus Status,
     bool FromAutopilot,
     string? Error,
-    bool Trial = false);
+    bool Trial = false,
+    // Reel : type demandé, et vrai si la vidéo est prête.
+    string? ReelKind = null,
+    bool VideoReady = false);
 
 public sealed record CalendarDay(DateOnly Date, IReadOnlyList<CalendarPost> Posts);
 
@@ -265,7 +268,8 @@ public static class CalendarLogic
             .Where(p => (p.ScheduledAt ?? p.PublishedAt) is not null && p.Status != PostStatus.Cancelled)
             .Select(p => new CalendarPost(p.Id, (p.ScheduledAt ?? p.PublishedAt)!.Value, string.IsNullOrWhiteSpace(p.Title) ? Clip(p.Message) : p.Title,
                 p.ImageUrl, byPost[p.Id].Select(t => t.Channel).Distinct().ToList(), p.Status, p.FromAutopilot,
-                byPost[p.Id].Select(t => t.Error).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)), trials?.Contains(p.Id) == true))
+                byPost[p.Id].Select(t => t.Error).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)), trials?.Contains(p.Id) == true,
+                p.ReelKind, !string.IsNullOrWhiteSpace(p.VideoUrl)))
             .ToList();
         var days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i))
             .Select(d => new CalendarDay(d, items.Where(p => AutopilotSchedule.LocalDay(p.At) == d).OrderBy(p => p.At).ToList()))

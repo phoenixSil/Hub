@@ -62,6 +62,7 @@ ADMIN = [
     ("admin-publication", "first:/admin/publications|td a[href^='/admin/publications/']"),
     ("admin-publication-nouvelle", "/admin/publications/nouvelle"),
     ("admin-pilote", "/admin/pilote-automatique"),
+    ("admin-reel-avant-apres", "/admin/publications/reel-avant-apres"),
     ("admin-resultats", "/admin/resultats"),
     ("admin-plan", "/admin/plan-marketing"),
     ("admin-planche", "/admin/planche"),

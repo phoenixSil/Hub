@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Hub.Modules.Channels.Application.Decisions;
 using Hub.Modules.Channels.Application.Marketing;
+using Hub.Modules.Channels.Application.Reels;
 using Hub.Modules.Channels.Application.Planning;
 using Hub.Modules.Channels.Domain;
 using Hub.SharedKernel;
@@ -122,6 +123,7 @@ internal sealed class AutopilotRunner(
     AutopilotProgress progress,
     ITenantContext tenant,
     DecisionJournal decisions,
+    IReelService reels,
     Microsoft.Extensions.Options.IOptions<DecisionOptions> decisionOptions,
     TimeProvider clock,
     ILogger<AutopilotRunner> logger)
@@ -318,8 +320,12 @@ internal sealed class AutopilotRunner(
                 return (0, problems);
             }
             var channels = AutopilotService.ReadChannels(settings.Channels);
+            // Reels : quelles publications deviennent des vidéos (par semaine, sans dépasser le rythme choisi).
+            var reelPlan = await ReelPlanAsync(db, settings, plan.Value!.Select(p => p.At).ToList(), ct);
+            var index = -1;
             foreach (var item in plan.Value!)
             {
+                index++;
                 // Campagne arrêtée ou abandonnée pendant la préparation : on s'arrête là.
                 if (campaignId is { } cid && !await db.MarketingPlans.AsNoTracking().AnyAsync(
                         p => p.Id == cid && (p.Status == PlanStatus.Active || (planId != null && p.Status == PlanStatus.Draft)), ct))
@@ -337,6 +343,7 @@ internal sealed class AutopilotRunner(
                     // Aperçu d'une campagne pas encore démarrée : rien ne part avant le démarrage.
                     if (planId is not null) post.Value.Post.Status = PostStatus.AwaitingApproval;
                     post.Value.Post.PlanId = campaignId;
+                    if (reelPlan.TryGetValue(index, out var reelKind)) post.Value.Post.ReelKind = reelKind;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
@@ -350,12 +357,33 @@ internal sealed class AutopilotRunner(
                 }
                 progress.Step(tenant.TenantId, created);
             }
+            // Les vidéos des Reels se préparent tout de suite (le gardien reprend celles qui restent).
+            if (created > 0 && reelPlan.Count > 0)
+            {
+                try { await reels.RenderPendingAsync(ct); }
+                catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "Préparation des Reels reportée au gardien"); }
+            }
             return (created, problems);
         }
         finally
         {
             progress.Finish(tenant.TenantId, Summary(created, problems), failed: created == 0 && problems.Count > 0);
         }
+    }
+
+    private async Task<IReadOnlyDictionary<int, string>> ReelPlanAsync(ChannelsDbContext db, AutopilotSettings settings,
+        IReadOnlyList<DateTimeOffset> slots, CancellationToken ct)
+    {
+        if (settings.ReelsPerWeek <= 0 || slots.Count == 0 || !reels.IsAvailable) return new Dictionary<int, string>();
+        var from = slots.Min().AddDays(-7);
+        var to = slots.Max().AddDays(7);
+        var existing = (await db.Posts.AsNoTracking()
+                .Where(p => p.ReelKind != null && p.Status != PostStatus.Cancelled && p.ScheduledAt >= from && p.ScheduledAt <= to)
+                .Select(p => new { p.ScheduledAt, p.ReelKind }).ToListAsync(ct))
+            .GroupBy(p => ReelPlanner.WeekOf(p.ScheduledAt!.Value))
+            .ToDictionary(g => g.Key, g => (g.Count(), g.Count(p => p.ReelKind == ReelKinds.Ai)));
+        var budget = await reels.BudgetAsync(ct);
+        return ReelPlanner.Assign(slots, settings.ReelsPerWeek, existing, reels.AiConfigured && budget.Remaining >= reels.AiCostPerReel);
     }
 
     private async Task<(Post Post, List<PostTarget> Targets)?> PrepareAsync(

@@ -1,0 +1,145 @@
+@page "/admin/publications/reel-avant-apres"
+@rendermode InteractiveServer
+@using Hub.Modules.Channels.Application.Reels
+@inject IReelService Reels
+@inject IPostWriter Writer
+@inject ICatalogQueries Catalog
+@inject ICurrentTenant Tenant
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Reel avant/après</PageTitle>
+
+<MarketingTabs />
+
+<div class="admin-head">
+    <div>
+        <h1>Reel avant/après</h1>
+        <p class="muted">Filmez l'avant puis l'après au téléphone (vertical de préférence). Hub coupe les vidéos, ajoute « AVANT / APRÈS », votre logo, la musique et la fin « Devis gratuit ». Vous relisez avant que ça parte.</p>
+    </div>
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert alert-error" role="alert">@feedback</div>
+}
+
+@if (!Reels.IsAvailable)
+{
+    <div class="admin-card"><p>Le montage vidéo n'est pas disponible sur ce serveur pour le moment.</p></div>
+}
+else
+{
+    <div class="admin-card reel-upload">
+        <div class="reel-drop">
+            <label for="reel-avant"><strong>1. Vidéo AVANT</strong> <span class="muted small">(obligatoire, 7 secondes gardées)</span></label>
+            <InputFile id="reel-avant" accept="video/*" OnChange="e => PickAsync(e, before: true)" disabled="@busy" />
+            @if (beforeName is not null) { <span class="small">✓ @beforeName</span> }
+        </div>
+        <div class="reel-drop">
+            <label for="reel-apres"><strong>2. Vidéo APRÈS</strong> <span class="muted small">(conseillée ; sans elle, une seule vidéo de 15 secondes au plus)</span></label>
+            <InputFile id="reel-apres" accept="video/*" OnChange="e => PickAsync(e, before: false)" disabled="@busy" />
+            @if (afterName is not null) { <span class="small">✓ @afterName</span> }
+        </div>
+
+        <div class="field">
+            <label for="reel-service">Service montré</label>
+            <select id="reel-service" @bind="linkPath" disabled="@busy">
+                <option value="">— Choisir —</option>
+                @foreach (var s in services) { <option value="@s.Url">@s.Title</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label for="reel-title">Titre interne</label>
+            <input id="reel-title" @bind="title" placeholder="Avant/après — cuisine à Sainte-Foy" disabled="@busy" />
+        </div>
+        <div class="field">
+            <label for="reel-message">Texte de la publication</label>
+            <textarea id="reel-message" rows="5" @bind="message" @bind:event="oninput" disabled="@busy"></textarea>
+            <div class="actions">
+                <BusyButton Class="btn btn-ghost btn-sm" OnClick="SuggestAsync" IsBusy="@(action == "suggest")" AnyBusy="busy" BusyText="L'IA écrit…">Proposer un texte</BusyButton>
+            </div>
+        </div>
+
+        <BusyButton OnClick="CreateAsync" IsBusy="@(action == "create")" AnyBusy="busy" Disabled="@(beforePath is null || string.IsNullOrWhiteSpace(message))"
+                    BusyText="Montage du Reel (moins d'une minute)…">Créer le Reel</BusyButton>
+        <p class="muted small">Le Reel est créé en brouillon : vous le regardez, choisissez la date, puis l'approuvez.</p>
+    </div>
+}
+
+@code {
+    private const long MaxBytes = 300L * 1024 * 1024;
+    private List<ServiceSummary> services = [];
+    private string? beforePath, afterPath, beforeName, afterName;
+    private string? linkPath, title, message, feedback, action;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync() =>
+        services = (await Catalog.GetCatalogAsync()).SelectMany(c => c.Services).ToList();
+
+    private async Task PickAsync(InputFileChangeEventArgs e, bool before)
+    {
+        feedback = null;
+        if (e.File.Size > MaxBytes) { feedback = "Vidéo trop lourde (300 Mo au plus) : filmez plus court."; return; }
+        busy = true;
+        action = "upload";
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"hub-upload-{Guid.NewGuid():N}{Path.GetExtension(e.File.Name)}");
+            await using (var output = File.Create(path))
+            await using (var input = e.File.OpenReadStream(MaxBytes))
+                await input.CopyToAsync(output);
+            if (before) { Delete(beforePath); beforePath = path; beforeName = e.File.Name; }
+            else { Delete(afterPath); afterPath = path; afterName = e.File.Name; }
+        }
+        catch (IOException ex) { feedback = $"Vidéo non reçue : {ex.Message}"; }
+        finally { busy = false; action = null; }
+    }
+
+    private async Task SuggestAsync()
+    {
+        busy = true;
+        action = "suggest";
+        try
+        {
+            var tenant = await Tenant.GetAsync();
+            var service = services.FirstOrDefault(s => s.Url == linkPath)?.Title ?? "ménage";
+            var result = await Writer.SuggestAsync(new PostIdea(tenant.Name, string.IsNullOrWhiteSpace(tenant.City) ? "Québec" : tenant.City,
+                $"Avant/après : {service}", "Vidéo avant/après d'un vrai travail de l'équipe. Mettre en valeur le résultat, inviter à demander un devis.",
+                "Chaleureux", ChannelType.Instagram));
+            if (result.IsSuccess && result.Value!.Count > 0) message = result.Value[0].Text;
+            else feedback = result.Error ?? "Aucune proposition pour le moment.";
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (beforePath is null) return;
+        busy = true;
+        action = "create";
+        feedback = null;
+        StateHasChanged();
+        try
+        {
+            var user = (await Auth.GetAuthenticationStateAsync()).User;
+            var author = user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur";
+            var result = await Reels.CreateBeforeAfterAsync(new BeforeAfterRequest(beforePath, afterPath,
+                title ?? "", message ?? "", string.IsNullOrWhiteSpace(linkPath) ? "/devis" : linkPath, null, author,
+                [ChannelType.Facebook, ChannelType.Instagram]));
+            if (result.IsSuccess)
+            {
+                Delete(beforePath); Delete(afterPath);
+                Nav.NavigateTo($"/admin/publications/{result.Value}#reel");
+                return;
+            }
+            feedback = result.Error;
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private static void Delete(string? path)
+    {
+        try { if (path is not null && File.Exists(path)) File.Delete(path); } catch (IOException) { }
+    }
+}

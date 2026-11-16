@@ -21,6 +21,7 @@
     <div class="cal-head-actions">
         <a class="btn btn-primary btn-sm" href="/admin/marketing/nouvelle-campagne">Nouvelle campagne</a>
         <a class="btn btn-outline btn-sm" href="/admin/publications/nouvelle">+ Publication à la main</a>
+        <a class="btn btn-outline btn-sm" href="/admin/publications/reel-avant-apres">+ Reel avant/après</a>
         <BusyButton Class="btn btn-ghost btn-sm" OnClick="PrepareAsync" IsBusy="@(Preparing)" AnyBusy="busy" BusyText="Préparation…">Compléter la semaine</BusyButton>
     </div>
 </div>
@@ -145,6 +146,7 @@
                             <div class="cal-meta">
                                 <strong>@Hour(p.At)</strong>
                                 @foreach (var c in p.Channels) { <span class="cal-net cal-net-@c.ToString().ToLowerInvariant()" title="@PostLabels.Of(c)">@Short(c)</span> }
+                                @if (p.ReelKind is not null) { <span class="cal-reel" title="@(p.VideoReady ? ReelKinds.Label(p.ReelKind) : ReelKinds.Label(p.ReelKind) + " : vidéo en préparation")">@(p.VideoReady ? "▶ Reel" : "Reel…")</span> }
                                 @if (p.Trial) { <span class="cal-trial" title="Créneau tiré au hasard pour apprendre quel moment marche le mieux (journal des décisions). Vous pouvez le modifier comme d'habitude.">essai</span> }
                             </div>
                             <a href="/admin/publications/@p.Id" class="cal-title">@p.Title</a>
