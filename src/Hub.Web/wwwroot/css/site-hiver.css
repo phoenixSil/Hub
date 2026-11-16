@@ -112,6 +112,9 @@
 .footer-local { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0; color: #fff; font-weight: 500; }
 
 @media (max-width: 760px) {
+    /* Sur téléphone, le flocon reste sur la même ligne que le texte. */
+    .skin-hiver .season-bar { display: block; }
+    .skin-hiver .season-bar-flake { vertical-align: -3px; margin-right: 4px; }
     .skin-hiver .hero::before { height: 110px; }
     .skin-hiver .hero-content { padding-bottom: 130px; }
     .skin-hiver .page-hero, .skin-hiver .page-hero-plain { padding-bottom: 80px; }
