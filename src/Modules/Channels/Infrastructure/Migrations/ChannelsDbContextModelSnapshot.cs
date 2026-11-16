@@ -154,6 +154,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<bool>("PublishWithoutApproval")
                         .HasColumnType("bit");
 
+                    b.Property<int>("ReelsPerWeek")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -598,6 +601,14 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("ReelError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ReelKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("SceneNote")
                         .HasMaxLength(400)
                         .HasColumnType("nvarchar(400)");
@@ -624,6 +635,10 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("VideoUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("VisualKind")
                         .HasMaxLength(20)
@@ -735,6 +750,46 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.HasIndex("TenantId", "PostId");
 
                     b.ToTable("PostTargets", "channels");
+                });
+
+            modelBuilder.Entity("Hub.Modules.Channels.Domain.VideoUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Month")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<double>("Seconds")
+                        .HasColumnType("float");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Month")
+                        .IsUnique();
+
+                    b.ToTable("VideoUsages", "channels");
                 });
 #pragma warning restore 612, 618
         }
