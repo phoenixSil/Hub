@@ -134,6 +134,8 @@ internal sealed class DecisionJournal(
             if (PublicationDecisions.Slot(post.PublishedAt ?? post.ScheduledAt ?? d.DecidedAt) != d.Slot
                 || post.Audience != d.Audience || post.Theme != d.Theme)
                 d.EditedByHuman = true;
+            // Reel : le type de vidéo compte comme visuel (Kairos compare images et Reels).
+            if (!string.IsNullOrWhiteSpace(post.VideoUrl)) d.VisualKind = ReelKinds.Label(post.ReelKind);
             var s = stats.GetValueOrDefault(post.Id) ?? [];
             d.Reach = s.Sum(x => x.Reach);
             d.Interactions = s.Sum(x => x.Interactions);

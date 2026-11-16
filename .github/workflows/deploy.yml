@@ -71,6 +71,17 @@ jobs:
         if: steps.actif.outputs.ok == 'true'
         run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release -o publish
 
+      - name: Outil de montage vidéo des Reels (ffmpeg statique)
+        if: steps.actif.outputs.ok == 'true'
+        run: |
+          mkdir -p publish/tools /tmp/ffmpeg
+          curl -fsSL --retry 3 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ffmpeg.tar.xz \
+            || curl -fsSL --retry 3 https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz -o /tmp/ffmpeg.tar.xz
+          tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg
+          cp "$(find /tmp/ffmpeg -type f -name ffmpeg | head -1)" publish/tools/ffmpeg
+          chmod +x publish/tools/ffmpeg
+          publish/tools/ffmpeg -hide_banner -version | head -1
+
       - name: Connexion à Azure (OpenID Connect, sans secret)
         if: steps.actif.outputs.ok == 'true'
         uses: azure/login@v2

@@ -16,6 +16,7 @@
 @inject TimeProvider Clock
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider Auth
+@inject Hub.Modules.Channels.Application.Reels.IReelService Reels
 
 <PageTitle>@(Id is null ? "Nouvelle publication" : "Publication")</PageTitle>
 
@@ -196,6 +197,50 @@ else
                     </div>
                 </div>
 
+                @if (view is not null && view.Post.Status is not (PostStatus.Published or PostStatus.PartiallyPublished or PostStatus.Publishing))
+                {
+                    var p = view.Post;
+                    <div class="admin-card reel-card" id="reel">
+                        <h2>Vidéo (Reel)</h2>
+                        @if (!string.IsNullOrWhiteSpace(p.VideoUrl))
+                        {
+                            <p class="muted small"><strong>@ReelKinds.Label(p.ReelKind)</strong> · part en Reel sur Facebook et Instagram (Google Business garde l'image).</p>
+                            <video class="reel-video" src="@p.VideoUrl" controls playsinline preload="metadata"></video>
+                        }
+                        else if (p.ReelKind is not null && p.ReelError is null)
+                        {
+                            <p class="muted">@ReelKinds.Label(p.ReelKind) demandé par le pilote : la vidéo est en préparation (quelques minutes).</p>
+                        }
+                        else
+                        {
+                            <p class="muted small">Transformez cette publication en vidéo verticale de 10 à 20 secondes : accroche, logo, musique et fin « Devis gratuit ».</p>
+                        }
+                        @if (p.ReelError is not null)
+                        {
+                            <p class="small reel-note">@p.ReelError</p>
+                        }
+                        @if (!Reels.IsAvailable)
+                        {
+                            <p class="muted small">Le montage vidéo n'est pas disponible sur ce serveur.</p>
+                        }
+                        else
+                        {
+                            <div class="actions">
+                                <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Montage)" IsBusy="@(action == "reel-Montage")" AnyBusy="busy" BusyText="Montage de la vidéo…">@(p.VideoUrl is null ? "Créer un Reel monté (gratuit)" : "Refaire en Reel monté")</BusyButton>
+                                @if (Reels.AiConfigured)
+                                {
+                                    <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Ai)" IsBusy="@(action == "reel-IA")" AnyBusy="busy" BusyText="L'IA filme la scène (1 à 6 min)…">@(p.ReelKind == ReelKinds.Ai && p.VideoUrl is not null ? "Nouvelle vidéo IA" : "Créer un Reel IA") (≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $)</BusyButton>
+                                }
+                                @if (p.VideoUrl is not null || p.ReelKind is not null)
+                                {
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="RemoveReelAsync" disabled="@busy">Retirer la vidéo</button>
+                                }
+                                <a class="btn btn-ghost btn-sm" href="/admin/publications/reel-avant-apres">Reel avant/après avec vos vidéos</a>
+                            </div>
+                        }
+                    </div>
+                }
+
                 @if (view?.Post.Status == PostStatus.AwaitingApproval)
                 {
                     <div class="admin-card approval-card">
@@ -278,7 +323,12 @@ else
                         <div><strong>@companyName</strong><div class="muted small">À l'instant · 🌐</div></div>
                     </div>
                     <div class="fb-text">@(string.IsNullOrWhiteSpace(draft.Message) ? "Le texte de la publication apparaîtra ici." : draft.Message)</div>
-                    @if (!string.IsNullOrWhiteSpace(draft.ImageUrl))
+                    @if (!string.IsNullOrWhiteSpace(view?.Post.VideoUrl))
+                    {
+                        <video class="fb-image reel-video" src="@view.Post.VideoUrl" muted autoplay loop playsinline></video>
+                        @if (previewLink is not null) { <div class="fb-text fb-link-inline">@previewLink</div> }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(draft.ImageUrl))
                     {
                         <img class="fb-image" src="@draft.ImageUrl" alt="" />
                         @if (previewLink is not null) { <div class="fb-text fb-link-inline">@previewLink</div> }
@@ -583,6 +633,28 @@ else
         var result = await Posts.DeleteAsync(id);
         if (result.IsSuccess) Nav.NavigateTo("/admin/publications");
         else { feedback = result.Error; feedbackIsError = true; }
+    }
+
+    private async Task ReelAsync(string kind)
+    {
+        if (view is null) return;
+        await BeginAsync($"reel-{kind}", kind == ReelKinds.Ai ? "L'IA filme la scène : jusqu'à 6 minutes…" : "Montage de la vidéo…");
+        var id = await SaveDraftInternalAsync();
+        if (id is null) { End(); return; }
+        var result = await Reels.RenderAsync(id.Value, kind);
+        End();
+        await ReloadAsync(id.Value);
+        feedback = result.IsSuccess ? (view?.Post.ReelError ?? "Reel prêt : regardez l'aperçu avant de l'approuver.") : result.Error;
+        feedbackIsError = result.IsFailure;
+    }
+
+    private async Task RemoveReelAsync()
+    {
+        if (view is null) return;
+        await Reels.RemoveAsync(view.Post.Id);
+        await ReloadAsync(view.Post.Id);
+        feedback = "Vidéo retirée : la publication partira avec son image.";
+        feedbackIsError = false;
     }
 
     private async Task ReloadAsync(Guid id)

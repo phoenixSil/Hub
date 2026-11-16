@@ -24,6 +24,9 @@ public interface IMediaStorage
 {
     /// <summary>Convertit l'image en WebP, la redimensionne et renvoie son adresse publique.</summary>
     Task<string> SaveImageAsync(Stream input, string fileName, CancellationToken ct = default);
+
+    /// <summary>Enregistre un fichier tel quel (ex. vidéo MP4 d'un Reel) et renvoie son adresse publique.</summary>
+    Task<string> SaveFileAsync(Stream input, string fileName, string contentType, CancellationToken ct = default);
 }
 
 internal static class ImageProcessor
@@ -59,6 +62,16 @@ internal static class ImageProcessor
         }
     }
 
+    /// <summary>Nom unique gardant l'extension d'origine (« reel.mp4 » → « reel-1a2b3c4d.mp4 »).</summary>
+    public static string RawFileNameFor(string original)
+    {
+        var ext = Path.GetExtension(original).ToLowerInvariant();
+        var slug = Slug.From(Path.GetFileNameWithoutExtension(original));
+        if (slug.Length > 60) slug = slug[..60].Trim('-');
+        var id = Guid.NewGuid().ToString("N")[..8];
+        return string.IsNullOrEmpty(slug) ? $"{id}{ext}" : $"{slug}-{id}{ext}";
+    }
+
     public static string FileNameFor(string original)
     {
         var slug = Slug.From(Path.GetFileNameWithoutExtension(original));
@@ -79,6 +92,15 @@ internal sealed class LocalMediaStorage(IWebHostEnvironment env, ITenantContext 
         await File.WriteAllBytesAsync(Path.Combine(folder, name), bytes, ct);
         return $"/uploads/{tenant.TenantId:N}/{name}";
     }
+
+    public async Task<string> SaveFileAsync(Stream input, string fileName, string contentType, CancellationToken ct = default)
+    {
+        var folder = Path.Combine(env.WebRootPath, "uploads", tenant.TenantId.ToString("N"));
+        Directory.CreateDirectory(folder);
+        var name = ImageProcessor.RawFileNameFor(fileName);
+        await using (var file = File.Create(Path.Combine(folder, name))) await input.CopyToAsync(file, ct);
+        return $"/uploads/{tenant.TenantId:N}/{name}";
+    }
 }
 
 internal sealed class BlobMediaStorage(ITenantContext tenant, Microsoft.Extensions.Options.IOptions<MediaOptions> options) : IMediaStorage
@@ -97,6 +119,22 @@ internal sealed class BlobMediaStorage(ITenantContext tenant, Microsoft.Extensio
             HttpHeaders = new BlobHttpHeaders { ContentType = "image/webp", CacheControl = "public, max-age=31536000, immutable" },
         }, ct);
 
+        return string.IsNullOrWhiteSpace(opts.PublicBaseUrl)
+            ? blob.Uri.ToString()
+            : $"{opts.PublicBaseUrl.TrimEnd('/')}/{blobName}";
+    }
+
+    public async Task<string> SaveFileAsync(Stream input, string fileName, string contentType, CancellationToken ct = default)
+    {
+        var opts = options.Value;
+        var container = new BlobContainerClient(opts.BlobConnectionString, opts.Container);
+        await container.CreateIfNotExistsAsync(PublicAccessType.Blob, cancellationToken: ct);
+        var blobName = $"{tenant.TenantId:N}/{ImageProcessor.RawFileNameFor(fileName)}";
+        var blob = container.GetBlobClient(blobName);
+        await blob.UploadAsync(input, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders { ContentType = contentType, CacheControl = "public, max-age=31536000, immutable" },
+        }, ct);
         return string.IsNullOrWhiteSpace(opts.PublicBaseUrl)
             ? blob.Uri.ToString()
             : $"{opts.PublicBaseUrl.TrimEnd('/')}/{blobName}";

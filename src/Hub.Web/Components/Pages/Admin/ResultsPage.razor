@@ -6,6 +6,7 @@
 @inject ICurrentTenant Tenant
 @inject Hub.Modules.Channels.Application.Reviews.IReviewService Reviews
 @inject Hub.Modules.Channels.Application.Decisions.IDecisionJournal Decisions
+@inject Hub.Modules.Channels.Application.Reels.IReelService Reels
 
 <PageTitle>Résultats du marketing</PageTitle>
 
@@ -37,6 +38,10 @@ else
         <div class="kpi"><span>Dont rendez-vous</span><strong>@report.Appointments</strong></div>
         <div class="kpi"><span>Clients gagnés</span><strong>@report.Won</strong></div>
         <div class="kpi"><span>Photos IA ce mois</span><strong>@report.PhotosThisMonth</strong><small class="muted">≈ @report.PhotoCostThisMonth.ToString("0.00", Fr) $</small></div>
+        @if (videoBudget is not null)
+        {
+            <div class="kpi"><span>Vidéos IA ce mois</span><strong>@videoBudget.Count</strong><small class="muted">≈ @videoBudget.Used.ToString("0.00", Fr) $ / @videoBudget.Cap.ToString("0", Fr) $</small></div>
+        }
     </div>
 
     @if (decisionSummary is not null)
@@ -188,6 +193,7 @@ else
     private MarketingReport? report;
     private Result<Hub.Modules.Channels.Publishers.LocationMetrics>? google;
     private Hub.Modules.Channels.Application.Decisions.DecisionSummary? decisionSummary;
+    private Hub.Modules.Channels.Application.Reels.ReelBudget? videoBudget;
     private IReadOnlyList<Hub.Modules.Channels.Application.Decisions.DecisionView> decisionRows = [];
     private string BioLink = "";
 
@@ -198,6 +204,7 @@ else
         report = await Results.GetAsync(days);
         await LoadGoogleAsync();
         decisionSummary = await Decisions.SummaryAsync();
+        videoBudget = await Reels.BudgetAsync();
         decisionRows = await Decisions.ListAsync(10);
     }
 

@@ -45,6 +45,13 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Outil de montage vidéo (ffmpeg) et vidéos d'essai avant/après
+        run: |
+          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          mkdir -p .github/e2e/clips
+          ffmpeg -loglevel error -y -f lavfi -i testsrc=size=1280x720:rate=30 -t 6 -c:v libx264 -pix_fmt yuv420p .github/e2e/clips/avant.mp4
+          ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=720x1280:rate=30 -t 5 -c:v libx264 -pix_fmt yuv420p .github/e2e/clips/apres.mp4
+
       - name: Publier
         run: dotnet publish src/Hub.Web/Hub.Web.csproj -c Release -o publish
 

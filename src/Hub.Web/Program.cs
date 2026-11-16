@@ -70,6 +70,17 @@ else if (builder.Configuration.GetValue<bool>($"{GeminiOptions.Section}:Simulate
 else
     builder.Services.AddSingleton<Hub.SharedKernel.Ai.IAiImageGenerator, NoAiImageGenerator>();
 builder.Services.AddSingleton<Hub.Modules.Channels.Application.IPhotoComposer, SkiaPhotoComposer>();
+
+// Reels : montage avec ffmpeg (livré avec le site), vidéo IA de Google si une clé Gemini est fournie.
+builder.Services.Configure<Hub.Web.Infrastructure.Reels.VideoOptions>(builder.Configuration.GetSection(Hub.Web.Infrastructure.Reels.VideoOptions.Section));
+builder.Services.AddSingleton<Hub.Web.Infrastructure.Reels.Ffmpeg>();
+builder.Services.AddScoped<Hub.Modules.Channels.Application.Reels.IReelStudio, Hub.Web.Infrastructure.Reels.ReelStudio>();
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{GeminiOptions.Section}:ApiKey"]))
+    builder.Services.AddHttpClient<Hub.Modules.Channels.Application.Reels.IAiVideoGenerator, Hub.Web.Infrastructure.Reels.GeminiVideoGenerator>(c => c.Timeout = TimeSpan.FromMinutes(3));
+else if (builder.Configuration.GetValue<bool>($"{GeminiOptions.Section}:Simulate"))
+    builder.Services.AddSingleton<Hub.Modules.Channels.Application.Reels.IAiVideoGenerator, Hub.Web.Infrastructure.Reels.SimulatedVideoGenerator>();
+else
+    builder.Services.AddSingleton<Hub.Modules.Channels.Application.Reels.IAiVideoGenerator, Hub.Web.Infrastructure.Reels.NoAiVideoGenerator>();
 builder.Services.AddScoped<IMarketingResults, MarketingResults>();
 builder.Services.AddScoped<Hub.Modules.Channels.Application.Decisions.IDecisionOutcomeSource, DecisionOutcomeSource>();
 builder.Services.AddHostedService<WeeklyReportWorker>();

@@ -536,3 +536,13 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; font-s
 .dj-head h2 { margin-bottom: 4px; }
 .dj-table td { vertical-align: top; }
 .spam-banner { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+
+/* Reels */
+.cal-reel { font-size: .66rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #0b2a3c; color: #fff; }
+.reel-video { width: 100%; max-width: 320px; aspect-ratio: 9 / 16; border-radius: 16px; background: #0b2a3c; display: block; margin: 8px 0 12px; object-fit: cover; }
+.fb-preview .reel-video { max-width: none; border-radius: 0; margin: 0; }
+.reel-note { background: #fff7e6; border: 1px solid #f3d38a; border-radius: 10px; padding: 8px 12px; }
+.reel-upload { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 760px; }
+.reel-upload > * { min-width: 0; }
+.reel-drop { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 16px; border: 2px dashed var(--line, #dcebf5); border-radius: 14px; background: #f8fbfe; }
+.reel-drop input[type=file] { max-width: 100%; width: 100%; }

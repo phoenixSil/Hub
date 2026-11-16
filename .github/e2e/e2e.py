@@ -15,6 +15,7 @@ Parcours de bout en bout dans un vrai navigateur : ce que fait l'administrateur 
 
 Usage : python3 e2e.py http://localhost:5080
 """
+import re
 import sys
 import time
 
@@ -376,6 +377,47 @@ def spam_filter(page):
     expect(page.locator("a", has_text="RobertBuimi")).to_have_count(0)
 
 
+def save_video(page, video, name):
+    """Garde la vidéo produite avec les captures (branche « apercus »), pour la regarder."""
+    import os
+    src = video.get_attribute("src")
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "apercus")
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, name), "wb") as f:
+        f.write(page.request.get(src if src.startswith("http") else BASE + src).body())
+
+
+@step("Reels : avant/après téléversé, monté, refait par l'IA (simulée) puis publié en Reel")
+def reels(page):
+    import os
+    clips = os.path.join(os.path.dirname(os.path.abspath(__file__)), "clips")
+    page.goto(BASE + "/admin/publications/reel-avant-apres", wait_until="networkidle")
+    page.set_input_files("#reel-avant", os.path.join(clips, "avant.mp4"))
+    expect(page.locator(".reel-drop", has_text="AVANT")).to_contain_text("avant.mp4", timeout=60000)
+    page.set_input_files("#reel-apres", os.path.join(clips, "apres.mp4"))
+    expect(page.locator(".reel-drop", has_text="APRÈS")).to_contain_text("apres.mp4", timeout=60000)
+    page.fill("#reel-title", "Reel e2e avant/après")
+    page.fill("#reel-message", "Une cuisine qui retrouve tout son éclat. Demandez votre devis gratuit !")
+    page.locator("button", has_text="Créer le Reel").click()
+    page.wait_for_url("**/admin/publications/*", timeout=180000)
+    video = page.locator("#reel video.reel-video")
+    expect(video).to_have_attribute("src", re.compile(r"\.mp4$"), timeout=30000)
+    expect(page.locator("#reel")).to_contain_text("Reel avant/après")
+    save_video(page, video, "reel-avant-apres.mp4")
+
+    # L'IA vidéo (simulée) refait le Reel : le budget est compté.
+    page.locator("#reel button", has_text="Créer un Reel IA").click()
+    expect(page.locator(".alert-success")).to_contain_text("Reel prêt", timeout=300000)
+    expect(page.locator("#reel")).to_contain_text("Reel IA")
+    save_video(page, page.locator("#reel video.reel-video"), "reel-ia-simule.mp4")
+
+    page.locator("button", has_text="Publier maintenant").click()
+    expect(page.locator(".alert-success")).to_contain_text("Publication envoyée", timeout=120000)
+
+    page.goto(BASE + "/admin/resultats", wait_until="networkidle")
+    expect(page.locator(".kpi", has_text="Vidéos IA ce mois").locator("strong")).not_to_have_text("0", timeout=20000)
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -398,6 +440,7 @@ with sync_playwright() as p:
     google_business(page)
     decision_journal(page)
     spam_filter(page)
+    reels(page)
     browser.close()
 
 if failures:

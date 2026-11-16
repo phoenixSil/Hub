@@ -2,8 +2,11 @@ using Hub.SharedKernel;
 
 namespace Hub.Modules.Channels.Publishers;
 
-/// <summary>Ce qui part sur le réseau : texte, lien mesuré (absolu), image publique (absolue).</summary>
-public sealed record PublishRequest(string Message, string? Link, string? ImageUrl);
+/// <summary>
+/// Ce qui part sur le réseau : texte, lien mesuré (absolu), image publique (absolue) et, pour un Reel,
+/// la vidéo verticale publique (absolue). Un réseau qui ne prend pas la vidéo publie l'image.
+/// </summary>
+public sealed record PublishRequest(string Message, string? Link, string? ImageUrl, string? VideoUrl = null);
 
 public sealed record PublishResult(bool Success, string? ExternalId, string? ExternalUrl, string? Error)
 {
