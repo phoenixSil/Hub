@@ -82,6 +82,30 @@ public class AutopilotPlannerTests
         }
     }
 
+    /// <summary>Une IA dont la réponse est toujours coupée.</summary>
+    private sealed class BrokenAi : IAiTextGenerator
+    {
+        public int Calls { get; private set; }
+        public bool IsAvailable => true;
+        public string ModelName => "coupée";
+        public Task<Result<AiJsonResponse>> GenerateJsonAsync(AiJsonRequest request, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(Result<AiJsonResponse>.Failure("Réponse de l'IA incomplète (trop longue). Réessayez."));
+        }
+    }
+
+    [Fact]
+    public async Task Une_reponse_coupee_de_l_IA_ne_fait_jamais_echouer_la_preparation()
+    {
+        var ai = new BrokenAi();
+        var plan = await new AutopilotPlanner(ai).PlanAsync(Request(14));
+        Assert.True(plan.IsSuccess);
+        Assert.Equal(14, plan.Value!.Count);
+        Assert.All(plan.Value, p => Assert.False(string.IsNullOrWhiteSpace(p.Topic)));
+        Assert.True(ai.Calls > 2, "les lots sont recoupés et retentés avant le repli");
+    }
+
     private static readonly AutopilotContext Context = new("ScintiNet", "Québec", "418 555-0100", "#0097CE", "#E2E735",
         "https://www.scintinet.com", "admin@test",
         [

@@ -43,7 +43,7 @@ internal sealed class PostWriter(IAiTextGenerator ai) : IPostWriter
         if (!ai.IsAvailable)
             return Result<IReadOnlyList<PostSuggestion>>.Success(Templates(idea));
 
-        var response = await ai.GenerateJsonAsync(new AiJsonRequest(SystemPrompt(idea), UserPrompt(idea), Schema, 1500), ct);
+        var response = await ai.GenerateJsonAsync(new AiJsonRequest(SystemPrompt(idea), UserPrompt(idea), Schema, 3000), ct);
         if (response.IsFailure)
             return Result<IReadOnlyList<PostSuggestion>>.Failure(response.Error!);
 

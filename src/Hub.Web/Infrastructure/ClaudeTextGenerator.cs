@@ -61,8 +61,15 @@ internal sealed class ClaudeTextGenerator(HttpClient http, IOptions<AnthropicOpt
             }
 
             var root = JsonNode.Parse(json)!;
-            if (root["stop_reason"]?.GetValue<string>() is "refusal" or "max_tokens")
-                return Result<AiJsonResponse>.Failure("Réponse de l'IA incomplète. Réessayez.");
+            var stop = root["stop_reason"]?.GetValue<string>();
+            if (stop is "refusal" or "max_tokens")
+            {
+                logger.LogWarning("API Claude : réponse arrêtée ({Stop}), {Tokens} jetons de sortie sur {Max}",
+                    stop, root["usage"]?["output_tokens"]?.GetValue<int>(), r.MaxTokens);
+                return Result<AiJsonResponse>.Failure(stop == "refusal"
+                    ? "L'IA a refusé de répondre à cette demande. Réessayez."
+                    : "Réponse de l'IA incomplète (trop longue). Réessayez.");
+            }
 
             var text = string.Concat((root["content"]?.AsArray() ?? [])
                 .Where(c => c?["type"]?.GetValue<string>() == "text")
