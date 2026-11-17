@@ -194,6 +194,9 @@ public class MarketingPlanTests
         Assert.Equal(310, FacebookPagePublisher.MetricValue(ig, "reach"));
         Assert.Equal(25, FacebookPagePublisher.MetricValue(ig, "total_interactions"));
         Assert.Equal(0, FacebookPagePublisher.MetricValue(null, "reach"));
+        // Un Reel Facebook (vidéo) n'a pas le même identifiant qu'une publication de page.
+        Assert.True(FacebookPagePublisher.IsVideo("1234567890123456"));
+        Assert.False(FacebookPagePublisher.IsVideo("796823776857834_122110"));
     }
 
     [Fact]

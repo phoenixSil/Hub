@@ -148,6 +148,8 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
     public async Task<Result<PostInsight>> GetPostAsync(string externalId, ChannelCredentials c, CancellationToken ct = default)
     {
         var token = Uri.EscapeDataString(c.AccessToken);
+        // Un Reel est une vidéo (identifiant sans « _ ») : ses chiffres se lisent autrement qu'une publication.
+        if (IsVideo(externalId)) return await GetReelAsync(externalId, token, ct);
         try
         {
             // Deux lectures indépendantes : les interactions (réactions, commentaires, partages) et les vues (read_insights).
@@ -179,6 +181,34 @@ internal sealed class FacebookPagePublisher(HttpClient http, IOptions<FacebookOp
         {
             logger.LogWarning(ex, "Chiffres Facebook indisponibles");
             return Result<PostInsight>.Failure("Facebook est injoignable pour le moment.");
+        }
+    }
+
+    /// <summary>Identifiant d'une vidéo (Reel) plutôt que d'une publication de page (« idpage_idpublication »).</summary>
+    internal static bool IsVideo(string externalId) => !externalId.Contains('_');
+
+    /// <summary>
+    /// Chiffres d'un Reel : personnes atteintes (video_insights « post_impressions_unique ») et j'aime + commentaires.
+    /// Un chiffre illisible compte pour zéro : un Reel ne doit jamais faire remonter de problème.
+    /// </summary>
+    private async Task<Result<PostInsight>> GetReelAsync(string videoId, string token, CancellationToken ct)
+    {
+        try
+        {
+            using var counts = await http.GetAsync(Url($"{videoId}?fields=likes.summary(total_count).limit(0),comments.summary(total_count).limit(0)&access_token={token}"), ct);
+            var countsJson = counts.IsSuccessStatusCode ? JsonNode.Parse(await counts.Content.ReadAsStringAsync(ct)) : null;
+            using var insights = await http.GetAsync(Url($"{videoId}/video_insights?metric=post_impressions_unique&access_token={token}"), ct);
+            var insightsJson = insights.IsSuccessStatusCode ? JsonNode.Parse(await insights.Content.ReadAsStringAsync(ct)) : null;
+            if (countsJson is null || insightsJson is null)
+                logger.LogInformation("Chiffres du Reel {Video} partiels (vidéo encore en traitement ou permission manquante)", videoId);
+            return Result<PostInsight>.Success(new PostInsight(
+                MetricValue(insightsJson, "post_impressions_unique"),
+                (Int(countsJson?["likes"]?["summary"]?["total_count"]) ?? 0) + (Int(countsJson?["comments"]?["summary"]?["total_count"]) ?? 0)));
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Chiffres du Reel Facebook indisponibles");
+            return Result<PostInsight>.Success(new PostInsight(0, 0));
         }
     }
 
