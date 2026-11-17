@@ -67,7 +67,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
         r = WithFormats(r, Random.Shared);
 
         if (!ai.IsAvailable) return Result<IReadOnlyList<PlannedPost>>.Success(Rotation(r, audiences));
-        if (r.Slots.Count <= BatchSize) return await PlanBatchAsync(r, audiences, ct);
+        if (r.Slots.Count <= BatchSize) return await PlanResilientAsync(r, audiences, ct);
 
         // Rythme soutenu (plus de 7 par semaine) : l'IA choisit les sujets par lots de 7, pour que sa réponse
         // reste complète ; chaque lot connaît les sujets déjà choisis pour ne pas les répéter.
@@ -85,7 +85,7 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
                     : r.Plan,
                 AlreadyPlanned = [.. r.AlreadyPlanned ?? [], .. all.Select(p => p.Topic)],
             };
-            var batch = await PlanBatchAsync(part, audiences, ct);
+            var batch = await PlanResilientAsync(part, audiences, ct);
             if (batch.IsFailure) lastError = batch.Error;
             else all.AddRange(batch.Value!);
         }
@@ -97,10 +97,42 @@ internal sealed class AutopilotPlanner(IAiTextGenerator ai) : IAutopilotPlanner
     /// <summary>Au plus 7 créneaux par appel à l'IA : au-delà, sa réponse risque d'être coupée.</summary>
     public const int BatchSize = 7;
 
+    /// <summary>
+    /// Un lot qui échoue (réponse coupée ou refusée) est recoupé en deux et retenté ; un créneau seul qui échoue encore
+    /// prend un sujet par rotation des services et offres. La préparation n'échoue donc jamais à cause de l'IA.
+    /// </summary>
+    private async Task<Result<IReadOnlyList<PlannedPost>>> PlanResilientAsync(AutopilotPlanRequest r, IReadOnlyList<AutopilotAudience> audiences,
+        CancellationToken ct, int depth = 0)
+    {
+        var batch = await PlanBatchAsync(r, audiences, ct);
+        if (batch.IsSuccess) return batch;
+        if (r.Slots.Count > 1 && depth < 2)
+        {
+            var half = r.Slots.Count / 2;
+            var all = new List<PlannedPost>();
+            foreach (var (start, n) in new[] { (0, half), (half, r.Slots.Count - half) })
+            {
+                var part = r with
+                {
+                    Slots = r.Slots.Skip(start).Take(n).ToList(),
+                    Formats = r.Formats?.Skip(start).Take(n).ToList(),
+                    Plan = r.Plan is { SlotPillars.Count: > 0 } brief
+                        ? brief with { SlotPillars = Enumerable.Range(start, n).Select(i => SlotPillar(r, i)!).ToList() }
+                        : r.Plan,
+                    AlreadyPlanned = [.. r.AlreadyPlanned ?? [], .. all.Select(p => p.Topic)],
+                };
+                var sub = await PlanResilientAsync(part, audiences, ct, depth + 1);
+                all.AddRange(sub.IsSuccess ? sub.Value! : Rotation(part, audiences));
+            }
+            return Result<IReadOnlyList<PlannedPost>>.Success(all);
+        }
+        return Result<IReadOnlyList<PlannedPost>>.Success(Rotation(r, audiences));
+    }
+
     private async Task<Result<IReadOnlyList<PlannedPost>>> PlanBatchAsync(AutopilotPlanRequest r, IReadOnlyList<AutopilotAudience> audiences, CancellationToken ct)
     {
         // Assez de place pour chaque sujet (angle détaillé, format, pilier) : la réponse ne doit jamais être coupée.
-        var maxTokens = Math.Clamp(1500 + 700 * r.Slots.Count, 3000, 8000);
+        var maxTokens = Math.Clamp(2000 + 900 * r.Slots.Count, 4000, 12000);
         var response = await ai.GenerateJsonAsync(new AiJsonRequest(SystemPrompt(r), UserPrompt(r, audiences), Schema, maxTokens), ct);
         if (response.IsFailure) return Result<IReadOnlyList<PlannedPost>>.Failure(response.Error!);
 
