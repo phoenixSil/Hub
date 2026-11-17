@@ -194,6 +194,14 @@ public class MarketingPlanTests
         Assert.Equal(310, FacebookPagePublisher.MetricValue(ig, "reach"));
         Assert.Equal(25, FacebookPagePublisher.MetricValue(ig, "total_interactions"));
         Assert.Equal(0, FacebookPagePublisher.MetricValue(null, "reach"));
+        // Un Reel Facebook (vidéo) n'a pas le même identifiant qu'une publication de page.
+        Assert.True(FacebookPagePublisher.IsVideo("1234567890123456"));
+        Assert.False(FacebookPagePublisher.IsVideo("796823776857834_122110"));
+        // « Not enough viewers » (code 10) : compte récent, pas une permission manquante.
+        Assert.Equal(InstagramPublisher.NotEnoughViewers, InstagramPublisher.ErrorOf(System.Text.Json.Nodes.JsonNode.Parse(
+            """{"error":{"message":"(#10) Not enough viewers for the media to show insights","code":10}}""")));
+        Assert.StartsWith("Autorisations Instagram manquantes", InstagramPublisher.ErrorOf(System.Text.Json.Nodes.JsonNode.Parse(
+            """{"error":{"message":"(#10) Application does not have permission for this action","code":10}}""")));
     }
 
     [Fact]

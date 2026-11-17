@@ -142,6 +142,8 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
         {
             // « reach » = comptes uniques atteints ; « total_interactions » = j'aime, commentaires, partages, enregistrements.
             var json = await GetAsync($"{externalId}/insights?metric=reach,total_interactions", c.AccessToken, ct);
+            // Compte récent : Instagram ne donne pas de chiffres tant qu'une publication a trop peu de vues. Ce n'est pas une erreur.
+            if (json.IsFailure && json.Error == NotEnoughViewers) return Result<PostInsight>.Success(new PostInsight(0, 0));
             if (json.IsFailure) return Result<PostInsight>.Failure(json.Error!);
             return Result<PostInsight>.Success(new PostInsight(
                 FacebookPagePublisher.MetricValue(json.Value, "reach"),
@@ -190,17 +192,23 @@ internal sealed class InstagramPublisher(HttpClient http, IOptions<FacebookOptio
         return Result<JsonNode>.Failure(ErrorOf(json) ?? $"Instagram a répondu {(int)response.StatusCode}.");
     }
 
+    /// <summary>Instagram ne calcule pas les chiffres d'une publication qui a encore trop peu de vues (compte récent).</summary>
+    internal const string NotEnoughViewers = "Instagram : pas encore assez de vues pour donner des chiffres.";
+
     internal static string? ErrorOf(JsonNode? json)
     {
         var error = json?["error"];
         if (error is null) return null;
         var code = error["code"]?.ToString();
-        var message = error["message"]?.GetValue<string>();
+        var message = error["message"]?.GetValue<string>() ?? "";
+        // Le code 10 sert aussi à « Not enough viewers for the media to show insights » : ce n'est pas une permission.
+        if (message.Contains("not enough viewers", StringComparison.OrdinalIgnoreCase)) return NotEnoughViewers;
         return code switch
         {
             "190" => "Le jeton de la page Facebook est expiré ou invalide : reconnectez la page, puis Instagram.",
             "10" or "200" => "Autorisations Instagram manquantes : régénérez le jeton de la page avec instagram_basic, " +
-                             "instagram_content_publish et instagram_manage_insights (Canaux → Instagram → la marche à suivre), puis reconnectez.",
+                             "instagram_content_publish et instagram_manage_insights (Canaux → Instagram → la marche à suivre), puis reconnectez." +
+                             (message.Length > 0 ? $" (Instagram : {message})" : ""),
             "9004" or "36003" => "Instagram n'a pas pu récupérer l'image : elle doit être publique, en JPEG, au format carré ou proche.",
             _ => $"Instagram : {message} (code {code}).",
         };
