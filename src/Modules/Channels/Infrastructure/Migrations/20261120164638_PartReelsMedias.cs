@@ -16,6 +16,9 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                 table: "AutopilotSettings",
                 newName: "ReelSharePercent");
 
+            // L'ancien réglage était un nombre de Reels par semaine : la part minimale démarre à 45 %.
+            migrationBuilder.Sql("UPDATE [channels].[AutopilotSettings] SET [ReelSharePercent] = 45;");
+
             migrationBuilder.AddColumn<string>(
                 name: "MediaKind",
                 schema: "channels",
