@@ -33,6 +33,7 @@ jobs:
       Decisions__CloseAfterDays: "0"
       Decisions__FinalizeAfterDays: "0"
       Gemini__Simulate: "true"
+      Pexels__Simulate: "true"
     steps:
       - uses: actions/checkout@v4
 

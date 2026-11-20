@@ -18,8 +18,8 @@ public sealed class AutopilotSettings : TenantEntity
 
     public int PostsPerWeek { get; set; } = 3;
 
-    /// <summary>Reels par semaine préparés par le pilote (le premier généré par l'IA si le budget le permet, les autres montés).</summary>
-    public int ReelsPerWeek { get; set; } = 2;
+    /// <summary>Part minimale de Reels parmi les publications du pilote, en pour cent (au plus un Reel par jour).</summary>
+    public int ReelSharePercent { get; set; } = 45;
 
     /// <summary>Publics visés, en JSON (liste de <see cref="AutopilotAudience"/>).</summary>
     public string AudiencesJson { get; set; } = "[]";

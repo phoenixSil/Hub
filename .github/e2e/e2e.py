@@ -405,7 +405,17 @@ def reels(page):
     expect(page.locator("#reel")).to_contain_text("Reel avant/après")
     save_video(page, video, "reel-avant-apres.mp4")
 
-    # L'IA vidéo (simulée) refait le Reel : le budget est compté.
+    # Vidéos d'archives (Pexels simulé) : de vraies vidéos assemblées.
+    page.locator("#reel button", has_text="Vidéos d'archives").click()
+    expect(page.locator(".alert-success")).to_contain_text("Reel prêt", timeout=300000)
+    expect(page.locator("#reel")).to_contain_text("Reel vidéos d'archives")
+    save_video(page, page.locator("#reel video.reel-video"), "reel-archives-simule.mp4")
+
+    # L'IA vidéo (simulée) refait le Reel en version cinématique, puis réaliste : le budget est compté.
+    page.locator("#reel button", has_text="Version cinématique").click()
+    expect(page.locator(".alert-success")).to_contain_text("Reel prêt", timeout=300000)
+    expect(page.locator("#reel")).to_contain_text("Reel IA cinématique")
+
     page.locator("#reel button", has_text="Créer un Reel IA").click()
     expect(page.locator(".alert-success")).to_contain_text("Reel prêt", timeout=300000)
     expect(page.locator("#reel")).to_contain_text("Reel IA")

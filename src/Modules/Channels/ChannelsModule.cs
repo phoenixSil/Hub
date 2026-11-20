@@ -159,6 +159,7 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.Property(x => x.Pillar).HasMaxLength(40);
             e.Property(x => x.VisualKind).HasMaxLength(30);
             e.Property(x => x.Channels).HasMaxLength(100);
+            e.Property(x => x.MediaKind).HasMaxLength(20);
             e.Property(x => x.ContextJson).HasMaxLength(2000);
             e.Property(x => x.Cost).HasPrecision(10, 2);
             e.Property(x => x.Note).HasMaxLength(200);

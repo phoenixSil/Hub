@@ -125,6 +125,7 @@ internal sealed class AutopilotRunner(
     DecisionJournal decisions,
     IReelService reels,
     Microsoft.Extensions.Options.IOptions<DecisionOptions> decisionOptions,
+    Microsoft.Extensions.Options.IOptions<ReelOptions> reelOptions,
     TimeProvider clock,
     ILogger<AutopilotRunner> logger)
 {
@@ -320,8 +321,8 @@ internal sealed class AutopilotRunner(
                 return (0, problems);
             }
             var channels = AutopilotService.ReadChannels(settings.Channels);
-            // Reels : quelles publications deviennent des vidéos (par semaine, sans dépasser le rythme choisi).
-            var reelPlan = await ReelPlanAsync(db, settings, plan.Value!.Select(p => p.At).ToList(), ct);
+            // Reels : au moins la part choisie, un par jour au plus ; publications et types tirés au hasard (journal de Kairos).
+            var reelPlan = await ReelPlanAsync(db, settings, plan.Value!.Select(p => new ReelSlot(p.At, p.Format)).ToList(), ct);
             var index = -1;
             foreach (var item in plan.Value!)
             {
@@ -343,7 +344,8 @@ internal sealed class AutopilotRunner(
                     // Aperçu d'une campagne pas encore démarrée : rien ne part avant le démarrage.
                     if (planId is not null) post.Value.Post.Status = PostStatus.AwaitingApproval;
                     post.Value.Post.PlanId = campaignId;
-                    if (reelPlan.TryGetValue(index, out var reelKind)) post.Value.Post.ReelKind = reelKind;
+                    var media = reelPlan.ElementAtOrDefault(index);
+                    if (media is { IsReel: true }) post.Value.Post.ReelKind = media.Kind;
                     if (post.Value.Post.SceneNote is { } scene) recentScenes.Insert(0, scene);
                     if (post.Value.Post.ImageUrl is { } url) recentImages.Insert(0, url);
                     if (post.Value.Post.ArtStyle is { } style) recentStyles.Insert(0, style);
@@ -351,14 +353,14 @@ internal sealed class AutopilotRunner(
                     db.PostTargets.AddRange(post.Value.Targets);
                     await decisions.RecordAsync(db, post.Value.Post, post.Value.Targets.Select(t => t.Channel),
                         explored.Explored ? DecisionPolicy.Exploration : DecisionPolicy.Ai,
-                        explored.Explored ? "Créneau" : null, explored.Propensity, ct);
+                        explored.Explored ? "Créneau" : null, explored.Propensity, ct, media);
                     await db.SaveChangesAsync(ct);
                     created++;
                 }
                 progress.Step(tenant.TenantId, created);
             }
             // Les vidéos des Reels se préparent tout de suite (le gardien reprend celles qui restent).
-            if (created > 0 && reelPlan.Count > 0)
+            if (created > 0 && reelPlan.Any(m => m.IsReel))
             {
                 try { await reels.RenderPendingAsync(ct); }
                 catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "Préparation des Reels reportée au gardien"); }
@@ -371,19 +373,21 @@ internal sealed class AutopilotRunner(
         }
     }
 
-    private async Task<IReadOnlyDictionary<int, string>> ReelPlanAsync(ChannelsDbContext db, AutopilotSettings settings,
-        IReadOnlyList<DateTimeOffset> slots, CancellationToken ct)
+    private async Task<IReadOnlyList<MediaChoice>> ReelPlanAsync(ChannelsDbContext db, AutopilotSettings settings,
+        IReadOnlyList<ReelSlot> slots, CancellationToken ct)
     {
-        if (settings.ReelsPerWeek <= 0 || slots.Count == 0 || !reels.IsAvailable) return new Dictionary<int, string>();
-        var from = slots.Min().AddDays(-7);
-        var to = slots.Max().AddDays(7);
-        var existing = (await db.Posts.AsNoTracking()
-                .Where(p => p.ReelKind != null && p.Status != PostStatus.Cancelled && p.ScheduledAt >= from && p.ScheduledAt <= to)
-                .Select(p => new { p.ScheduledAt, p.ReelKind }).ToListAsync(ct))
-            .GroupBy(p => ReelPlanner.WeekOf(p.ScheduledAt!.Value))
-            .ToDictionary(g => g.Key, g => (g.Count(), g.Count(p => p.ReelKind == ReelKinds.Ai)));
+        if (settings.ReelSharePercent <= 0 || slots.Count == 0 || !reels.IsAvailable) return [];
+        var from = slots.Min(s => s.At).AddDays(-2);
+        var to = slots.Max(s => s.At).AddDays(2);
+        var reelDays = (await db.Posts.AsNoTracking()
+                .Where(p => p.ReelKind != null && p.Status != PostStatus.Cancelled && p.Status != PostStatus.Expired
+                    && p.ScheduledAt >= from && p.ScheduledAt <= to)
+                .Select(p => p.ScheduledAt!.Value).ToListAsync(ct))
+            .Select(ReelPlanner.DayOf).ToHashSet();
         var budget = await reels.BudgetAsync(ct);
-        return ReelPlanner.Assign(slots, settings.ReelsPerWeek, existing, reels.AiConfigured && budget.Remaining >= reels.AiCostPerReel);
+        var aiReels = reels.AiConfigured && reels.AiCostPerReel > 0 ? (int)Math.Floor(budget.Remaining / reels.AiCostPerReel) : 0;
+        return ReelPlanner.Assign(slots, settings.ReelSharePercent, reelDays, new ReelCapacity(aiReels, reels.StockConfigured),
+            Random.Shared, reelOptions.Value.MaxPerDay);
     }
 
     private async Task<(Post Post, List<PostTarget> Targets)?> PrepareAsync(

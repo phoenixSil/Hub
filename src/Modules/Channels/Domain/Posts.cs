@@ -90,11 +90,17 @@ public sealed class Post : TenantEntity
     public string? ReelError { get; set; }
 }
 
-/// <summary>Les trois façons de faire un Reel.</summary>
+/// <summary>Les façons de faire un Reel.</summary>
 public static class ReelKinds
 {
-    /// <summary>Scène générée par l'IA vidéo (payant, plafonné chaque mois).</summary>
+    /// <summary>Scène réaliste générée par l'IA vidéo (payant, plafonné chaque mois).</summary>
     public const string Ai = "IA";
+
+    /// <summary>Scène « film » générée par l'IA vidéo : lumière dorée, ralenti, mouvements lents (payant, plafonné).</summary>
+    public const string Cinematic = "IACinema";
+
+    /// <summary>Vraies vidéos d'archives libres de droits (Pexels), assemblées (gratuit). Jamais présentées comme notre travail.</summary>
+    public const string Stock = "Archives";
 
     /// <summary>Vidéos avant/après filmées et téléversées par l'entreprise.</summary>
     public const string BeforeAfter = "AvantApres";
@@ -102,11 +108,16 @@ public static class ReelKinds
     /// <summary>Montage animé des images de la publication (gratuit).</summary>
     public const string Montage = "Montage";
 
+    /// <summary>Types générés par l'IA vidéo (comptent dans le plafond mensuel).</summary>
+    public static bool IsAi(string? kind) => kind is Ai or Cinematic;
+
     public static string Label(string? kind) => kind switch
     {
         Ai => "Reel IA",
+        Cinematic => "Reel IA cinématique",
+        Stock => "Reel vidéos d'archives",
         BeforeAfter => "Reel avant/après",
-        Montage => "Reel monté",
+        Montage => "Reel images animées",
         _ => "Image",
     };
 }

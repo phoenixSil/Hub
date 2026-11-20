@@ -75,6 +75,14 @@ builder.Services.AddSingleton<Hub.Modules.Channels.Application.IPhotoComposer, S
 builder.Services.Configure<Hub.Web.Infrastructure.Reels.VideoOptions>(builder.Configuration.GetSection(Hub.Web.Infrastructure.Reels.VideoOptions.Section));
 builder.Services.AddSingleton<Hub.Web.Infrastructure.Reels.Ffmpeg>();
 builder.Services.AddScoped<Hub.Modules.Channels.Application.Reels.IReelStudio, Hub.Web.Infrastructure.Reels.ReelStudio>();
+// Vidéos d'archives libres de droits (Pexels) si une clé est fournie.
+builder.Services.Configure<Hub.Web.Infrastructure.Reels.PexelsOptions>(builder.Configuration.GetSection(Hub.Web.Infrastructure.Reels.PexelsOptions.Section));
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{Hub.Web.Infrastructure.Reels.PexelsOptions.Section}:ApiKey"]))
+    builder.Services.AddHttpClient<Hub.Modules.Channels.Application.Reels.IStockVideoSource, Hub.Web.Infrastructure.Reels.PexelsVideoSource>(c => c.Timeout = TimeSpan.FromMinutes(2));
+else if (builder.Configuration.GetValue<bool>($"{Hub.Web.Infrastructure.Reels.PexelsOptions.Section}:Simulate"))
+    builder.Services.AddSingleton<Hub.Modules.Channels.Application.Reels.IStockVideoSource, Hub.Web.Infrastructure.Reels.SimulatedStockVideoSource>();
+else
+    builder.Services.AddSingleton<Hub.Modules.Channels.Application.Reels.IStockVideoSource, Hub.Modules.Channels.Application.Reels.NoStockVideoSource>();
 if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{GeminiOptions.Section}:ApiKey"]))
     builder.Services.AddHttpClient<Hub.Modules.Channels.Application.Reels.IAiVideoGenerator, Hub.Web.Infrastructure.Reels.GeminiVideoGenerator>(c => c.Timeout = TimeSpan.FromMinutes(3));
 else if (builder.Configuration.GetValue<bool>($"{GeminiOptions.Section}:Simulate"))

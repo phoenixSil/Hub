@@ -7,8 +7,11 @@ public sealed class ReelOptions
 {
     public const string Section = "Reels";
 
-    /// <summary>Plafond mensuel des vidéos générées par l'IA, en dollars américains. Au-delà : Reel monté (gratuit).</summary>
+    /// <summary>Plafond mensuel des vidéos générées par l'IA, en dollars américains. Au-delà : vidéos d'archives ou images animées (gratuit).</summary>
     public decimal MonthlyAiBudget { get; set; } = 15m;
+
+    /// <summary>Reels préparés par le pilote au plus par jour (plafond de coût : il l'emporte sur la part minimale).</summary>
+    public int MaxPerDay { get; set; } = 1;
 
     /// <summary>Reels préparés à chaque passage (la vidéo IA peut prendre plusieurs minutes).</summary>
     public int MaxPerPass { get; set; } = 3;
@@ -55,6 +58,26 @@ public interface IAiVideoGenerator
     Task<Result<string>> GenerateAsync(string prompt, CancellationToken ct = default);
 }
 
+/// <summary>Vidéos d'archives libres de droits (fournies par l'hôte : Pexels).</summary>
+public interface IStockVideoSource
+{
+    bool IsConfigured { get; }
+
+    /// <summary>
+    /// Cherche des vidéos verticales pour chaque recherche (en anglais) et en télécharge une par recherche, au hasard parmi les meilleures ;
+    /// renvoie les chemins de fichiers MP4 temporaires (à supprimer après le montage).
+    /// </summary>
+    Task<Result<IReadOnlyList<string>>> DownloadAsync(IReadOnlyList<string> queries, CancellationToken ct = default);
+}
+
+/// <summary>Sans clé Pexels : pas de vidéos d'archives (le pilote ne tire pas ce type).</summary>
+public sealed class NoStockVideoSource : IStockVideoSource
+{
+    public bool IsConfigured => false;
+    public Task<Result<IReadOnlyList<string>>> DownloadAsync(IReadOnlyList<string> queries, CancellationToken ct = default) =>
+        Task.FromResult(Result<IReadOnlyList<string>>.Failure("Aucune clé Pexels : les vidéos d'archives ne sont pas disponibles."));
+}
+
 /// <summary>Une vidéo avant/après téléversée par l'administrateur.</summary>
 public sealed record BeforeAfterRequest(
     string BeforePath, string? AfterPath, string Title, string Message, string? LinkPath, DateTimeOffset? ScheduledAt, string Author,
@@ -70,6 +93,9 @@ public interface IReelService
 {
     bool IsAvailable { get; }
     bool AiConfigured { get; }
+
+    /// <summary>Vidéos d'archives (Pexels) disponibles.</summary>
+    bool StockConfigured { get; }
 
     /// <summary>Coût estimé d'un Reel généré par l'IA.</summary>
     decimal AiCostPerReel { get; }

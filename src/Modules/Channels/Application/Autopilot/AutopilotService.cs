@@ -18,7 +18,7 @@ public sealed class AutopilotForm
     public int PostsPerWeek { get; set; } = 3;
 
     /// <summary>Reels par semaine (0 = aucun) : le premier généré par l'IA si le budget le permet, les autres montés.</summary>
-    public int ReelsPerWeek { get; set; } = 2;
+    public int ReelSharePercent { get; set; } = 45;
     public List<AudienceForm> Audiences { get; set; } = [];
     public List<ChannelType> Channels { get; set; } = [ChannelType.Facebook];
     public string? Guidelines { get; set; }
@@ -92,7 +92,7 @@ internal sealed class AutopilotService(
             Enabled = s?.Enabled ?? false,
             PublishWithoutApproval = s?.PublishWithoutApproval ?? false,
             PostsPerWeek = s?.PostsPerWeek ?? 3,
-            ReelsPerWeek = s?.ReelsPerWeek ?? 2,
+            ReelSharePercent = s?.ReelSharePercent ?? 45,
             Audiences = audiences.Select(a => new AudienceForm { Name = a.Name, Description = a.Description, Hour = a.Hour }).ToList(),
             Channels = ReadChannels(s?.Channels).ToList(),
             Guidelines = s?.Guidelines,
@@ -110,7 +110,7 @@ internal sealed class AutopilotService(
         var errors = new Dictionary<string, string>();
         if (f.PostsPerWeek is < 1 or > AutopilotSchedule.MaxPostsPerWeek)
             errors["PostsPerWeek"] = $"Entre 1 et {AutopilotSchedule.MaxPostsPerWeek} publications par semaine.";
-        if (f.ReelsPerWeek is < 0 or > 7) errors["ReelsPerWeek"] = "Entre 0 et 7 Reels par semaine.";
+        if (f.ReelSharePercent is < 0 or > 100) errors["ReelSharePercent"] = "Entre 0 et 100 %.";
         if (audiences.Count == 0) errors["Audiences"] = "Décrivez au moins un public.";
         if (audiences.Count > 6) errors["Audiences"] = "6 publics au plus.";
         if (f.Channels.Count == 0) errors["Channels"] = "Choisissez au moins un réseau.";
@@ -123,7 +123,7 @@ internal sealed class AutopilotService(
         s.Enabled = f.Enabled;
         s.PublishWithoutApproval = f.PublishWithoutApproval;
         s.PostsPerWeek = f.PostsPerWeek;
-        s.ReelsPerWeek = f.ReelsPerWeek;
+        s.ReelSharePercent = f.ReelSharePercent;
         s.AudiencesJson = JsonSerializer.Serialize(audiences, Json);
         s.Channels = string.Join(",", f.Channels.Distinct());
         s.Guidelines = string.IsNullOrWhiteSpace(f.Guidelines) ? null : f.Guidelines.Trim();

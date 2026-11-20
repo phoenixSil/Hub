@@ -48,17 +48,19 @@ else
                     <FieldError Errors="errors" For="PostsPerWeek" />
                 </div>
                 <div class="field">
-                    <label for="reels-per-week">Reels (vidéos) par semaine</label>
-                    <select id="reels-per-week" @bind="form.ReelsPerWeek">
-                        @for (var n = 0; n <= 7; n++) { var v = n; <option value="@v">@(v == 0 ? "Aucun" : $"{v} par semaine")</option> }
+                    <label for="reel-share">Part minimale de Reels (vidéos)</label>
+                    <select id="reel-share" @bind="form.ReelSharePercent">
+                        @foreach (var v in new[] { 0, 25, 35, 45, 50, 60, 75, 100 }) { <option value="@v">@(v == 0 ? "Aucun Reel" : $"{v} % au moins")</option> }
                     </select>
                     <span class="muted small">
-                        Parmi les publications de la semaine : la première devient un Reel généré par l'IA
-                        @if (Reels.AiConfigured) { <text>(≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $ chacun)</text> }
-                        , les autres des Reels montés à partir des images (gratuits).
-                        @if (budget is not null) { <text> Vidéos IA ce mois-ci : @budget.Used.ToString("0.00", AdminFormat.Fr) $ sur un plafond de @budget.Cap.ToString("0", AdminFormat.Fr) $ ; au-delà, Reels montés seulement.</text> }
+                        Au plus <strong>un Reel par jour</strong> (le plafond l'emporte sur la part). Les publications qui deviennent des Reels, et leur type, sont tirées au hasard
+                        et notées dans le journal des décisions : IA réaliste, IA cinématique
+                        @if (Reels.AiConfigured) { <text>(≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $ chacun)</text> },
+                        vidéos d'archives@(Reels.StockConfigured ? "" : " (clé Pexels à ajouter)"), images animées (gratuits).
+                        Les avant/après, coulisses et portraits ne sont jamais faits avec des archives ou l'IA.
+                        @if (budget is not null) { <text> Vidéos IA ce mois-ci : @budget.Used.ToString("0.00", AdminFormat.Fr) $ sur un plafond de @budget.Cap.ToString("0", AdminFormat.Fr) $ ; au-delà, archives ou images animées seulement.</text> }
                     </span>
-                    <FieldError Errors="errors" For="ReelsPerWeek" />
+                    <FieldError Errors="errors" For="ReelSharePercent" />
                 </div>
                 <div class="field">
                     <label>Validation</label>
