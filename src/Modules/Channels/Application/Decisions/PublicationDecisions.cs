@@ -26,6 +26,9 @@ public sealed class DecisionOptions
 
     /// <summary>Coût d'une photo générée par l'IA (même réglage que Gemini:CostPerImage par défaut).</summary>
     public decimal CostPerPhoto { get; set; } = 0.07m;
+
+    /// <summary>Coût estimé d'un Reel généré par l'IA vidéo (8 s à 0,10 $ la seconde par défaut).</summary>
+    public decimal CostPerAiReel { get; set; } = 0.80m;
 }
 
 /// <summary>Résultat d'une publication venu du site : visites et demandes reliées à sa campagne (utm_campaign).</summary>

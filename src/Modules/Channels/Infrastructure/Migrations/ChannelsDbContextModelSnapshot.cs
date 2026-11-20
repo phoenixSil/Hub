@@ -154,7 +154,7 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
                     b.Property<bool>("PublishWithoutApproval")
                         .HasColumnType("bit");
 
-                    b.Property<int>("ReelsPerWeek")
+                    b.Property<int>("ReelSharePercent")
                         .HasColumnType("int");
 
                     b.Property<Guid>("TenantId")
@@ -237,6 +237,13 @@ namespace Hub.Modules.Channels.Infrastructure.Migrations
 
                     b.Property<int>("Leads")
                         .HasColumnType("int");
+
+                    b.Property<string>("MediaKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<double?>("MediaPropensity")
+                        .HasColumnType("float");
 
                     b.Property<string>("Note")
                         .HasMaxLength(200)

@@ -37,6 +37,12 @@ public sealed class Decision : TenantEntity
     public string? VisualKind { get; set; }
     public string Channels { get; set; } = string.Empty;
 
+    /// <summary>Média choisi par le pilote : « Image » ou le type de Reel (<see cref="ReelKinds"/>), tiré au hasard.</summary>
+    public string? MediaKind { get; set; }
+
+    /// <summary>Probabilité du média choisi au moment du tirage (pour comparer images et types de Reels sans biais).</summary>
+    public double? MediaPropensity { get; set; }
+
     /// <summary>Vrai si l'administrateur a changé l'heure, la cible ou le thème après la décision.</summary>
     public bool EditedByHuman { get; set; }
 

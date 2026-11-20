@@ -65,7 +65,7 @@ else
             {
                 <div class="table-wrap">
                     <table class="admin-table dj-table">
-                        <thead><tr><th>Publication</th><th>Choix</th><th>Créneau</th><th>Format · thème</th><th>Résultat</th></tr></thead>
+                        <thead><tr><th>Publication</th><th>Choix</th><th>Créneau</th><th>Média</th><th>Format · thème</th><th>Résultat</th></tr></thead>
                         <tbody>
                             @foreach (var d in decisionRows)
                             {
@@ -73,6 +73,7 @@ else
                                     <td><a href="/admin/publications/@d.PostId">@d.PostTitle</a><br /><span class="muted small">@AdminFormat.Local(d.DecidedAt, "d MMM HH:mm")</span></td>
                                     <td>@d.Policy@(d.Explored is null ? "" : $" ({d.Explored})")@(d.EditedByHuman ? " · modifiée" : "")</td>
                                     <td>@d.Slot</td>
+                                    <td>@(d.MediaKind is null or "Image" ? "Image" : ReelKinds.Label(d.MediaKind))@(d.MediaPropensity is { } mp ? $" · p = {mp.ToString("0.##", Fr)}" : "")</td>
                                     <td>@(d.Format ?? "—") · @(d.Theme ?? "—")</td>
                                     <td>@(d.Note ?? (d.ClosedAt is null ? "en attente" : $"{d.Leads} demande(s), {d.Interactions} interaction(s) · r = {d.Reward?.ToString("0.#", Fr)}"))</td>
                                 </tr>

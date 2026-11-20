@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Hub.Modules.Channels.Application.Reels;
 using Hub.Modules.Channels.Domain;
 using Hub.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ namespace Hub.Modules.Channels.Application.Decisions;
 public sealed record DecisionView(
     Guid Id, Guid PostId, string PostTitle, DateTimeOffset DecidedAt, string Policy, string? Explored, double? Propensity,
     string Slot, double Intensity, string? Format, string? Audience, string? Theme, string Channels, bool EditedByHuman,
+    string? MediaKind, double? MediaPropensity,
     int Reach, int Interactions, int Visits, int Leads, int Won, double? Reward, DateTimeOffset? ClosedAt, string? Note);
 
 public sealed record DecisionSummary(int Total, int Closed, int Pending, int Explorations, double? AverageReward, double ExplorationRate);
@@ -38,7 +40,7 @@ internal sealed class DecisionJournal(
 
     /// <summary>Écrit la décision d'une publication (à appeler avant l'enregistrement de la publication).</summary>
     public async Task RecordAsync(ChannelsDbContext db, Post post, IEnumerable<ChannelType> channels, string policy,
-        string? explored, double? propensity, CancellationToken ct)
+        string? explored, double? propensity, CancellationToken ct, MediaChoice? media = null)
     {
         var at = post.ScheduledAt ?? post.PublishedAt ?? clock.GetUtcNow();
         var settings = await db.AutopilotSettings.AsNoTracking().FirstOrDefaultAsync(ct);
@@ -70,6 +72,8 @@ internal sealed class DecisionJournal(
             Pillar = post.Pillar,
             VisualKind = post.VisualKind,
             Channels = string.Join(",", channels.Distinct().OrderBy(c => c)),
+            MediaKind = media?.Kind ?? post.ReelKind ?? MediaChoice.Image,
+            MediaPropensity = media?.Propensity,
             ContextJson = PublicationDecisions.Context(at, perWeek, perWeek >= 14, followers,
                 recent.Count(r => r.Audience != null && r.Audience == post.Audience),
                 recent.Count(r => PublicationDecisions.Intensity(r.Theme) >= 1)),
@@ -144,7 +148,8 @@ internal sealed class DecisionJournal(
             d.Leads = o?.Leads ?? 0;
             d.Appointments = o?.Appointments ?? 0;
             d.Won = o?.Won ?? 0;
-            d.Cost = post.VisualKind == "Photo" ? O.CostPerPhoto : 0;
+            d.Cost = (post.VisualKind == "Photo" ? O.CostPerPhoto : 0)
+                + (ReelKinds.IsAi(post.ReelKind) && !string.IsNullOrWhiteSpace(post.VideoUrl) ? O.CostPerAiReel : 0);
             d.Reward = adapter.Reward(d, O);
             rewards.Add(d.Reward.Value);
             if (final) { d.FinalizedAt = now; finalized++; }
@@ -176,6 +181,7 @@ internal sealed class DecisionJournal(
         orderby d.DecidedAt descending
         select new DecisionView(d.Id, d.PostId, p == null ? "(supprimée)" : p.Title, d.DecidedAt, d.Policy, d.Explored, d.Propensity,
             d.Slot, d.Intensity, d.Format, d.Audience, d.Theme, d.Channels, d.EditedByHuman,
+            d.MediaKind, d.MediaPropensity,
             d.Reach, d.Interactions, d.Visits, d.Leads, d.Won, d.Reward, d.ClosedAt, d.Note);
 
     public async Task<string> ExportCsvAsync(CancellationToken ct = default)
@@ -189,6 +195,7 @@ internal sealed class DecisionJournal(
         [
             "decision_id", "domaine", "publication_id", "titre", "campagne_id", "decidee_le", "politique", "dimension_exploree", "probabilite",
             "taux_exploration", "creneau", "intensite", "format", "cible", "theme", "pilier", "visuel", "reseaux", "modifiee_par_humain",
+            "type_media", "probabilite_media",
             "contexte_json", "portee", "interactions", "visites", "demandes", "rendez_vous", "gagnes", "cout", "recompense",
             "cloturee_le", "finalisee_le", "remarque",
         ];
@@ -201,6 +208,7 @@ internal sealed class DecisionJournal(
                 d.Id.ToString(), d.Domain, d.PostId.ToString(), titles.GetValueOrDefault(d.PostId), d.PlanId?.ToString(), D(d.DecidedAt), d.Policy,
                 d.Explored, d.Propensity?.ToString("0.####", inv), d.ExplorationRate.ToString("0.##", inv), d.Slot, d.Intensity.ToString("0.#", inv),
                 d.Format, d.Audience, d.Theme, d.Pillar, d.VisualKind, d.Channels, d.EditedByHuman ? "1" : "0",
+                d.MediaKind, d.MediaPropensity?.ToString("0.####", inv),
                 d.ContextJson, d.Reach.ToString(inv), d.Interactions.ToString(inv), d.Visits.ToString(inv), d.Leads.ToString(inv),
                 d.Appointments.ToString(inv), d.Won.ToString(inv), d.Cost.ToString("0.##", inv), d.Reward?.ToString("0.##", inv),
                 D(d.ClosedAt), D(d.FinalizedAt), d.Note,

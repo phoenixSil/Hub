@@ -13,6 +13,7 @@ internal sealed partial class ReelService(
     IDbContextFactory<ChannelsDbContext> factory,
     IReelStudio studio,
     IAiVideoGenerator generator,
+    IStockVideoSource stock,
     IAutopilotContextSource context,
     IOptions<ReelOptions> options,
     TimeProvider clock,
@@ -20,6 +21,7 @@ internal sealed partial class ReelService(
 {
     public bool IsAvailable => studio.IsAvailable;
     public bool AiConfigured => generator.IsConfigured;
+    public bool StockConfigured => stock.IsConfigured;
     public decimal AiCostPerReel => Math.Round(generator.PricePerSecond * generator.ClipSeconds, 2);
 
     private string Month => TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTime.Zone).ToString("yyyy-MM");
@@ -48,15 +50,23 @@ internal sealed partial class ReelService(
         var finalKind = kind;
         string? note = null;
 
-        if (kind == ReelKinds.Ai)
+        if (ReelKinds.IsAi(kind))
         {
-            var ai = await RenderAiAsync(post, text, brand, ct);
-            if (ai.IsSuccess) rendered = ai;
-            else
+            rendered = await RenderAiAsync(post, kind == ReelKinds.Cinematic, text, brand, ct);
+            if (rendered.IsFailure)
             {
-                // Budget atteint ou IA indisponible : on ne laisse pas la publication sans vidéo, on monte ses images.
-                logger.LogWarning("Reel IA impossible pour {Post} : {Error}", post.Id, ai.Error);
-                note = $"{ai.Error} Reel monté à partir des images à la place.";
+                // Budget atteint ou IA indisponible : on ne laisse pas la publication sans vidéo.
+                logger.LogWarning("Reel IA impossible pour {Post} : {Error}", post.Id, rendered.Error);
+                (finalKind, rendered, note) = await FallbackAsync(post, ctx, text, brand, rendered.Error!, ct);
+            }
+        }
+        else if (kind == ReelKinds.Stock)
+        {
+            rendered = await RenderStockAsync(post, text, brand, ct);
+            if (rendered.IsFailure)
+            {
+                logger.LogWarning("Reel d'archives impossible pour {Post} : {Error}", post.Id, rendered.Error);
+                note = $"{rendered.Error} Reel en images animées à la place.";
                 finalKind = ReelKinds.Montage;
                 rendered = await RenderMontageAsync(post, ctx, text, brand, ct);
             }
@@ -82,14 +92,26 @@ internal sealed partial class ReelService(
         return Result.Success();
     }
 
-    private async Task<Result<RenderedReel>> RenderAiAsync(Post post, ReelText text, ReelBrand brand, CancellationToken ct)
+    /// <summary>Repli d'un Reel IA : vidéos d'archives si possible (sauf format « preuve »), sinon images animées.</summary>
+    private async Task<(string Kind, Result<RenderedReel> Rendered, string Note)> FallbackAsync(Post post, AutopilotContext ctx, ReelText text,
+        ReelBrand brand, string error, CancellationToken ct)
+    {
+        if (stock.IsConfigured && (post.Format is null || !ReelPlanner.ProofFormats.Contains(post.Format)))
+        {
+            var archive = await RenderStockAsync(post, text, brand, ct);
+            if (archive.IsSuccess) return (ReelKinds.Stock, archive, $"{error} Reel en vidéos d'archives à la place.");
+        }
+        return (ReelKinds.Montage, await RenderMontageAsync(post, ctx, text, brand, ct), $"{error} Reel en images animées à la place.");
+    }
+
+    private async Task<Result<RenderedReel>> RenderAiAsync(Post post, bool cinematic, ReelText text, ReelBrand brand, CancellationToken ct)
     {
         if (!generator.IsConfigured) return Result<RenderedReel>.Failure("La génération de vidéos par l'IA n'est pas configurée.");
         var budget = await BudgetAsync(ct);
         if (budget.Used + AiCostPerReel > budget.Cap)
             return Result<RenderedReel>.Failure($"Plafond mensuel des vidéos IA atteint ({budget.Used:0.00} $ sur {budget.Cap:0} $).");
 
-        var clip = await generator.GenerateAsync(ScenePrompt(post, TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTime.Zone).Month), ct);
+        var clip = await generator.GenerateAsync(ScenePrompt(post, TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTime.Zone).Month, cinematic), ct);
         if (clip.IsFailure) return Result<RenderedReel>.Failure(clip.Error!);
         try
         {
@@ -98,6 +120,20 @@ internal sealed partial class ReelService(
             return await studio.FromClipsAsync([clip.Value!], [""], text, brand, ct);
         }
         finally { TryDelete(clip.Value!); }
+    }
+
+    /// <summary>Reel de vraies vidéos d'archives : trois plans (le sujet, un détail, l'ambiance de saison).</summary>
+    private async Task<Result<RenderedReel>> RenderStockAsync(Post post, ReelText text, ReelBrand brand, CancellationToken ct)
+    {
+        if (!stock.IsConfigured) return Result<RenderedReel>.Failure("Les vidéos d'archives (Pexels) ne sont pas configurées.");
+        var clips = await stock.DownloadAsync(StockQueries(post, TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTime.Zone).Month), ct);
+        if (clips.IsFailure) return Result<RenderedReel>.Failure(clips.Error!);
+        try
+        {
+            if (clips.Value!.Count == 0) return Result<RenderedReel>.Failure("Aucune vidéo d'archives trouvée pour ce sujet.");
+            return await studio.FromClipsAsync(clips.Value, clips.Value.Select(_ => "").ToList(), text, brand, ct);
+        }
+        finally { foreach (var path in clips.Value!) TryDelete(path); }
     }
 
     private async Task<Result<RenderedReel>> RenderMontageAsync(Post post, AutopilotContext ctx, ReelText text, ReelBrand brand, CancellationToken ct)
@@ -212,17 +248,58 @@ internal sealed partial class ReelService(
         return (space > 40 ? cut[..space] : cut).TrimEnd(',', ' ') + "…";
     }
 
-    /// <summary>Consigne de la scène pour l'IA vidéo : réaliste, verticale, sans texte (les textes sont ajoutés au montage).</summary>
-    internal static string ScenePrompt(Post post, int month)
+    /// <summary>
+    /// Consigne de la scène pour l'IA vidéo : verticale, sans texte (les textes sont ajoutés au montage).
+    /// Réaliste : lumière naturelle, caméra posée. Cinématique : rendu « film », lumière dorée, ralenti, travelling lent.
+    /// </summary>
+    internal static string ScenePrompt(Post post, int month, bool cinematic = false)
     {
         var season = month is 12 or 1 or 2 or 3 ? "in winter, snow visible through the windows"
             : month is 4 or 5 ? "in spring" : month is 6 or 7 or 8 ? "in summer" : "in autumn";
         var subject = !string.IsNullOrWhiteSpace(post.SceneNote) ? post.SceneNote! : Hook(post.Message, post.Title);
-        return "Vertical 9:16 realistic video for a home cleaning company in Québec City, Canada, " + season + ". "
+        var look = cinematic
+            ? "Cinematic film look: slow dolly-in and gentle parallax, golden-hour light, soft haze in the light beams, shallow depth of field, "
+              + "subtle slow motion, rich but natural colour grading, 24 fps film feel; "
+            : "Realistic, documentary feel: steady handheld camera, bright natural daylight, true-to-life colours; ";
+        return $"Vertical 9:16 {(cinematic ? "cinematic" : "realistic")} video for a home cleaning company in Québec City, Canada, " + season + ". "
             + $"Scene: {subject}. "
-            + "Slow, smooth cinematic camera movement; bright natural light; spotless, welcoming home; "
-            + "a professional cleaner in a neat uniform working calmly, seen from behind or at a distance. "
+            + look
+            + "spotless, welcoming home; a professional cleaner in a neat uniform working calmly, seen from behind or at a distance. "
             + "No text, no captions, no logos, no watermark, no brand names.";
+    }
+
+    /// <summary>Mots du texte (français) → recherches de vidéos d'archives (anglais).</summary>
+    private static readonly (string[] Words, string Query)[] StockTopics =
+    [
+        (["cuisine", "comptoir", "four", "frigo", "réfrigérateur"], "cleaning kitchen counter"),
+        (["salle de bain", "salle de bains", "douche", "bain", "toilette", "lavabo"], "cleaning bathroom"),
+        (["fenêtre", "vitre", "vitres", "fenêtres"], "cleaning window"),
+        (["plancher", "planchers", "sol", "calcium", "vadrouille"], "mopping floor"),
+        (["tapis", "aspirateur", "moquette"], "vacuum cleaning carpet"),
+        (["lit", "literie", "draps", "chambre"], "making bed bedroom"),
+        (["déménagement", "déménager", "boîtes"], "moving boxes empty apartment"),
+        (["bureau", "bureaux", "commercial", "entreprise"], "office cleaning"),
+        (["aîné", "aînés", "aînée", "parents"], "senior woman relaxing at home"),
+        (["poussière", "époussetage", "étagère"], "dusting shelves"),
+        (["rangement", "désencombrer", "organiser", "garde-robe"], "organizing closet"),
+        (["temps libre", "temps retrouvé", "famille", "détente"], "family relaxing living room"),
+    ];
+
+    /// <summary>Trois recherches : le sujet du texte, un geste de ménage, l'ambiance de la saison au Québec.</summary>
+    internal static IReadOnlyList<string> StockQueries(Post post, int month)
+    {
+        var text = $" {post.SceneNote} {post.Title} {post.Message} ".ToLowerInvariant();
+        var topics = StockTopics.Where(t => t.Words.Any(w => Regex.IsMatch(text, $@"\b{Regex.Escape(w)}\b"))).Select(t => t.Query).Take(2).ToList();
+        if (topics.Count == 0) topics.Add("house cleaning");
+        if (topics.Count == 1) topics.Add(topics[0] == "house cleaning" ? "clean bright living room" : "house cleaning");
+        topics.Add(month switch
+        {
+            12 or 1 or 2 or 3 => "snowy house winter",
+            4 or 5 => "spring sunlight window",
+            6 or 7 or 8 => "sunny summer house",
+            _ => "autumn leaves house",
+        });
+        return topics;
     }
 
     private static void TryDelete(string path)

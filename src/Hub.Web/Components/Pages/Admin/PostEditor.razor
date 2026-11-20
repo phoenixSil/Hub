@@ -205,6 +205,10 @@ else
                         @if (!string.IsNullOrWhiteSpace(p.VideoUrl))
                         {
                             <p class="muted small"><strong>@ReelKinds.Label(p.ReelKind)</strong> · part en Reel sur Facebook et Instagram (Google Business garde l'image).</p>
+                            @if (p.ReelKind is ReelKinds.Stock or ReelKinds.Ai or ReelKinds.Cinematic)
+                            {
+                                <p class="muted small">Les vidéos d'archives et celles de l'IA ne montrent pas votre équipe : gardez-les pour les conseils, l'ambiance et les offres, jamais pour un « résultat ».</p>
+                            }
                             <video class="reel-video" src="@p.VideoUrl" controls playsinline preload="metadata"></video>
                         }
                         else if (p.ReelKind is not null && p.ReelError is null)
@@ -226,10 +230,15 @@ else
                         else
                         {
                             <div class="actions">
-                                <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Montage)" IsBusy="@(action == "reel-Montage")" AnyBusy="busy" BusyText="Montage de la vidéo…">@(p.VideoUrl is null ? "Créer un Reel monté (gratuit)" : "Refaire en Reel monté")</BusyButton>
+                                <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Montage)" IsBusy="@(action == "reel-Montage")" AnyBusy="busy" BusyText="Montage de la vidéo…">Images animées (gratuit)</BusyButton>
+                                @if (Reels.StockConfigured)
+                                {
+                                    <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Stock)" IsBusy="@(action == "reel-Archives")" AnyBusy="busy" BusyText="Recherche et montage des vidéos…">Vidéos d'archives (gratuit)</BusyButton>
+                                }
                                 @if (Reels.AiConfigured)
                                 {
                                     <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Ai)" IsBusy="@(action == "reel-IA")" AnyBusy="busy" BusyText="L'IA filme la scène (1 à 6 min)…">@(p.ReelKind == ReelKinds.Ai && p.VideoUrl is not null ? "Nouvelle vidéo IA" : "Créer un Reel IA") (≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $)</BusyButton>
+                                    <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ReelAsync(ReelKinds.Cinematic)" IsBusy="@(action == "reel-IACinema")" AnyBusy="busy" BusyText="L'IA tourne la scène (1 à 6 min)…">Version cinématique (IA, ≈ @Reels.AiCostPerReel.ToString("0.00", AdminFormat.Fr) $)</BusyButton>
                                 }
                                 @if (p.VideoUrl is not null || p.ReelKind is not null)
                                 {
@@ -638,7 +647,8 @@ else
     private async Task ReelAsync(string kind)
     {
         if (view is null) return;
-        await BeginAsync($"reel-{kind}", kind == ReelKinds.Ai ? "L'IA filme la scène : jusqu'à 6 minutes…" : "Montage de la vidéo…");
+        await BeginAsync($"reel-{kind}", ReelKinds.IsAi(kind) ? "L'IA filme la scène : jusqu'à 6 minutes…"
+            : kind == ReelKinds.Stock ? "Recherche des vidéos d'archives et montage…" : "Montage de la vidéo…");
         var id = await SaveDraftInternalAsync();
         if (id is null) { End(); return; }
         var result = await Reels.RenderAsync(id.Value, kind);
