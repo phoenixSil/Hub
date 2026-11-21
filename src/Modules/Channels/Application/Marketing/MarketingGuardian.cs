@@ -58,6 +58,7 @@ internal sealed class MarketingGuardian(
     Reviews.IReviewService reviews,
     IChannelConnections connections,
     Decisions.DecisionJournal decisions,
+    Ads.IAdService ads,
     Reels.IReelService reels,
     IAutopilotContextSource source,
     IEmailSender email,
@@ -218,6 +219,9 @@ internal sealed class MarketingGuardian(
         // 9. Reels demandés par le pilote dont la vidéo n'est pas encore prête.
         var rendered = await reels.RenderPendingAsync(ct);
         if (rendered > 0) Log("Reels", $"{rendered} vidéo(s) de Reel préparée(s).", true);
+
+        // 10. Publicités payantes : état chez Meta (examen, refus, fin) et dépense, avant le journal (le coût compte dans la récompense).
+        await ads.SyncAsync(ct);
 
         // 8. Journal des décisions : publications à journaliser, résultats à clôturer (J+7) et à finaliser (J+30).
         var sync = await decisions.SyncAsync(ct);
