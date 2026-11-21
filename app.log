@@ -1,0 +1,162 @@
+info: Hub.Web[0]
+      Courriels envoyés par : Journal
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Entreprise scintinet créée.
+info: Hub.Modules.Platform.PlatformInitializer[0]
+      Administrateur admin@smoke.test créé.
+info: Seed[0]
+      Préparation des données de départ de ScintiNet.
+info: Seed[0]
+      Données de départ prêtes.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {ce4e4939-9284-4ef5-8440-58f021693d96} may be persisted to storage in unencrypted form.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/runner/work/Hub/Hub/publish
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /media/social.jpg (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /media/social.jpg (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /services/nexiste-pas (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Devis — Test Fumée (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre demande de devis (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Contact — Test Fumée (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — nous avons bien reçu votre message (0 pièce(s) jointe(s))
+info: Hub.Modules.Quotes.Application.QuoteService[0]
+      Proposition de devis Draft pour la demande 01a1ff79-4a1b-7d91-ac73-71acc64104dd (simulé, 111.00 $)
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : [ScintiNet] Rappel : 1 demande sans réponse (0 pièce(s) jointe(s))
+info: Hub.Modules.Leads.Application.LeadReminderService[0]
+      Rappel envoyé pour 1 demande(s) en attente.
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+info: Hub.Web.Components.Pages.Account.Login[0]
+      Connexion de admin@smoke.test
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à fumee@example.com : ScintiNet — votre proposition de prix (0 pièce(s) jointe(s))
+info: Hub.Channels.Simulated[0]
+      Publication simulée sur Facebook : ✨ Nettoyage résidentiel
+      
+      Nettoyage complet de votre maison, condo ou appartement, une seule fois ou selon un horaire régulier.
+      
+      L'équipe ScintiNet est là pour vous à Québec. Demandez votre devis gratuit dès aujourd'hui !
+      
+      #Québec #Entretien | https://www.scintinet.com/services/nettoyage-residentiel?utm_source=facebook&utm_medium=social&utm_campaign=2026-11-nettoyage-residentiel-5520 | https://www.scintinet.com/media/social.jpg?src=%2Fuploads%2F01a1ff7925ea7a428ee6ee069c93798b%2Fvisuel-2f066f42.webp | (pas de vidéo)
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1ff7a-9a50-78f3-a770-feabdd3dc579 sur Facebook : publiée
+info: Hub.Web.Infrastructure.Reels.Ffmpeg[0]
+      Montage vidéo : ffmpeg trouvé (ffmpeg)
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : 3 publication(s) préparée(s).
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : 3 publication(s) à valider (0 pièce(s) jointe(s))
+info: Hub.Modules.Channels.Application.Marketing.MarketingGuardian[0]
+      Gardien : 1 vidéo(s) de Reel préparée(s). | 1 décision(s) clôturée(s), 0 finalisée(s) : récompense moyenne -0,1. | 1 publication(s) ajoutée(s) au journal des décisions.
+info: Hub.Web.Components.Pages.Account.LoginWith2fa[0]
+      Connexion en deux étapes réussie
+info: Hub.Web.Components.Pages.Account.LoginWith2fa[0]
+      Connexion en deux étapes réussie
+info: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Ancienne adresse /contactez-nous/ redirigée vers /contact
+info: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Ancienne adresse /Devis.html redirigée vers /devis
+info: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Ancienne adresse /fr/faq redirigée vers /faq
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-qui-nexiste-pas (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : 5 publication(s) préparée(s).
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : 5 publication(s) à valider (0 pièce(s) jointe(s))
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : La semaine est déjà couverte : rien à ajouter.
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : 1 publication(s) préparée(s).
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : 1 publication(s) à valider (0 pièce(s) jointe(s))
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : 16 publication(s) préparée(s).
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : 16 publication(s) à valider (0 pièce(s) jointe(s))
+info: Hub.Modules.Channels.Application.Autopilot.AutopilotRunner[0]
+      Pilote automatique : La semaine est déjà couverte : rien à ajouter.
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1ff7e-2214-7056-8bb6-dd40e726001d sur Facebook : Service temporairement indisponible (simulé).
+info: Hub.Channels.Simulated[0]
+      Publication simulée sur Facebook : Test des relances [échec passager] : un ménage impeccable, sans effort. | (null) | (null) | (pas de vidéo)
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1ff7e-2214-7056-8bb6-dd40e726001d sur Facebook : publiée
+info: Hub.Modules.Channels.Application.Marketing.MarketingGuardian[0]
+      Gardien : « Test des relances » : relancée sur Facebook, partie. | Chiffres des réseaux relevés (le relevé quotidien n'avait pas abouti). | 3 vidéo(s) de Reel préparée(s). | 1 décision(s) clôturée(s), 1 finalisée(s) : récompense moyenne -0. | 1 publication(s) ajoutée(s) au journal des décisions.
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à marie@example.com : Votre carte-cadeau ScintiNet : demande reçue (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à tsillery@ymail.com : Carte-cadeau demandée : 75 $ par Marie Essai (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à jeanne@example.com : Marie Essai vous offre une carte-cadeau ScintiNet (0 pièce(s) jointe(s))
+info: Hub.Web.Infrastructure.LoggingEmailSender[0]
+      Courriel (non envoyé, aucune clé Resend) à marie@example.com : Votre carte-cadeau a été envoyée à Jeanne Essai (0 pièce(s) jointe(s))
+info: Hub.Modules.Channels.Application.Marketing.MarketingGuardian[0]
+      Gardien : 2 nouvel(s) avis Google relevé(s). | 16 publication(s) à venir partiront aussi sur votre fiche Google. | Les prochaines publications de la campagne partiront aussi sur Google. | 2 vidéo(s) de Reel préparée(s). | 0 décision(s) clôturée(s), 1 finalisée(s) : récompense moyenne 0.
+info: Hub.Channels.Simulated[0]
+      Réponse simulée à l'avis simule-avis-2 : Merci Jean-François pour votre avis ! L'équipe Scintinet
+info: Hub.Channels.Simulated[0]
+      Publication simulée sur Instagram : Une cuisine qui retrouve tout son éclat. Demandez votre devis gratuit ! | https://www.scintinet.com/devis?utm_source=instagram&utm_medium=social&utm_campaign=reel-202611211905-0e9b | https://www.scintinet.com/media/social.jpg?src=%2Fuploads%2F01a1ff7925ea7a428ee6ee069c93798b%2Freel-couverture-0aabcbb6.webp | https://www.scintinet.com/uploads/01a1ff7925ea7a428ee6ee069c93798b/reel-2e0498dd.mp4
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1ff80-019c-7bac-b990-aa1cd6a8390b sur Instagram : publiée
+info: Hub.Channels.Simulated[0]
+      Publication simulée sur Facebook : Une cuisine qui retrouve tout son éclat. Demandez votre devis gratuit ! | https://www.scintinet.com/devis?utm_source=facebook&utm_medium=social&utm_campaign=reel-202611211905-0e9b | https://www.scintinet.com/media/social.jpg?src=%2Fuploads%2F01a1ff7925ea7a428ee6ee069c93798b%2Freel-couverture-0aabcbb6.webp | https://www.scintinet.com/uploads/01a1ff7925ea7a428ee6ee069c93798b/reel-2e0498dd.mp4
+info: Hub.Modules.Channels.Application.PostPublishing[0]
+      Publication 01a1ff80-019c-7bac-b990-aa1cd6a8390b sur Facebook : publiée
+info: Hub.Modules.Channels.Application.Ads.AdService[0]
+      Publicité Hub · Boost · Reel e2e avant/après · 2026-11-21 : InReview (budget 21 CAD, par Administrateur)
+info: Hub.Modules.Channels.Application.Marketing.MarketingGuardian[0]
+      Gardien : 1 décision(s) clôturée(s), 0 finalisée(s) : récompense moyenne -1,8. | 1 publication(s) ajoutée(s) au journal des décisions.
+info: Hub.Modules.Channels.Application.Ads.AdService[0]
+      Publicité Hub · Campagne · Ménage à Québec : devis gratuit · 2026-11-21 : InReview (budget 30 CAD, par Administrateur)
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /page-inconnue (référent : )
+warn: Hub.Web.Infrastructure.LegacyRedirectMiddleware[0]
+      Page introuvable : /introuvable (référent : )
