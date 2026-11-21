@@ -38,7 +38,7 @@ internal sealed class MetaAdsPlatform(HttpClient http, IOptions<FacebookOptions>
         var goal = Plan(objective).Optimization;
         var got = await GetAsync($"act_{access.AccountId}/delivery_estimate?optimization_goal={goal}&targeting_spec={Uri.EscapeDataString(Targeting(audience).ToJsonString())}", access, ct);
         if (got.IsFailure) { logger.LogInformation("Estimation Meta indisponible : {Error}", got.Error); return null; }
-        var first = got.Value!["data"]?[0];
+        var first = First(got.Value!["data"]);
         var lower = first?["estimate_mau_lower_bound"]?.GetValue<long>();
         var upper = first?["estimate_mau_upper_bound"]?.GetValue<long>();
         return lower is null || upper is null ? null : new ReachEstimate(lower.Value, upper.Value);
@@ -137,7 +137,7 @@ internal sealed class MetaAdsPlatform(HttpClient http, IOptions<FacebookOptions>
             ? string.Join(" ", feedback.SelectMany(section => section.Value is JsonObject reasons
                 ? reasons.Select(r => r.Value?.ToString() ?? r.Key) : [section.Value?.ToString() ?? ""])).Trim()
             : null;
-        var row = insights["data"]?[0];
+        var row = First(insights["data"]);
         int Int(string name) => int.TryParse(row?[name]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
         var spend = decimal.TryParse(row?["spend"]?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var s) ? s : 0;
         var engagements = (row?["actions"]?.AsArray() ?? [])
@@ -146,6 +146,9 @@ internal sealed class MetaAdsPlatform(HttpClient http, IOptions<FacebookOptions>
         return new AdSnapshot(ad["effective_status"]?.GetValue<string>() ?? "UNKNOWN", string.IsNullOrWhiteSpace(review) ? null : review,
             spend, Int("reach"), Int("impressions"), Int("inline_link_clicks"), engagements);
     }
+
+    /// <summary>Premier élément d'une liste de Meta (null si elle est vide : pas encore de chiffres).</summary>
+    private static JsonNode? First(JsonNode? list) => list is JsonArray { Count: > 0 } array ? array[0] : null;
 
     /// <summary>Objectif Hub → objectif de campagne, optimisation et destination chez Meta.</summary>
     internal static (string Objective, string Optimization, string? Destination) Plan(AdObjective objective) => objective switch
