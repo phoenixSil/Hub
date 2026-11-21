@@ -428,6 +428,73 @@ def reels(page):
     expect(page.locator(".kpi", has_text="Vidéos IA ce mois").locator("strong")).not_to_have_text("0", timeout=20000)
 
 
+@step("Publicités : compte connecté, boost vérifié puis lancé, suivi, pause et arrêt, campagne mesurée, plafond respecté")
+def ads(page):
+    page.goto(BASE + "/admin/publicites", wait_until="networkidle")
+    page.fill("#ads-account", "act_123456789")
+    page.fill("#ads-token", "jeton-simule")
+    page.locator("button", has_text="Connecter le compte publicitaire").click()
+    expect(page.locator(".alert-success")).to_contain_text("Compte publicitaire connecté", timeout=20000)
+
+    # Boost : rien ne part avant le récapitulatif et le clic « Lancer ».
+    page.locator("button", has_text="Booster une publication").click()
+    page.select_option("#ad-post", index=1)
+    page.fill("#ad-budget", "21")
+    page.locator("#ad-budget").press("Tab")
+    page.locator("button", has_text="Vérifier avant de lancer").click()
+    recap = page.locator(".ads-recap")
+    expect(recap).to_contain_text("Coût maximal : 21 $", timeout=20000)
+    expect(recap).to_contain_text("Public estimé")
+    page.locator(".ads-recap button", has_text="Lancer").click()
+    expect(page.locator(".alert-success")).to_contain_text("Publicité envoyée à Meta", timeout=30000)
+    item = page.locator(".ads-item", has_text="Boost").first
+    expect(item).to_contain_text("En examen chez Meta")
+
+    # Le gardien relève l'état et la dépense.
+    page.goto(BASE + "/admin/marketing", wait_until="networkidle")
+    page.locator("button", has_text="Vérifier maintenant").click()
+    expect(page.locator(".alert-success")).to_contain_text("Vérification faite", timeout=120000)
+    page.goto(BASE + "/admin/publicites", wait_until="networkidle")
+    item = page.locator(".ads-item", has_text="Boost").first
+    expect(item.locator(".status")).to_have_text("Active", timeout=20000)
+    item.locator("button", has_text="Mettre en pause").click()
+    expect(page.locator(".alert-success")).to_contain_text("en pause", timeout=20000)
+    item = page.locator(".ads-item", has_text="Boost").first
+    item.locator("button", has_text="Arrêter").click()
+    item.locator("button", has_text="Confirmer l'arrêt définitif").click()
+    expect(page.locator(".alert-success")).to_contain_text("Publicité arrêtée", timeout=20000)
+    expect(page.locator(".ads-item", has_text="Boost").first.locator(".status")).to_have_text("Arrêtée")
+
+    # Campagne : annonce avec bouton vers le site, demandes mesurées.
+    page.locator("button", has_text="Créer une campagne").click()
+    page.select_option("#ad-post", index=1)
+    page.fill("#ad-message", "Une maison propre sans y passer vos fins de semaine. Devis gratuit en ligne.")
+    page.fill("#ad-budget", "30")
+    page.locator("#ad-budget").press("Tab")
+    page.locator("button", has_text="Vérifier avant de lancer").click()
+    expect(page.locator(".ads-recap")).to_contain_text("Coût maximal : 30 $", timeout=20000)
+    page.locator(".ads-recap button", has_text="Lancer").click()
+    expect(page.locator(".alert-success")).to_contain_text("Publicité envoyée à Meta", timeout=30000)
+    expect(page.locator(".ads-item", has_text="Campagne").first).to_contain_text("Demandes")
+
+    # Plafond facultatif : 40 $ par mois, une nouvelle publicité de 21 $ est refusée.
+    page.locator(".ads-account summary").click()
+    page.fill("#ads-cap", "40")
+    page.locator("#ads-cap").press("Tab")
+    page.locator("button", has_text="Enregistrer les réglages").click()
+    expect(page.locator(".alert-success")).to_contain_text("Réglages enregistrés", timeout=20000)
+    page.locator("button", has_text="Booster une publication").click()
+    page.select_option("#ad-post", index=1)
+    page.fill("#ad-budget", "21")
+    page.locator("#ad-budget").press("Tab")
+    page.locator("button", has_text="Vérifier avant de lancer").click()
+    expect(page.locator(".field-error", has_text="plafond").first).to_be_visible(timeout=20000)
+    expect(page.locator(".ads-recap")).to_have_count(0)
+
+    page.goto(BASE + "/admin/resultats", wait_until="networkidle")
+    expect(page.locator("#ads-results")).to_contain_text("Dépensé", timeout=20000)
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     state = session(browser, BASE)
@@ -451,6 +518,7 @@ with sync_playwright() as p:
     decision_journal(page)
     spam_filter(page)
     reels(page)
+    ads(page)
     browser.close()
 
 if failures:

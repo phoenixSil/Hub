@@ -7,6 +7,8 @@
 @inject Hub.Modules.Channels.Application.Reviews.IReviewService Reviews
 @inject Hub.Modules.Channels.Application.Decisions.IDecisionJournal Decisions
 @inject Hub.Modules.Channels.Application.Reels.IReelService Reels
+@inject Hub.Modules.Channels.Application.Ads.IAdService Ads
+@inject TimeProvider Clock
 
 <PageTitle>Résultats du marketing</PageTitle>
 
@@ -82,6 +84,21 @@ else
                     </table>
                 </div>
             }
+        </div>
+    }
+
+    @if (ads is { Count: > 0 })
+    {
+        <div class="admin-card" id="ads-results">
+            <h2>Publicités (@days derniers jours)</h2>
+            <div class="kpi-grid">
+                <div class="kpi"><span>Publicités</span><strong>@ads.Count</strong></div>
+                <div class="kpi"><span>Dépensé</span><strong>@ads.Spend.ToString("0.##", Fr) $</strong></div>
+                <div class="kpi"><span>Personnes atteintes</span><strong>@ads.Reach.ToString("N0", Fr)</strong></div>
+                <div class="kpi"><span>Clics vers le site</span><strong>@ads.Clicks.ToString("N0", Fr)</strong></div>
+                <div class="kpi kpi-accent"><span>Demandes venues des campagnes</span><strong>@ads.Leads</strong>@if (ads.CostPerLead is { } cpl) { <small class="muted">@cpl.ToString("0.##", Fr) $ par demande</small> }</div>
+            </div>
+            <p class="muted small">Le coût des boosts est soustrait du score des publications dans le journal des décisions. <a href="/admin/publicites">Gérer les publicités</a></p>
         </div>
     }
 
@@ -191,6 +208,7 @@ else
 @code {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-CA");
     private int days = 30;
+    private Hub.Modules.Channels.Application.Ads.AdsSummary? ads;
     private MarketingReport? report;
     private Result<Hub.Modules.Channels.Publishers.LocationMetrics>? google;
     private Hub.Modules.Channels.Application.Decisions.DecisionSummary? decisionSummary;
@@ -204,6 +222,7 @@ else
         BioLink = $"{(company.SiteUrl ?? "https://votre-site").TrimEnd('/')}/devis?utm_source=instagram&utm_medium=social&utm_campaign={MarketingResults.BioCampaign}";
         report = await Results.GetAsync(days);
         await LoadGoogleAsync();
+        ads = await Ads.SummaryAsync(Clock.GetUtcNow().AddDays(-days));
         decisionSummary = await Decisions.SummaryAsync();
         videoBudget = await Reels.BudgetAsync();
         decisionRows = await Decisions.ListAsync(10);
@@ -221,6 +240,7 @@ else
         report = null;
         report = await Results.GetAsync(days);
         await LoadGoogleAsync();
+        ads = await Ads.SummaryAsync(Clock.GetUtcNow().AddDays(-days));
     }
 
     private static string Details(PostResult r) => string.Join(" · ", new[]

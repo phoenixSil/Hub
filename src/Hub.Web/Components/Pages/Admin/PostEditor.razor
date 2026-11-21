@@ -315,6 +315,10 @@ else
                             </li>
                         }
                     </ul>
+                    @if (view.Targets.Any(t => t.Status == PostTargetStatus.Published && t.Channel is ChannelType.Facebook or ChannelType.Instagram))
+                    {
+                        <p><a class="btn btn-outline btn-sm" href="/admin/publicites?post=@view.Post.Id#nouvelle">Booster cette publication (publicité payante)</a></p>
+                    }
                     @if (view.Post.Status is PostStatus.PartiallyPublished)
                     {
                         <BusyButton Class="btn btn-outline btn-sm" OnClick="PublishNowAsync" IsBusy="@(action == "publish")" AnyBusy="busy" BusyText="Publication en cours…">Réessayer les réseaux en échec</BusyButton>

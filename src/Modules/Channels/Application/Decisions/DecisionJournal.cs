@@ -121,6 +121,11 @@ internal sealed class DecisionJournal(
         var ids = due.Select(x => x.Decision.PostId).ToList();
         var stats = (await db.PostStats.AsNoTracking().Where(s => ids.Contains(s.PostId)).ToListAsync(ct))
             .GroupBy(s => s.PostId).ToDictionary(g => g.Key, g => g.GroupBy(s => s.Channel).Select(c => c.OrderByDescending(s => s.MeasuredAt).First()).ToList());
+        // Publications boostées : la dépense publicitaire compte dans le coût (et la décision est marquée).
+        var adSpend = (await db.AdCampaigns.AsNoTracking()
+                .Where(a => a.Kind == AdKind.Boost && a.PostId != null && ids.Contains(a.PostId.Value) && a.Status != AdStatus.Failed)
+                .Select(a => new { PostId = a.PostId!.Value, a.Spend }).ToListAsync(ct))
+            .GroupBy(a => a.PostId).ToDictionary(g => g.Key, g => g.Sum(a => a.Spend));
 
         int closed = 0, finalized = 0;
         var rewards = new List<double>();
@@ -150,6 +155,12 @@ internal sealed class DecisionJournal(
             d.Won = o?.Won ?? 0;
             d.Cost = (post.VisualKind == "Photo" ? O.CostPerPhoto : 0)
                 + (ReelKinds.IsAi(post.ReelKind) && !string.IsNullOrWhiteSpace(post.VideoUrl) ? O.CostPerAiReel : 0);
+            if (adSpend.TryGetValue(post.Id, out var spent))
+            {
+                // La portée d'une publication boostée n'est plus seulement gratuite : on le note pour ne pas fausser la comparaison.
+                d.Cost += spent;
+                d.Note = $"Boostée ({spent:0.##} $ de publicité)";
+            }
             d.Reward = adapter.Reward(d, O);
             rewards.Add(d.Reward.Value);
             if (final) { d.FinalizedAt = now; finalized++; }

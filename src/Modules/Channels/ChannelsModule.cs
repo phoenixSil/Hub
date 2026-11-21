@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Hub.Modules.Channels;
 
@@ -67,6 +68,8 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
     public DbSet<Decision> Decisions => Set<Decision>();
     public DbSet<VideoUsage> VideoUsages => Set<VideoUsage>();
     public DbSet<GoogleReview> Reviews => Set<GoogleReview>();
+    public DbSet<AdCampaign> AdCampaigns => Set<AdCampaign>();
+    public DbSet<AdSettings> AdSettings => Set<AdSettings>();
 
     protected override void ConfigureModel(ModelBuilder b)
     {
@@ -167,6 +170,42 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             e.HasIndex(x => new { x.TenantId, x.DecidedAt });
         });
 
+        b.Entity<AdCampaign>(e =>
+        {
+            e.ToTable("AdCampaigns");
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Objective).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SourceChannel).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Message).HasMaxLength(4000);
+            e.Property(x => x.Headline).HasMaxLength(200);
+            e.Property(x => x.LinkUrl).HasMaxLength(1000);
+            e.Property(x => x.TrackingCampaign).HasMaxLength(100);
+            e.Property(x => x.Currency).HasMaxLength(3);
+            e.Property(x => x.Budget).HasPrecision(10, 2);
+            e.Property(x => x.Spend).HasPrecision(10, 2);
+            e.Property(x => x.MetaCampaignId).HasMaxLength(40);
+            e.Property(x => x.MetaAdSetId).HasMaxLength(40);
+            e.Property(x => x.MetaAdId).HasMaxLength(40);
+            e.Property(x => x.StatusDetail).HasMaxLength(1000);
+            e.Property(x => x.LaunchedBy).HasMaxLength(200);
+            e.Ignore(x => x.Committed);
+            e.Ignore(x => x.IsLive);
+            e.HasIndex(x => new { x.TenantId, x.CreatedAt });
+            e.HasIndex(x => new { x.TenantId, x.PostId });
+        });
+
+        b.Entity<AdSettings>(e =>
+        {
+            e.ToTable("AdSettings");
+            e.Property(x => x.AdAccountId).HasMaxLength(40);
+            e.Property(x => x.AdAccountName).HasMaxLength(200);
+            e.Property(x => x.Currency).HasMaxLength(3);
+            e.Property(x => x.MonthlyCap).HasPrecision(10, 2);
+            e.HasIndex(x => x.TenantId).IsUnique();
+        });
+
         b.Entity<VideoUsage>(e =>
         {
             e.ToTable("VideoUsages");
@@ -265,6 +304,14 @@ public static class ChannelsModule
         services.AddScoped<Application.Reels.IReelService, Application.Reels.ReelService>();
         services.AddScoped<Application.Decisions.IDecisionJournal>(sp => sp.GetRequiredService<Application.Decisions.DecisionJournal>());
         services.AddScoped<Application.Reviews.IReviewService, Application.Reviews.ReviewService>();
+
+        // Publicités payantes Meta (boost et campagnes) : rien n'est dépensé sans le clic « Lancer » de l'administrateur.
+        services.AddHttpClient<MetaAdsPlatform>(c => c.Timeout = TimeSpan.FromSeconds(90));
+        services.AddSingleton<SimulatedAdsPlatform>();
+        services.AddScoped<Application.Ads.IAdsPlatform>(sp => sp.GetRequiredService<IOptions<ChannelsOptions>>().Value.Simulate
+            ? sp.GetRequiredService<SimulatedAdsPlatform>()
+            : sp.GetRequiredService<MetaAdsPlatform>());
+        services.AddScoped<Application.Ads.IAdService, Application.Ads.AdService>();
         services.AddHostedService<Application.Marketing.MarketingGuardianWorker>();
         services.AddScoped<IMarketingPlanService, MarketingPlanService>();
         services.AddHostedService<PlanInsightsWorker>();

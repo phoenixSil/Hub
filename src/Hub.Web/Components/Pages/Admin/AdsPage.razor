@@ -1,0 +1,511 @@
+@page "/admin/publicites"
+@rendermode InteractiveServer
+@using Hub.Modules.Channels
+@using Hub.Modules.Channels.Application.Ads
+@using Hub.Modules.Channels.Domain
+@inject IAdService Ads
+@inject AuthenticationStateProvider Auth
+@inject TimeProvider Clock
+
+<PageTitle>Publicités</PageTitle>
+
+<MarketingTabs />
+
+<div class="admin-head">
+    <div>
+        <h1>Publicités</h1>
+        <p class="muted">Booster une publication ou lancer une campagne sur Facebook et Instagram. <strong>Rien n'est dépensé sans votre clic « Lancer »</strong> : chaque publicité a un budget total fixe, que Meta ne peut pas dépasser, et vous pouvez la mettre en pause ou l'arrêter à tout moment.</p>
+    </div>
+</div>
+
+@if (feedback is not null)
+{
+    <div class="alert @(feedbackIsError ? "alert-error" : "alert-success")" role="status">@feedback</div>
+}
+
+@if (settings is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    @if (settings.Simulated)
+    {
+        <p class="alert alert-info">Mode simulé : aucune publicité n'est envoyée à Meta, rien n'est dépensé.</p>
+    }
+
+    @* ---------- Compte publicitaire ---------- *@
+    <section class="admin-card ads-account" id="compte">
+        <h2>Compte publicitaire Meta</h2>
+        @if (settings.Connected)
+        {
+            <p><span class="status status-active">Connecté</span> <strong>@settings.AccountName</strong> <span class="muted">· act_@settings.AccountId · @settings.Currency</span></p>
+            @if (!settings.FacebookConnected)
+            {
+                <p class="alert alert-error">La page Facebook n'est pas connectée : <a href="/admin/canaux">connectez-la</a>, toutes les publicités Meta passent par elle.</p>
+            }
+            <details>
+                <summary>Réglages par défaut et plafond facultatif</summary>
+                <div class="ads-grid">
+                    <div class="field">
+                        <label for="ads-cap">Plafond mensuel (facultatif, $)</label>
+                        <input id="ads-cap" type="number" min="0" step="10" @bind="capText" placeholder="Aucun" />
+                        <span class="muted small">Vide : pas de limite globale, seul le budget de chaque publicité compte. Sinon, Hub refuse toute publicité qui le ferait dépasser.</span>
+                    </div>
+                    <div class="field">
+                        <label for="ads-radius">Rayon autour de Québec (km)</label>
+                        <input id="ads-radius" type="number" min="5" max="80" @bind="defRadius" />
+                    </div>
+                    <div class="field">
+                        <label for="ads-agemin">Âge minimum</label>
+                        <input id="ads-agemin" type="number" min="18" max="64" @bind="defAgeMin" />
+                    </div>
+                    <div class="field">
+                        <label for="ads-agemax">Âge maximum (65 = 65 et plus)</label>
+                        <input id="ads-agemax" type="number" min="19" max="65" @bind="defAgeMax" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <BusyButton Class="btn btn-outline btn-sm" OnClick="SaveDefaultsAsync" IsBusy="@(action == "defaults")" AnyBusy="busy" BusyText="Enregistrement…">Enregistrer les réglages</BusyButton>
+                    <BusyButton Class="btn btn-ghost btn-sm" OnClick="DisconnectAsync" IsBusy="@(action == "disconnect")" AnyBusy="busy" BusyText="…">Déconnecter le compte</BusyButton>
+                </div>
+            </details>
+        }
+        else
+        {
+            <p>Pour lancer des publicités, Hub a besoin de votre <strong>compte publicitaire</strong> (avec un moyen de paiement, devise CAD) et d'un <strong>jeton</strong> avec les permissions <code>ads_management</code> et <code>ads_read</code>. Le jeton est chiffré et n'est jamais réaffiché.</p>
+            <div class="ads-grid">
+                <div class="field">
+                    <label for="ads-account">Identifiant du compte publicitaire</label>
+                    <input id="ads-account" @bind="accountId" placeholder="act_123456789" autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label for="ads-token">Jeton (utilisateur système de préférence)</label>
+                    <input id="ads-token" type="password" @bind="token" autocomplete="off" />
+                </div>
+            </div>
+            <div class="actions">
+                <BusyButton OnClick="ConnectAsync" IsBusy="@(action == "connect")" AnyBusy="busy" BusyText="Vérification auprès de Meta…">Connecter le compte publicitaire</BusyButton>
+            </div>
+        }
+    </section>
+
+    @if (settings.Connected)
+    {
+        <div class="kpi-grid">
+            <div class="kpi"><span>Engagé ce mois-ci</span><strong>@Money(month.Committed)</strong>@if (month.Cap is { } cap) { <small class="muted">sur un plafond de @Money(cap)</small> } else { <small class="muted">aucun plafond global</small> }</div>
+            <div class="kpi"><span>Publicités en cours</span><strong>@items.Count(i => i.Ad.IsLive)</strong></div>
+            <div class="kpi"><span>Dépensé (90 jours)</span><strong>@Money(summary.Spend)</strong></div>
+            <div class="kpi kpi-accent"><span>Demandes venues des campagnes</span><strong>@summary.Leads</strong>@if (summary.CostPerLead is { } cpl) { <small class="muted">@Money(cpl) par demande</small> }</div>
+        </div>
+
+        @if (suggestion is not null && draft is null)
+        {
+            <section class="admin-card ads-suggestion">
+                <h2>Suggestion de Kairos</h2>
+                <p>« <strong>@suggestion.Title</strong> » marche bien sans publicité : @suggestion.Interactions interaction(s) pour @suggestion.Reach personne(s) atteinte(s), le meilleur taux des 14 derniers jours. La booster montrerait ce contenu à plus de gens du secteur.</p>
+                <button class="btn btn-outline btn-sm" @onclick="() => StartBoost(suggestion.PostId)" disabled="@busy">Préparer un boost de cette publication</button>
+                <span class="muted small">C'est une suggestion : rien n'est lancé sans vous.</span>
+            </section>
+        }
+
+        @* ---------- Nouvelle publicité ---------- *@
+        <section class="admin-card ads-new" id="nouvelle">
+            <h2>Nouvelle publicité</h2>
+            @if (draft is null)
+            {
+                <div class="actions">
+                    <button class="btn btn-primary" @onclick="() => StartBoost(null)" disabled="@(busy || targets.Count == 0)">Booster une publication</button>
+                    <button class="btn btn-outline" @onclick="StartCampaign" disabled="@(busy || targets.Count == 0)">Créer une campagne</button>
+                </div>
+                @if (targets.Count == 0)
+                {
+                    <p class="muted small">Aucune publication partie sur Facebook ou Instagram ces 60 derniers jours : publiez d'abord, puis revenez la booster.</p>
+                }
+            }
+            else
+            {
+                <p class="muted">@(draft.Kind == AdKind.Boost
+                    ? "Un boost montre une publication déjà partie à plus de personnes du secteur, telle quelle (ses réactions restent sur la publication)."
+                    : "Une campagne est une vraie annonce avec un bouton vers votre site : les demandes de devis qu'elle apporte sont comptées.")</p>
+
+                <div class="ads-grid">
+                    <div class="field ads-wide">
+                        <label for="ad-post">@(draft.Kind == AdKind.Boost ? "Publication à booster" : "Visuel de l'annonce (image ou Reel de la publication)")</label>
+                        <select id="ad-post" value="@draft.PostId" @onchange="PostChanged" disabled="@(recap is not null)">
+                            <option value="">— Choisir —</option>
+                            @foreach (var t in targets)
+                            {
+                                <option value="@t.PostId">@t.Title@(t.HasVideo ? " ▶" : "") · @string.Join(" + ", t.Sources)</option>
+                            }
+                        </select>
+                        <FieldError Errors="errors" For="PostId" />
+                    </div>
+
+                    @if (draft.Kind == AdKind.Boost && Selected is { } sel)
+                    {
+                        <div class="field">
+                            <label for="ad-source">Publication d'origine</label>
+                            <select id="ad-source" @bind="SourceText" disabled="@(recap is not null)">
+                                @foreach (var s in sel.Sources) { <option value="@s">@s</option> }
+                            </select>
+                            <FieldError Errors="errors" For="Source" />
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label for="ad-objective">Objectif</label>
+                        <select id="ad-objective" @bind="draft.Objective" disabled="@(recap is not null)">
+                            @if (draft.Kind == AdKind.Boost)
+                            {
+                                <option value="@AdObjective.Engagement">Plus de réactions et de commentaires</option>
+                                <option value="@AdObjective.Reach">Être vu par le plus de gens du secteur</option>
+                            }
+                            else
+                            {
+                                <option value="@AdObjective.Quotes">Demandes de devis (visites de la page devis)</option>
+                                <option value="@AdObjective.Reach">Notoriété (faire connaître ScintiNet)</option>
+                            }
+                        </select>
+                        <FieldError Errors="errors" For="Objective" />
+                    </div>
+
+                    @if (draft.Kind == AdKind.Campaign)
+                    {
+                        <div class="field ads-wide">
+                            <label for="ad-headline">Titre (sous l'image, 60 caractères au plus)</label>
+                            <input id="ad-headline" @bind="draft.Headline" maxlength="60" disabled="@(recap is not null)" />
+                            <FieldError Errors="errors" For="Headline" />
+                        </div>
+                        <div class="field ads-wide">
+                            <label for="ad-message">Texte de l'annonce</label>
+                            <textarea id="ad-message" @bind="draft.Message" maxlength="2000" rows="4" disabled="@(recap is not null)"></textarea>
+                            <FieldError Errors="errors" For="Message" />
+                        </div>
+                        <div class="field">
+                            <label for="ad-link">Page du site visée</label>
+                            <input id="ad-link" @bind="draft.LinkPath" disabled="@(recap is not null)" />
+                            <span class="muted small">Bouton « Obtenir un devis » ; le lien est mesuré (les demandes venues de l'annonce sont comptées).</span>
+                            <FieldError Errors="errors" For="LinkPath" />
+                        </div>
+                        @if (Selected is { HasVideo: true })
+                        {
+                            <label class="check"><input type="checkbox" @bind="draft.UseVideo" disabled="@(recap is not null)" /> Utiliser la vidéo (Reel) plutôt que l'image</label>
+                        }
+                    }
+
+                    <div class="field">
+                        <label for="ad-budget">Budget total ($ @settings.Currency)</label>
+                        <input id="ad-budget" type="number" min="1" step="1" @bind="draft.Budget" disabled="@(recap is not null)" />
+                        <span class="muted small">@(draft.Days > 0 ? $"≈ {Money(draft.Budget / draft.Days)} par jour" : "")</span>
+                        <FieldError Errors="errors" For="Budget" />
+                    </div>
+                    <div class="field">
+                        <label for="ad-days">Durée</label>
+                        <select id="ad-days" @bind="draft.Days" disabled="@(recap is not null)">
+                            @foreach (var d in new[] { 3, 5, 7, 10, 14, 21, 30 }) { <option value="@d">@d jours</option> }
+                        </select>
+                        <FieldError Errors="errors" For="Days" />
+                    </div>
+                    <div class="field">
+                        <label for="ad-radius">Rayon autour de Québec (km)</label>
+                        <input id="ad-radius" type="number" min="5" max="80" @bind="draft.RadiusKm" disabled="@(recap is not null)" />
+                        <FieldError Errors="errors" For="RadiusKm" />
+                    </div>
+                    <div class="field">
+                        <label>Âges</label>
+                        <div class="field-row">
+                            <input aria-label="Âge minimum" type="number" min="18" max="64" @bind="draft.AgeMin" disabled="@(recap is not null)" />
+                            <input aria-label="Âge maximum" type="number" min="19" max="65" @bind="draft.AgeMax" disabled="@(recap is not null)" />
+                        </div>
+                        <FieldError Errors="errors" For="AgeMin" />
+                    </div>
+                    <div class="field">
+                        <span class="ads-label">Diffusion</span>
+                        <label class="check"><input type="checkbox" @bind="draft.Facebook" disabled="@(recap is not null)" /> Facebook</label>
+                        <label class="check"><input type="checkbox" @bind="draft.Instagram" disabled="@(recap is not null || !settings.InstagramConnected)" /> Instagram@(settings.InstagramConnected ? "" : " (non connecté)")</label>
+                        <FieldError Errors="errors" For="Facebook" />
+                    </div>
+                </div>
+
+                @if (recap is null)
+                {
+                    <div class="actions">
+                        <BusyButton OnClick="ReviewAsync" IsBusy="@(action == "review")" AnyBusy="busy" BusyText="Vérification…">Vérifier avant de lancer</BusyButton>
+                        <button class="btn btn-ghost" @onclick="Cancel" disabled="@busy">Annuler</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="ads-recap" role="region" aria-label="Récapitulatif">
+                        <h3>Récapitulatif</h3>
+                        <ul>
+                            <li><strong>Coût maximal : @Money(draft.Budget)</strong> (budget total, Meta ne peut pas le dépasser)</li>
+                            <li>Du @AdminFormat.Local(recap.Value.Start, "d MMMM à HH:mm") au @AdminFormat.Local(recap.Value.End, "d MMMM yyyy à HH:mm"), après l'examen de Meta</li>
+                            <li>Public : @draft.RadiusKm km autour de Québec, @draft.AgeMin à @(draft.AgeMax == 65 ? "65 ans et plus" : $"{draft.AgeMax} ans"), sur @string.Join(" et ", Platforms())</li>
+                            @if (estimate is not null)
+                            {
+                                <li>Public estimé par Meta : @estimate.Lower.ToString("N0", AdminFormat.Fr) à @estimate.Upper.ToString("N0", AdminFormat.Fr) personnes</li>
+                            }
+                            @if (month.Cap is not null)
+                            {
+                                <li>Plafond mensuel : il restera @Money(Math.Max(0, (month.Remaining ?? 0) - draft.Budget)) après cette publicité</li>
+                            }
+                        </ul>
+                        <div class="actions">
+                            <BusyButton Class="btn btn-primary" OnClick="LaunchAsync" IsBusy="@(action == "launch")" AnyBusy="busy" BusyText="Envoi à Meta…">Lancer (@Money(draft.Budget) maximum)</BusyButton>
+                            <button class="btn btn-ghost" @onclick="() => recap = null" disabled="@busy">Modifier</button>
+                            <button class="btn btn-ghost" @onclick="Cancel" disabled="@busy">Annuler</button>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+
+        @* ---------- Publicités ---------- *@
+        <section class="admin-card" id="liste">
+            <h2>Vos publicités</h2>
+            @if (items.Count == 0)
+            {
+                <p class="muted">Aucune publicité pour l'instant.</p>
+            }
+            else
+            {
+                <div class="ads-list">
+                    @foreach (var i in items)
+                    {
+                        var a = i.Ad;
+                        <article class="ads-item">
+                            <div class="ads-item-head">
+                                <span class="status @StatusClass(a.Status)">@StatusLabel(a.Status)</span>
+                                <strong>@(a.Kind == AdKind.Boost ? "Boost" : "Campagne") · @(i.PostTitle ?? a.Name)</strong>
+                                <span class="muted small">@ObjectiveLabel(a.Objective) · @AdminFormat.Local(a.StartAt, "d MMM") → @AdminFormat.Local(a.EndAt, "d MMM yyyy")</span>
+                            </div>
+                            @if (a.StatusDetail is not null) { <p class="muted small">@a.StatusDetail</p> }
+                            <dl class="ads-figures">
+                                <div><dt>Dépensé</dt><dd>@Money(a.Spend) <span class="muted">/ @Money(a.Budget)</span></dd></div>
+                                <div><dt>Personnes atteintes</dt><dd>@a.Reach.ToString("N0", AdminFormat.Fr)</dd></div>
+                                <div><dt>@(a.Kind == AdKind.Boost ? "Interactions" : "Clics vers le site")</dt><dd>@(a.Kind == AdKind.Boost ? a.Engagements : a.Clicks)</dd></div>
+                                @if (a.Kind == AdKind.Campaign)
+                                {
+                                    <div><dt>Demandes</dt><dd>@i.Leads@(i.CostPerLead is { } c ? $" · {Money(c)} chacune" : "")</dd></div>
+                                }
+                            </dl>
+                            @if (a.IsLive)
+                            {
+                                <div class="actions">
+                                    @if (a.Status == AdStatus.Paused)
+                                    {
+                                        <BusyButton Class="btn btn-outline btn-sm" OnClick="() => ResumeAsync(a.Id)" IsBusy="@(action == $"resume-{a.Id}")" AnyBusy="busy" BusyText="…">Reprendre</BusyButton>
+                                    }
+                                    else
+                                    {
+                                        <BusyButton Class="btn btn-outline btn-sm" OnClick="() => PauseAsync(a.Id)" IsBusy="@(action == $"pause-{a.Id}")" AnyBusy="busy" BusyText="…">Mettre en pause</BusyButton>
+                                    }
+                                    @if (confirmStop == a.Id)
+                                    {
+                                        <BusyButton Class="btn btn-danger btn-sm" OnClick="() => StopAsync(a.Id)" IsBusy="@(action == $"stop-{a.Id}")" AnyBusy="busy" BusyText="…">Confirmer l'arrêt définitif</BusyButton>
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => confirmStop = null">Garder</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => confirmStop = a.Id" disabled="@busy">Arrêter</button>
+                                    }
+                                </div>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "post")] public Guid? PostParam { get; set; }
+
+    private AdSettingsView? settings;
+    private AdMonth month = new(0, null);
+    private AdsSummary summary = new(0, 0, 0, 0, 0);
+    private IReadOnlyList<AdView> items = [];
+    private IReadOnlyList<BoostTarget> targets = [];
+    private BoostTarget? suggestion;
+    private AdDraft? draft;
+    private (DateTimeOffset Start, DateTimeOffset End)? recap;
+    private ReachEstimate? estimate;
+    private IReadOnlyDictionary<string, string> errors = new Dictionary<string, string>();
+    private Guid? confirmStop;
+
+    private string accountId = "";
+    private string token = "";
+    private decimal? capText;
+    private int defRadius = 35, defAgeMin = 25, defAgeMax = 65;
+
+    private string? feedback;
+    private bool feedbackIsError;
+    private bool busy;
+    private string? action;
+
+    private string SourceText
+    {
+        get => draft?.Source?.ToString() ?? "";
+        set { if (draft is not null) draft.Source = Enum.TryParse<ChannelType>(value, out var c) ? c : null; }
+    }
+
+    private BoostTarget? Selected => draft?.PostId is { } id ? targets.FirstOrDefault(t => t.PostId == id) : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (PostParam is { } p && settings!.Connected && targets.Any(t => t.PostId == p)) StartBoost(p);
+    }
+
+    private async Task LoadAsync()
+    {
+        settings = await Ads.SettingsAsync();
+        capText = settings.MonthlyCap;
+        (defRadius, defAgeMin, defAgeMax) = (settings.RadiusKm, settings.AgeMin, settings.AgeMax);
+        if (!settings.Connected) return;
+        month = await Ads.MonthAsync();
+        summary = await Ads.SummaryAsync(Clock.GetUtcNow().AddDays(-90));
+        items = await Ads.ListAsync();
+        targets = await Ads.BoostTargetsAsync();
+        suggestion = await Ads.SuggestBoostAsync();
+    }
+
+    private AdDraft NewDraft(AdKind kind) => new()
+    {
+        Kind = kind,
+        Objective = kind == AdKind.Boost ? AdObjective.Engagement : AdObjective.Quotes,
+        RadiusKm = settings!.RadiusKm, AgeMin = settings.AgeMin, AgeMax = settings.AgeMax,
+        Instagram = settings.InstagramConnected,
+    };
+
+    private void StartBoost(Guid? postId)
+    {
+        draft = NewDraft(AdKind.Boost);
+        recap = null; errors = new Dictionary<string, string>(); feedback = null;
+        if (postId is { } id) SelectPost(id);
+    }
+
+    private void StartCampaign()
+    {
+        draft = NewDraft(AdKind.Campaign);
+        recap = null; errors = new Dictionary<string, string>(); feedback = null;
+    }
+
+    private void Cancel() { draft = null; recap = null; estimate = null; errors = new Dictionary<string, string>(); }
+
+    private void PostChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) SelectPost(id);
+        else if (draft is not null) draft.PostId = null;
+    }
+
+    private void SelectPost(Guid id)
+    {
+        if (draft is null) return;
+        draft.PostId = id;
+        var t = targets.FirstOrDefault(x => x.PostId == id);
+        draft.Source = t?.Sources.FirstOrDefault();
+        if (draft.Kind == AdKind.Campaign && t is not null && string.IsNullOrWhiteSpace(draft.Headline))
+            draft.Headline = "Ménage à Québec : devis gratuit";
+    }
+
+    private IEnumerable<string> Platforms()
+    {
+        if (draft!.Facebook) yield return "Facebook";
+        if (draft.Instagram) yield return "Instagram";
+    }
+
+    private async Task ReviewAsync()
+    {
+        if (draft is null || busy) return;
+        busy = true; action = "review";
+        try
+        {
+            errors = await Ads.ValidateAsync(draft);
+            if (errors.Count > 0) return;
+            recap = AdRules.Window(draft, Clock.GetUtcNow());
+            estimate = await Ads.EstimateAsync(draft);
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private Task LaunchAsync() => RunAsync("launch", async () =>
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+        var author = user.FindFirst("hub:name")?.Value ?? user.Identity?.Name ?? "Administrateur";
+        var r = await Ads.LaunchAsync(draft!, author);
+        if (r.IsSuccess) Cancel();
+        return (r.IsSuccess ? Result.Success() : Result.Failure(r.Error!),
+            "Publicité envoyée à Meta : elle sera diffusée après l'examen de l'annonce (de quelques minutes à 24 h).");
+    });
+
+    private Task ConnectAsync() => RunAsync("connect", async () =>
+    {
+        var r = await Ads.ConnectAsync(accountId, token);
+        token = "";
+        return (r.IsSuccess ? Result.Success() : Result.Failure(r.Error!), r.IsSuccess ? $"Compte publicitaire connecté : {r.Value}" : "");
+    });
+
+    private Task DisconnectAsync() => RunAsync("disconnect", async () =>
+    {
+        await Ads.DisconnectAsync();
+        return (Result.Success(), "Compte publicitaire déconnecté : les publicités en cours continuent chez Meta jusqu'à leur fin.");
+    });
+
+    private Task SaveDefaultsAsync() => RunAsync("defaults", async () =>
+        (await Ads.SaveDefaultsAsync(capText, defRadius, defAgeMin, defAgeMax), "Réglages enregistrés."));
+
+    private Task PauseAsync(Guid id) => RunAsync($"pause-{id}", async () => (await Ads.PauseAsync(id), "Publicité en pause : rien n'est dépensé pendant la pause."));
+    private Task ResumeAsync(Guid id) => RunAsync($"resume-{id}", async () => (await Ads.ResumeAsync(id), "Publicité relancée."));
+    private Task StopAsync(Guid id) => RunAsync($"stop-{id}", async () =>
+    {
+        confirmStop = null;
+        return (await Ads.StopAsync(id), "Publicité arrêtée : plus rien ne sera dépensé.");
+    });
+
+    private async Task RunAsync(string name, Func<Task<(Result Result, string Success)>> work)
+    {
+        if (busy) return;
+        busy = true; action = name;
+        try
+        {
+            var (result, success) = await work();
+            feedback = result.IsSuccess ? success : result.Error;
+            feedbackIsError = result.IsFailure;
+            await LoadAsync();
+        }
+        finally { busy = false; action = null; }
+    }
+
+    private string Money(decimal amount) => $"{amount.ToString(amount % 1 == 0 ? "0" : "0.00", AdminFormat.Fr)} $";
+
+    private static string StatusLabel(AdStatus s) => s switch
+    {
+        AdStatus.InReview => "En examen chez Meta",
+        AdStatus.Active => "Active",
+        AdStatus.Paused => "En pause",
+        AdStatus.Completed => "Terminée",
+        AdStatus.Stopped => "Arrêtée",
+        AdStatus.Rejected => "Refusée",
+        _ => "Échec du lancement",
+    };
+
+    private static string StatusClass(AdStatus s) => s switch
+    {
+        AdStatus.Active => "status-active",
+        AdStatus.InReview => "status-approval",
+        AdStatus.Completed => "status-won",
+        AdStatus.Rejected or AdStatus.Failed => "status-lost",
+        _ => "status-paused",
+    };
+
+    private static string ObjectiveLabel(AdObjective o) => o switch
+    {
+        AdObjective.Engagement => "Réactions",
+        AdObjective.Reach => "Portée",
+        _ => "Demandes de devis",
+    };
+}
