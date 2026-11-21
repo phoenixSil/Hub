@@ -73,6 +73,7 @@ ADMIN = [
     ("admin-faq", "/admin/faq"),
     ("admin-avis", "/admin/avis"),
     ("admin-avis-google", "/admin/avis-google"),
+    ("admin-publicites", "/admin/publicites"),
     ("admin-textes", "/admin/textes"),
     ("admin-pages", "/admin/pages"),
     ("admin-images", "/admin/images"),
